@@ -1,52 +1,9 @@
 -- Playing with Backwards Polish notation approach and some straigtforward naive
 -- type system
 
-{-# LANGUAGE DuplicateRecordFields #-}
-
 module Syntax where
 
-type Name = String
-
--- all available primitive types in the language that we will use as the basis vector to build the type System
-data PrimitiveType = PrimInt | PrimFloat | PrimByte | PrimVector PrimitiveType deriving (Show)
-
--- the most generic representation of (name, Type) pair, where Type can be Type, function or a 'type'
-data TypeTag = TYPE | FUNC | PrimType PrimitiveType | TypeTag Name deriving (Show)
-
--- typed variable of sorts. Int indexes variables for binding in terms
-data GenericVar = GenVar Int TypeTag deriving (Show)
--- simple type term (product)
-data ProductType = Cons Name [GenericVar] deriving (Show)
-
--- dependent type - type that can be parametrized over the list of variables 'vars',
--- e.g. Maybe a
-data DependentType = DependentType {
-    typeName :: Name,
-    vars :: [GenericVar],
-    constructors :: [ProductType]
-} deriving (Show)
-
--- concrete type - type that has been instantiated, e.g. Maybe Int
-data ConcreteType = ConcreteType {
-    typeName :: Name,
-    constructors :: [ProductType]
-} deriving (Show)
-
--- some examples
-typeBool = ConcreteType { typeName = "Bool", constructors = [Cons "False" [], Cons "True" []] }
--- dependent Maybe a
-typeMaybea = DependentType { typeName = "Maybe", vars = [GenVar 0 TYPE], constructors = [Cons "Nothing" [], Cons "Just" [GenVar 0 TYPE] ] }
--- concrete Maybe Int
-typeMaybeInt = ConcreteType {typeName = "MaybeInt", constructors = [Cons "Nothing" [], Cons "Just" [GenVar 0 (PrimType PrimInt)] ] }
--- MyType a b = MyType a b
-typeMyType = DependentType { typeName = "MyType", vars = [GenVar 0 TYPE, GenVar 1 TYPE], constructors = [Cons "MyType" [GenVar 0 TYPE, GenVar 1 TYPE] ] }
-
--- now, question is, how do we get Concrete from Dependent when instantiating type variable?
--- we have to bind specific types to our type variables and get something out as a result
--- let's start with Maybe a --> Maybe PrimInt
-
--- instantiateType depType varValues =
-
+import Typesystem
 
 data Expr
   = Float Double
