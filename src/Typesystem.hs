@@ -7,6 +7,8 @@
 
 module Typesystem where
 
+import Data.Word
+
 type Name = String
 
 -- all available primitive types in the language that we will use as the basis vector to build the type System
@@ -17,6 +19,14 @@ instance Show PrimitiveType where
     show PrimFloat = "float "
     show PrimByte = "byte "
     show (PrimVector t) = "vector " ++ (show t)
+
+-- primitive values
+data PrimitiveValue = PInt Int | PFloat Float | PByte Word8 deriving (Show)
+
+checkPrimitiveType :: PrimitiveValue -> PrimitiveType
+checkPrimitiveType (PInt _) = PrimInt
+checkPrimitiveType (PFloat _) = PrimFloat
+checkPrimitiveType (PByte _) = PrimByte
 
 -- the most generic representation of (name, Type) pair, where Type can be Type, function or a 'type'
 -- SELF__ is a dummy value used to define recursive types
