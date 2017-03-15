@@ -19,8 +19,10 @@ library
                      , Lexer
                      , Syntax
                      , Parser
+                     , Typesystem
   build-depends:       base >= 4.7 && < 5
                      , parsec
+                     , vector
   default-language:    Haskell2010
 
 executable fool-exe
