@@ -77,6 +77,13 @@ primitiveVar = Variable {
     varValue = UNDEFINED
 }
 
+-- binds Variable at place Int and returns adjusted Constructor
+-- bindVar :: Variable -> RValue -> Either String Variable
+bindVar var val =
+    if (isValueCorrectType val (varType var))
+        then (Right var{varValue = val})
+        else (Left "ERROR: Type mismatch")
+
 -- Product type constructor
 data Constructor = Constructor {
     consName :: Name,
@@ -168,12 +175,6 @@ tpDepType = SumType {
     ]
 }
 
--- binds Variable at place Int and returns adjusted Constructor
--- bindVar :: Variable -> RValue -> Either String Variable
-bindVar var val =
-    if (isValueCorrectType val (varType var))
-        then (Right var{varValue = val})
-        else (Left "ERROR: Type mismatch")
 
 {-
 -- Int - packed int
