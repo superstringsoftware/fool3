@@ -20,6 +20,7 @@ library
                      , Syntax
                      , Parser
                      , Typesystem
+                     , Typesystem2
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , vector

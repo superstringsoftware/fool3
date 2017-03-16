@@ -33,7 +33,8 @@ data BuiltinTypeValue = PInt Int | PFloat Float | PByte Word8
 data RTypeValue = TYPE | Primitive | RTypeValSum SumType
                 | RTypeValBound Int deriving (Show, Eq)-- int is an index to which Type Level var we are bound
 -- what can be assigned to value of a var
-data RValue = RValPrim BuiltinTypeValue | RValSum Constructor | RValBound Int | UNDEFINED deriving (Show, Eq)
+data RValue = RValPrim BuiltinTypeValue | RValSum Constructor
+            | RValBound Int | UNDEFINED | ERROR String deriving (Show, Eq)
 
 {-
 -- return type of the primitive value (needed for type comparisons etc)
@@ -90,6 +91,27 @@ bindVar var val =
             then (Right var{varValue = val})
             else (Left "ERROR: Type mismatch")
 -}
+
+-- Function - generic eventually, Constructor is simply one of the types????
+data Function = Function {
+    funName :: Name,
+    funVars :: [Variable],
+    definition :: [Function], -- list of function calls we need to make
+    callFunc :: [Variable] -> RValue -- executes the function and returns the result
+}
+
+pAdd :: Function
+pAdd = Function {
+    funName = "Operator +",
+    funVars = [primitiveVar, primitiveVar],
+    definition = [],
+    callFunc = primitiveAdd
+}
+
+primitiveAdd :: [Variable] -> RValue
+-- primitiveAdd ((RValPrim v1) : (RValPrim v2)) = RValPrim (v1 + v2)
+primitiveAdd _ = UNDEFINED
+
 -- Product type constructor
 data Constructor = Constructor {
     consName :: Name,
