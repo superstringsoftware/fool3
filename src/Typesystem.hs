@@ -18,7 +18,7 @@ import Data.List
 type Name = String
 
 -- all available primitive types in the language that we will use as the basis vector to build the type System
-data BuiltinType = PrimInt | PrimFloat | PrimByte | PrimReference | PrimArray BuiltinType deriving Eq
+-- data BuiltinType = PrimInt | PrimFloat | PrimByte | PrimReference | PrimArray BuiltinType deriving Eq
 
 -- primitive values
 data BuiltinTypeValue = PInt Int | PFloat Float | PByte Word8
@@ -30,11 +30,12 @@ data BuiltinTypeValue = PInt Int | PFloat Float | PByte Word8
 -- data TypeOrKind = Builtin BuiltinType | SELF | TYPE | FUNC | TypeRep SumType deriving Eq
 
 -- what can be assigned to a type
-data RTypeValue = TYPE | RTypeValPrim BuiltinType | RTypeValSum SumType
+data RTypeValue = TYPE | Primitive | RTypeValSum SumType
                 | RTypeValBound Int deriving (Show, Eq)-- int is an index to which Type Level var we are bound
 -- what can be assigned to value of a var
-data RValue = RValPrim BuiltinTypeValue | RValPrimType BuiltinType | RValSum Constructor | RValBound Int | UNDEFINED deriving (Show, Eq)
+data RValue = RValPrim BuiltinTypeValue | RValSum Constructor | RValBound Int | UNDEFINED deriving (Show, Eq)
 
+{-
 -- return type of the primitive value (needed for type comparisons etc)
 checkPrimitiveType :: BuiltinTypeValue -> BuiltinType
 checkPrimitiveType (PInt _) = PrimInt
@@ -43,18 +44,15 @@ checkPrimitiveType (PByte _) = PrimByte
 checkPrimitiveType (VInt _) = PrimArray PrimInt
 checkPrimitiveType (VFloat _) = PrimArray PrimFloat
 checkPrimitiveType (VByte _) = PrimArray PrimByte
+-}
 
--- checkRValType :: RValue 
+-- checkRValType :: RValue
 
 -- checking if RValue is of type RTypeValue
 isValueCorrectType :: RValue -> RTypeValue -> Bool
 -- checking primitives
-isValueCorrectType (RValPrim val) (RTypeValPrim tp) =
-    if (checkPrimitiveType val == tp) then True else False
-isValueCorrectType val TYPE = isValAType val
-                              where isValAType (RValPrimType _) = True
-                                    isValAType (RValSum _) = True
-                                    isValAType _ = False
+isValueCorrectType (RValSum _) TYPE = True
+isValueCorrectType _ _ = False
 
 
 
@@ -62,16 +60,21 @@ isValueCorrectType val TYPE = isValAType val
 data Variable = Variable {
     varLabel :: Name,
     varType :: RTypeValue,
-    varValue :: RValue,
-    varDefaultValue :: RValue
+    varValue :: RValue
+    -- varDefaultValue :: RValue
 } deriving (Show, Eq)
 
 -- shortcut for Variable initialization
 undefinedVar = Variable {
     varLabel = "",
     varType = TYPE,
-    varValue = UNDEFINED,
-    varDefaultValue = UNDEFINED
+    varValue = UNDEFINED
+}
+
+primitiveVar = Variable {
+    varLabel="",
+    varType = Primitive,
+    varValue = UNDEFINED
 }
 
 -- Product type constructor
@@ -81,21 +84,17 @@ data Constructor = Constructor {
     vars :: [Variable]
 } deriving (Eq)
 
-ptInt = Constructor {
+tcInt = Constructor {
     consName = "I#",
     consVars = [],
-    vars = [Variable {
-        varLabel = "",
-        varType = RTypeValPrim PrimInt,
-        varValue = UNDEFINED,
-        varDefaultValue = RValPrim (PInt 0)
-    }]
+    vars = [primitiveVar]
 }
 
-bindInt i = let vr = (head $ vars ptInt)
-                vn = vr {varValue = RValPrim (PInt i)}
-                in ptInt {vars = [vn]}
-
+tpInt = SumType {
+    typeName = "Int",
+    typeVars = [],
+    constructors = [tcInt]
+}
 
 -- Every concrete Type is a SumType of Products!
 data SumType = SumType {
@@ -114,12 +113,14 @@ data SumType = SumType {
 instance Show SumType where
     show st = (typeName st) ++ show (typeVars st) ++ " = " ++ show (constructors st)
 
+{-
 instance Show BuiltinType where
     show PrimInt = "int "
     show PrimFloat = "float "
     show PrimByte = "byte "
     show PrimReference = "reference "
     show (PrimArray t) = "array " ++ (show t)
+-}
 
 instance Show Constructor where
     show pc
@@ -142,12 +143,12 @@ tpBool = SumType {
 -- Maybe a = Nothing | Just a
 tpMaybe = SumType {
     typeName = "Maybe",
-    typeVars = [Variable {varLabel="a", varType = TYPE, varValue=UNDEFINED, varDefaultValue=UNDEFINED}],
+    typeVars = [undefinedVar {varLabel="a"}],
     constructors = [
         Constructor {consName = "Nothing", consVars = [], vars = []},
         Constructor {consName = "Just",
-            consVars = [Variable {varLabel="a", varType = TYPE, varValue=RValBound 0, varDefaultValue=UNDEFINED}],
-            vars     = [Variable {varLabel="", varType = RTypeValBound 0, varValue=UNDEFINED, varDefaultValue=UNDEFINED}]
+            consVars = [undefinedVar {varLabel="a", varValue=RValBound 0}],
+            vars     = [undefinedVar {varType = RTypeValBound 0}]
         }
     ]
 }
@@ -155,12 +156,12 @@ tpMaybe = SumType {
 tpDepType = SumType {
     typeName = "DepTypeExample",
     typeVars = [undefinedVar {varLabel="a", varType = TYPE},
-                undefinedVar {varLabel="n", varType = RTypeValPrim PrimInt}
+                undefinedVar {varLabel="n", varType = RTypeValSum tpInt}
                ],
     constructors = [
         Constructor {consName = "DepType",
             consVars = [undefinedVar {varLabel="a", varType = TYPE, varValue=RValBound 0},
-                        undefinedVar {varLabel="n", varType = RTypeValPrim PrimInt, varValue=RValBound 0}
+                        undefinedVar {varLabel="n", varType = RTypeValSum tpInt, varValue=RValBound 0}
                        ],
             vars     = [undefinedVar {varLabel="name", varType = RTypeValSum tpMaybe}]
         }
