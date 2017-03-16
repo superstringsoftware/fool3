@@ -49,10 +49,13 @@ checkPrimitiveType (VByte _) = PrimArray PrimByte
 -- checkRValType :: RValue
 
 -- checking if RValue is of type RTypeValue
-isValueCorrectType :: RValue -> RTypeValue -> Bool
+isValueCorrectType :: RValue -> RTypeValue -> Either String Bool
 -- checking primitives
-isValueCorrectType (RValSum _) TYPE = True
-isValueCorrectType _ _ = False
+isValueCorrectType (RValSum _) TYPE = Right True
+isValueCorrectType (RValPrim _) Primitive = Right True
+isValueCorrectType (RValPrim _) _ = Left "ERROR: Trying to assign primitive value to a non-primitive var"
+isValueCorrectType UNDEFINED _ = Right True
+isValueCorrectType _ _ = Left "ERROR: Generic type mismatch when bidning a variable"
 
 
 
@@ -80,10 +83,13 @@ primitiveVar = Variable {
 -- binds Variable at place Int and returns adjusted Constructor
 -- bindVar :: Variable -> RValue -> Either String Variable
 bindVar var val =
-    if (isValueCorrectType val (varType var))
-        then (Right var{varValue = val})
-        else (Left "ERROR: Type mismatch")
-
+    let res = isValueCorrectType val (varType var)
+    in res
+    {-
+        if ()
+            then (Right var{varValue = val})
+            else (Left "ERROR: Type mismatch")
+-}
 -- Product type constructor
 data Constructor = Constructor {
     consName :: Name,
