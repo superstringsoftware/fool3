@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs, EmptyDataDecls, KindSignatures #-}
 module Syntax where
 
 import Data.Word

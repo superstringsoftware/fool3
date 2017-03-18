@@ -49,7 +49,7 @@ binops = [[binary "=" Ex.AssocLeft]
         ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
 
 expr :: Parser Expr
-expr =  Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
+expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
 
 variable :: Parser Expr
 variable = Var <$> identifier
