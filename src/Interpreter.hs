@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, TypeSynonymInstances, FlexibleInstances #-}
 module Interpreter where
 
 import Data.Word
@@ -44,12 +44,32 @@ loadModule exs = do
 findMain :: FunctionTable -> IO (Maybe Expr)
 findMain ft = H.lookup ft "main"
 
--- evalStep :: Expr -> FunctionTable -> Expr
--- evalStep (BinaryOp "*" e1 e2)
+evalStep :: Expr -> FunctionTable -> IO Expr
+evalStep e@(BinaryOp op e1 e2) ft
+    | isPrimitive e1 && isPrimitive e2 =
+        do
+            let res = execPrimitiveBinaryOp (nameToOp op) e1 e2
+            putStrLn $ "[Primitive][" ++ op ++ "]: " ++ (show res)
+            return res
+    | otherwise = do
+        putStrLn $ "[Going deeper in the call of][" ++ op ++ "]"
+        e1' <- evalStep e1 ft
+        e2' <- evalStep e2 ft
+        let res = execPrimitiveBinaryOp (nameToOp op) e1' e2'
+        return res
 
 -- evalTrace :: Expr -> IO()
 -- evalTrace e = case e of
 
+nameToOp :: String -> (forall a. Num a => a->a->a)
+nameToOp "*" = (*)
+nameToOp "+" = (+)
+nameToOp "-" = (-)
+-- nameToOp "/" = (/)
+
+isPrimitive (PInt _) = True
+isPrimitive (PFloat _) = True
+isPrimitive _ = False
 
 
 -- evalBinaryOp :: Expr -> Expr
@@ -64,6 +84,10 @@ execPrimitiveBinaryOp op (PFloat x1) (PInt x2) = PFloat (op x1 (fromIntegral x2)
 evalExprStep :: Expr -> FunctionTable -> IO()
 evalExprStep e@(Function _ _ _) ft = funTable >>= addFunction e
 -}
+
+prettyPrintFT :: FunctionTable -> IO ()
+prettyPrintFT ft = H.mapM_ f ft where
+    f (k,v) = putStrLn $ show v
 
 testPrg = "def id(x) x; def binary --> 2 (x y) x*y*x;\
 \ def fg(x y) x+(y*y);\
