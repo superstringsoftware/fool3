@@ -18,6 +18,8 @@ import Control.Applicative ((<$>))
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
+import qualified Data.Vector.Unboxed as U
+
 import Lexer
 import Syntax
 
@@ -144,7 +146,7 @@ defn = try extern
     <|> try unarydef
     <|> try binarydef
     <|> vector
-    <|> try list
+    <|> list
     <|> expr
 
 contents :: Parser a -> Parser a
@@ -179,7 +181,11 @@ vector :: Parser Expr
 vector = do
     -- we are checking something is between <>
     -- then separating this input by commas
-    -- then for each expression - first trying to read it as a float then as an int!
+    -- then for each expression - first trying to read it as a float then if it fails - as an int!
     -- cool and beautiful!
     args <- angles $ commaSep (try floating <|> int)
-    return $ ListExpr args
+    let l = map conv args where
+        conv (PInt i) = fromIntegral i
+        conv (PFloat f) = f
+    let v = U.fromList l
+    return $ VFloat v
