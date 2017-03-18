@@ -34,7 +34,7 @@ instance Show Expr where
     show (VInt v) = show v
     show (VFloat v) = show v
     show (VByte v) = show v
-    show (Var s) = s
+    show (Var s) = "(Var " ++ s ++ ")"
     show (Call nm ex) = nm ++ (show ex)
     show (Function nm vars defn) = nm ++ (show vars) ++ " ≡ " ++ (show defn)
     show (BinaryOp nm x y) = (show x) ++ nm ++ (show y)

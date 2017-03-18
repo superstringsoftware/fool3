@@ -58,6 +58,9 @@ evalStep e@(BinaryOp op e1 e2) ft
         let res = execPrimitiveBinaryOp (nameToOp op) e1' e2'
         return res
 
+evalStep e@(Call fname vars) ft = do
+    return e
+
 -- evalTrace :: Expr -> IO()
 -- evalTrace e = case e of
 
