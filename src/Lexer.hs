@@ -11,7 +11,7 @@ lexer = Tok.makeTokenParser style
   where
     ops = ["+","*","-","/",";","=",",","<",">","|",":"]
     names = ["def","extern","if","then","else","in","for"
-            ,"binary", "unary", "var"]
+            ,"binary", "unary", "var", "переменная"]
     style = emptyDef {
                Tok.commentLine = "#"
              , Tok.reservedOpNames = ops
@@ -21,6 +21,8 @@ lexer = Tok.makeTokenParser style
 integer    = Tok.integer lexer
 float      = Tok.float lexer
 parens     = Tok.parens lexer
+angles     = Tok.angles lexer -- added to parse vectors <1,2,3>
+brackets   = Tok.brackets lexer
 commaSep   = Tok.commaSep lexer
 semiSep    = Tok.semiSep lexer
 identifier = Tok.identifier lexer

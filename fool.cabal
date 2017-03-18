@@ -21,9 +21,12 @@ library
                      , Parser
                      , Typesystem
                      , Typesystem2
+                     , Interpreter
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , vector
+                     , hashtables
+                     , text
   default-language:    Haskell2010
 
 executable fool-exe

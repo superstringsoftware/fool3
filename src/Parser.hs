@@ -1,3 +1,14 @@
+--------------------------------------------------------------------
+-- |
+-- Module    :  Parser
+-- Copyright :  (c) Stephen Diehl 2013
+-- License   :  MIT
+-- Maintainer:  stephen.m.diehl@gmail.com
+-- Stability :  experimental
+-- Portability: non-portable
+--
+--------------------------------------------------------------------
+
 module Parser where
 
 import Text.Parsec
@@ -11,12 +22,10 @@ import Lexer
 import Syntax
 
 int :: Parser Expr
-int = do
-  n <- integer
-  return $ Float (fromInteger n)
+int = PInt <$> fromInteger <$> integer
 
 floating :: Parser Expr
-floating = Float <$> float
+floating = PFloat <$> float
 
 binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
 unop = Ex.Prefix (UnaryOp <$> op)
@@ -30,11 +39,12 @@ op = do
   whitespace
   return o
 
-binops = [[binary "*" Ex.AssocLeft,
+binops = [[binary "=" Ex.AssocLeft]
+        ,[binary "*" Ex.AssocLeft,
           binary "/" Ex.AssocLeft]
         ,[binary "+" Ex.AssocLeft,
           binary "-" Ex.AssocLeft]
-        ,[binary "<" Ex.AssocLeft]]
+        ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
 
 expr :: Parser Expr
 expr =  Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
@@ -87,6 +97,18 @@ for = do
   body <- expr
   return $ For var start cond step body
 
+letins :: Parser Expr
+letins = do
+  reserved "var"
+  defs <- commaSep $ do
+    var <- identifier
+    reservedOp "="
+    val <- expr
+    return (var, val)
+  reserved "in"
+  body <- expr
+  return $ foldr (uncurry Let) body defs
+
 unarydef :: Parser Expr
 unarydef = do
   reserved "def"
@@ -112,6 +134,7 @@ factor = try floating
       <|> try call
       <|> try variable
       <|> ifthen
+      <|> try letins
       <|> for
       <|> (parens expr)
 
@@ -120,6 +143,8 @@ defn = try extern
     <|> try function
     <|> try unarydef
     <|> try binarydef
+    <|> vector
+    <|> try list
     <|> expr
 
 contents :: Parser a -> Parser a
@@ -140,3 +165,21 @@ parseExpr s = parse (contents expr) "<stdin>" s
 
 parseToplevel :: String -> Either ParseError [Expr]
 parseToplevel s = parse (contents toplevel) "<stdin>" s
+
+
+-- adding new stuff
+-- polymorphic list: [x, 2+4, 1.3]
+list :: Parser Expr
+list = do
+  args <- brackets $ commaSep expr
+  return $ ListExpr args
+
+-- numeric vector: <1,2,3.4>
+vector :: Parser Expr
+vector = do
+    -- we are checking something is between <>
+    -- then separating this input by commas
+    -- then for each expression - first trying to read it as a float then as an int!
+    -- cool and beautiful!
+    args <- angles $ commaSep (try floating <|> int)
+    return $ ListExpr args
