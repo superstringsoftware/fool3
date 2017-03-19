@@ -141,20 +141,22 @@ evalStep e@(Var n) st = do
 
 
 -- the most important - executing a call
-evalStep e@(Call fname vals) state = do
+evalStep e@(Call fname vals') state = do
+    -- try resolving vals in case they are variables (need it for stacked calls)
+    vals <- mapM ((flip evalStep) state) vals'
     fn <- resolveFunction state fname
     case fn of
         f@(Function _ vars body) -> do
+
             -- first, bind vals from (Call) to vars in Function
             zipWithM_ (addBinding $ localSymTable state) vars vals
             putStrLn $ "Binding variables in a call of " ++ (show f)
             prettyPrintST (localSymTable state)
             -- now, evaluating the body with variables bound
+            putStrLn $ "Evaluating body " ++ (show body)
             res <- evalStep body state
             -- now clearing local symtable
             mapM_ (H.delete $ localSymTable state) vars
-            putStrLn "Table cleared:"
-            prettyPrintST (localSymTable state)  
             return res
         otherwise -> return fn
 
