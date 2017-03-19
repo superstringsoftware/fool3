@@ -22,7 +22,7 @@ process line st = do
 
 processCommand :: [String] -> InterpreterState ->IO InterpreterState
 processCommand (":quit":xs) st = putStrLn "Goodbye." >> exitSuccess
-processCommand (":vars":_) st = prettyPrintFT (symTable st) >> return st
+processCommand (":vars":_) st = prettyPrintST (symTable st) >> return st
 processCommand (":functions":_) st = prettyPrintFT (funTable st) >> return st
 processCommand _ st = do return st
 

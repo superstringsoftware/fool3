@@ -45,8 +45,8 @@ binops = [[binary "=" Ex.AssocLeft]
         ,[binary "*" Ex.AssocLeft,
           binary "/" Ex.AssocLeft]
         ,[binary "+" Ex.AssocLeft,
-          binary "-" Ex.AssocLeft]
-        ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
+          binary "-" Ex.AssocLeft]]
+        -- ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
 
 expr :: Parser Expr
 expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
@@ -58,7 +58,7 @@ function :: Parser Expr
 function = do
   reserved "def"
   name <- identifier
-  args <- parens $ many identifier
+  args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
   body <- expr
   return $ Function name args body
 
@@ -66,7 +66,7 @@ extern :: Parser Expr
 extern = do
   reserved "extern"
   name <- identifier
-  args <- parens $ many identifier
+  args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
   return $ Extern name args
 
 call :: Parser Expr
@@ -118,17 +118,17 @@ unarydef = do
   o <- op
   args <- parens $ many identifier
   body <- expr
-  return $ UnaryDef o args body
+  return $ Function o args body
 
 binarydef :: Parser Expr
 binarydef = do
   reserved "def"
   reserved "binary"
   o <- op
-  prec <- int
+  prec <- int <?> "integer: precedence value for the operator definition"
   args <- parens $ many identifier
   body <- expr
-  return $ BinaryDef o args body
+  return $ Function o args body
 
 factor :: Parser Expr
 factor = try floating
@@ -146,8 +146,6 @@ defn = try extern
     <|> try unarydef
     <|> try binarydef
     <|> try globalvar
-    <|> vector
-    <|> list
     <|> expr
 
 contents :: Parser a -> Parser a
