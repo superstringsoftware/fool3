@@ -116,21 +116,23 @@ findMain :: ExpressionTable -> IO (Maybe Expr)
 findMain ft = H.lookup ft "main"
 
 evalStep :: Expr -> InterpreterState -> IO Expr
-evalStep e@(BinaryOp op e1 e2) state
-    | isPrimitive e1 && isPrimitive e2 =
-        do
-            let res = execPrimitiveBinaryOp (nameToOp op) e1 e2
-            putStrLn $ "[Primitive][" ++ op ++ "(" ++ (show e1) ++ ", " ++ (show e2) ++ ")]: " ++ (show res)
-            return res
-    | otherwise = do
-        putStrLn $ "[Going deeper in the call of][ " ++ op ++ "(" ++ (show e1) ++ ", " ++ (show e2) ++ ")]"
-        e1' <- evalStep e1 state
-        e2' <- evalStep e2 state
-        let res = execPrimitiveBinaryOp (nameToOp op) e1' e2'
-        return res
-
+-- basic terminals first
 evalStep e@(PInt _) _ = return e
 evalStep e@(PFloat _) _= return e
+
+-- primitive operators (what can't be defined via functions)
+evalStep e@(BinaryOp "+" e1 e2) state =
+    case (e1, e2) of
+        (PInt x1, PInt x2) -> return $ PInt $ x1 + x2
+        (PInt x1, PFloat x2) -> return $ PFloat $ (fromIntegral x1) + x2
+        (PFloat x1, PInt x2) -> return $ PFloat $ (fromIntegral x2) + x1
+        (PFloat x1, PFloat x2) -> return $ PFloat $ x1 + x2
+        otherwise -> do
+            e1' <- evalStep e1 state
+            e2' <- evalStep e2 state
+            evalStep (BinaryOp "+" e1' e2') state
+
+
 
 -- evaluate variable - check bindings, if there are - substituting, if not - returning as is
 evalStep e@(Var n) st = do

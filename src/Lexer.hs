@@ -10,9 +10,9 @@ import qualified Text.Parsec.Token as Tok
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
   where
-    ops = ["+","*","-","/",";","=",",","|",":"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
+    ops = ["+","*","-","/",";","=",",","|",":", "::"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
     names = ["def","extern","if","then","else","in","for"
-            ,"binary", "unary", "var", "let"]
+            ,"binary", "unary", "var", "let", "data"]
     style = emptyDef {
                Tok.commentLine = "#"
              , Tok.reservedOpNames = ops
@@ -21,6 +21,7 @@ lexer = Tok.makeTokenParser style
 
 integer    = Tok.integer lexer
 float      = Tok.float lexer
+braces     = Tok.braces lexer
 parens     = Tok.parens lexer
 angles     = Tok.angles lexer -- added to parse vectors <1,2,3>
 brackets   = Tok.brackets lexer

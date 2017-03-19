@@ -145,6 +145,7 @@ defn = try extern
     <|> try function
     <|> try unarydef
     <|> try binarydef
+    <|> try record
     <|> try globalvar
     <|> expr
 
@@ -169,6 +170,16 @@ parseToplevel s = parse (contents toplevel) "<stdin>" s
 
 
 -- adding new stuff
+
+-- simple (flat) record
+record :: Parser Expr
+record = do
+  reserved "data"
+  name <- identifier
+  reservedOp "="
+  fields <- braces $ semiSep expr
+  return $ Record name [] fields
+
 -- global vars - for the interpreter only
 globalvar :: Parser Expr
 globalvar = do

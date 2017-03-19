@@ -27,6 +27,8 @@ data Expr
   -- | UnaryDef Name [Name] Expr
   | GlobalVar Name Expr -- binding for a global var, interpreter only
   | ERROR String -- debugging only?
+  -- beginning of types
+  | Record Name [(Name,Name)] [Expr] -- simple record, named, [(fieldName, typeName)]
   deriving (Eq, Ord, Show)
 
 {-

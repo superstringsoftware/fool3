@@ -8,6 +8,8 @@ import System.Console.Haskeline
 
 import System.Exit
 
+import qualified TermColors as TC
+
 process :: String -> InterpreterState -> IO InterpreterState
 process line st = do
   let res = parseToplevel line
@@ -15,7 +17,7 @@ process line st = do
     Left err -> print err >> return st
     Right ex -> do
         -- processing parsed input
-        putStrLn $ "Received expressions: " ++ (show $ length ex)
+        putStrLn $ (TC.ansifyString [TC.bold, TC.underlined] "Received expressions: ") ++ (show $ length ex)
         mapM_ print ex -- show what was parsed first
         mapM_ (processExpr st) ex -- processing expressions one by one - need to figure out how to pass STATE properly
         return st
@@ -38,10 +40,10 @@ main = do
     -- initializing interpreter state
     state <- initializeInterpreter
     -- going into the loop
-    runInputT defaultSettings (loop state)
+    runInputT defaultSettings {historyFile=Just "./.fool_history"} (loop state)
       where
       loop st = do
-        minput <- getInputLine "ready> "
+        minput <- getInputLine  "fool>"
         case minput of
           Nothing -> outputStrLn "Goodbye."
           Just input -> case input of
