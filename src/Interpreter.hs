@@ -10,56 +10,91 @@ import Syntax
 import Parser
 
 type HashTable k v = H.BasicHashTable k v
-type FunctionTable = HashTable Name Expr
+type ExpressionTable = HashTable Name Expr
 
-newFunTable :: IO FunctionTable
-newFunTable = H.new
+data InterpreterState = InterpreterState {
+    funTable :: ExpressionTable, -- global function and operator table
+    symTable :: ExpressionTable, -- global symbol table for variable bidnings
+    logs     :: [String]
+} deriving Show
 
-getFunction :: Name -> FunctionTable -> IO (Maybe Expr)
-getFunction nm ft = H.lookup ft nm
+-- initializing starting state with tables etc
+initializeInterpreter :: IO InterpreterState
+initializeInterpreter = do
+    ft <- H.new
+    st <- H.new
+    return $ InterpreterState {
+                funTable = ft,
+                symTable = st,
+                logs = []
+             }
 
-addFunction :: Expr -> FunctionTable -> IO () -- FunctionTable
-addFunction e@(Function name _ _) ft = H.insert ft name e
-addFunction e@(BinaryDef name _ _) ft = H.insert ft ("operator"++name) e
-addFunction _ ft = return ()
+-- process a single expression and alter the interpreter state correspondigly
+processExpr :: InterpreterState -> Expr -> IO InterpreterState
+processExpr st e@(Function _ _ _) = addExpression e (funTable st) >> return st
+processExpr st e@(BinaryDef _ _ _) = addExpression e (funTable st) >> return st
+processExpr st e@(UnaryDef _ _ _) = addExpression e (funTable st) >> return st
+processExpr st e@(BinaryOp name _ _) = do
+    res <- evalStep e (funTable st)
+    -- putStrLn "Evaluation:"
+    putStrLn $ show res
+    return st
+processExpr st _ = return st
 
-ftoList :: FunctionTable -> IO [(Name,Expr)]
+
+
+-- adds function or operator definition to the table
+addExpression :: Expr -> ExpressionTable -> IO () -- FunctionTable
+addExpression e@(Function name _ _) ft = H.insert ft name e
+addExpression e@(BinaryDef name _ _) ft = H.insert ft ("operator"++name) e
+addExpression e@(UnaryDef name _ _) ft = H.insert ft ("operator"++name) e
+addExpression _ ft = return ()
+
+-- add a variable binding to a table, String is a
+addBinding :: String -> Expr -> ExpressionTable -> IO ()
+addBinding sym ex st =
+    case ex of
+        (BinaryDef _ _ _) -> errf
+        (UnaryDef _ _ _)  -> errf
+        (Function _ _ _)  -> errf
+        (Var _)           -> errf
+        otherwise -> do H.insert st sym ex
+    where errf = do putStrLn "[ERROR] Can't bind a Function / Operator or a Var declaration!"
+
+ftoList :: ExpressionTable -> IO [(Name,Expr)]
 ftoList = H.toList
 
-{-
-initBuiltinOps :: IO FunctionTable
-initBuiltinOps = do
-    ft <- H.new
-    addFunction (BinaryDef "*" )
--}
-
 -- process one module (file) and building top-level operator and function table
-loadModule :: [Expr] -> IO FunctionTable
-loadModule exs = do
-    ft <- H.new
-    mapM_ (flip addFunction $ ft) exs
-    return ft
+loadModule :: [Expr] -> InterpreterState -> IO InterpreterState
+loadModule exs st = do
+    let ft = funTable st
+    mapM_ (flip addExpression $ ft) exs
+    return st
 
 -- getting main function from the function table
-findMain :: FunctionTable -> IO (Maybe Expr)
+findMain :: ExpressionTable -> IO (Maybe Expr)
 findMain ft = H.lookup ft "main"
 
-evalStep :: Expr -> FunctionTable -> IO Expr
+evalStep :: Expr -> ExpressionTable -> IO Expr
 evalStep e@(BinaryOp op e1 e2) ft
     | isPrimitive e1 && isPrimitive e2 =
         do
             let res = execPrimitiveBinaryOp (nameToOp op) e1 e2
-            putStrLn $ "[Primitive][" ++ op ++ "]: " ++ (show res)
+            putStrLn $ "[Primitive][" ++ op ++ "(" ++ (show e1) ++ ", " ++ (show e2) ++ ")]: " ++ (show res)
             return res
     | otherwise = do
-        putStrLn $ "[Going deeper in the call of][" ++ op ++ "]"
+        putStrLn $ "[Going deeper in the call of][ " ++ op ++ "(" ++ (show e1) ++ ", " ++ (show e2) ++ ")]"
         e1' <- evalStep e1 ft
         e2' <- evalStep e2 ft
         let res = execPrimitiveBinaryOp (nameToOp op) e1' e2'
         return res
 
+evalStep e@(PInt _) _ = return e
+evalStep e@(PFloat _) _= return e
 evalStep e@(Call fname vars) ft = do
     return e
+
+evalStep e _ = return $ ERROR ("Not implemented eval: " ++ (show e))
 
 -- evalTrace :: Expr -> IO()
 -- evalTrace e = case e of
@@ -81,14 +116,14 @@ execPrimitiveBinaryOp op (PInt x1) (PInt x2) = PInt (op x1 x2)
 execPrimitiveBinaryOp op (PFloat x1) (PFloat x2) = PFloat (op x1 x2)
 execPrimitiveBinaryOp op (PInt x1) (PFloat x2) = PFloat (op (fromIntegral x1) x2)
 execPrimitiveBinaryOp op (PFloat x1) (PInt x2) = PFloat (op x1 (fromIntegral x2))
--- execPrimitiveBinaryOp op e1 e2 =
+execPrimitiveBinaryOp op e1 e2 = ERROR ("Not implemented op: (" ++ (show e1) ++ ", " ++ (show e2) ++ ")")
 
 {-
 evalExprStep :: Expr -> FunctionTable -> IO()
 evalExprStep e@(Function _ _ _) ft = funTable >>= addFunction e
 -}
 
-prettyPrintFT :: FunctionTable -> IO ()
+prettyPrintFT :: ExpressionTable -> IO ()
 prettyPrintFT ft = H.mapM_ f ft where
     f (k,v) = putStrLn $ show v
 

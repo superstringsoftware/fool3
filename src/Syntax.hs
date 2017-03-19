@@ -25,6 +25,7 @@ data Expr
   | Let Name Expr Expr
   | BinaryDef Name [Name] Expr
   | UnaryDef Name [Name] Expr
+  | ERROR String -- debugging only?
   deriving (Eq, Ord)
 
 instance Show Expr where
@@ -39,3 +40,5 @@ instance Show Expr where
     show (Function nm vars defn) = nm ++ (show vars) ++ " ≡ " ++ (show defn)
     show (BinaryOp nm x y) = (show x) ++ nm ++ (show y)
     show (BinaryDef nm vars defn) = "operator " ++ nm ++ " " ++ (show vars) ++ " ≡ " ++ (show defn)
+    show (Let nm e1 e2) = "let " ++ nm ++ (show e1) ++ (show e2)
+    show (ERROR s) = "[ERROR] " ++ s
