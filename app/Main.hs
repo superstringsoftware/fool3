@@ -21,9 +21,17 @@ process line st = do
         return st
 
 processCommand :: [String] -> InterpreterState ->IO InterpreterState
-processCommand (":quit":xs) st = do putStrLn "Goodbye." >> exitSuccess
+processCommand (":quit":xs) st = putStrLn "Goodbye." >> exitSuccess
+processCommand (":vars":_) st = prettyPrintFT (symTable st) >> return st
+processCommand (":functions":_) st = prettyPrintFT (funTable st) >> return st
 processCommand _ st = do return st
 
+showHelp :: IO ()
+showHelp = do
+    putStrLn "Available commands:"
+    putStrLn ":quit -- quit"
+    putStrLn ":vars -- list all global vars"
+    putStrLn ":functions -- list all global functions"
 
 main :: IO ()
 main = do
@@ -36,8 +44,9 @@ main = do
         minput <- getInputLine "ready> "
         case minput of
           Nothing -> outputStrLn "Goodbye."
-          Just input -> case input !! 0 of
+          Just input -> case input of
+              ([]) -> liftIO showHelp >> (loop st)
               -- if starts with ":" - then it's a command
-              ':' -> (liftIO $ processCommand (words input) st) >>= loop
+              (':':_) -> (liftIO $ processCommand (words input) st) >>= loop
               -- otherwise parsing our language input
               otherwise -> (liftIO $ process input st) >>= loop

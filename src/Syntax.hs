@@ -25,6 +25,7 @@ data Expr
   | Let Name Expr Expr
   | BinaryDef Name [Name] Expr
   | UnaryDef Name [Name] Expr
+  | GlobalVar Name Expr -- binding for a global var, interpreter only
   | ERROR String -- debugging only?
   deriving (Eq, Ord)
 
@@ -42,3 +43,4 @@ instance Show Expr where
     show (BinaryDef nm vars defn) = "operator " ++ nm ++ " " ++ (show vars) ++ " ≡ " ++ (show defn)
     show (Let nm e1 e2) = "let " ++ nm ++ (show e1) ++ (show e2)
     show (ERROR s) = "[ERROR] " ++ s
+    show (GlobalVar v def) = "Var " ++ v ++ " ≡ " ++ (show def)

@@ -101,7 +101,7 @@ for = do
 
 letins :: Parser Expr
 letins = do
-  reserved "var"
+  reserved "let"
   defs <- commaSep $ do
     var <- identifier
     reservedOp "="
@@ -145,6 +145,7 @@ defn = try extern
     <|> try function
     <|> try unarydef
     <|> try binarydef
+    <|> try globalvar
     <|> vector
     <|> list
     <|> expr
@@ -170,6 +171,15 @@ parseToplevel s = parse (contents toplevel) "<stdin>" s
 
 
 -- adding new stuff
+-- global vars - for the interpreter only
+globalvar :: Parser Expr
+globalvar = do
+  reserved "var"
+  var <- identifier
+  reservedOp "="
+  val <- expr
+  return $ GlobalVar var val
+
 -- polymorphic list: [x, 2+4, 1.3]
 list :: Parser Expr
 list = do

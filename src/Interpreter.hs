@@ -31,14 +31,24 @@ initializeInterpreter = do
 
 -- process a single expression and alter the interpreter state correspondigly
 processExpr :: InterpreterState -> Expr -> IO InterpreterState
+-- binding functions and ops
 processExpr st e@(Function _ _ _) = addExpression e (funTable st) >> return st
 processExpr st e@(BinaryDef _ _ _) = addExpression e (funTable st) >> return st
 processExpr st e@(UnaryDef _ _ _) = addExpression e (funTable st) >> return st
+
+-- executing binary op
 processExpr st e@(BinaryOp name _ _) = do
     res <- evalStep e (funTable st)
     -- putStrLn "Evaluation:"
     putStrLn $ show res
     return st
+
+-- binding a global variable
+processExpr st (GlobalVar name ex) = do
+    let stable = symTable st
+    addBinding name ex stable
+    return st
+
 processExpr st _ = return st
 
 
