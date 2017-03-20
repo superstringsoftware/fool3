@@ -42,7 +42,10 @@ extern random, print
 map (f, X) ≡ {f (x) | ∀x ∊ X}
 square (x) ≡ x * x
 
-v1 = <random | times n>
-v2 = map (f, v1)
+v1 = <random | times 10>
+v2 = map (square, v1)
 
 print (v1, v2)
+
+---------------------------
+data Address = city, street, country : String; 

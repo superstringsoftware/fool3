@@ -253,17 +253,27 @@ var _l = {
         var cons = Types.findConstructor(consName);
         //console.log(cons);
         return cons.create(values);
+    },
+
+    // pattern matching on constructors
+    match: function (expr, pattern, func) {
+        console.log(expr);
+        console.log(pattern);
+        console.log(func);
+
     }
 }
 
 
 // ****************************************************************************
 
+function info (t) {
+    //console.log(t);
+    console.dir(t, {depth: null, colors: true});
+};
+
 function tests() {
-    var info = function(t) {
-        //console.log(t);
-        console.dir(t, {depth: null, colors: true});
-    };
+
     var t0 = new ProductConstructor("Strange", [Types.Any]);
     var t01 = new ProductConstructor("Weird", [Types.Any]);
     var vt1 = t0.create([1]);
@@ -331,50 +341,42 @@ function tests() {
 
     var tval = _l.n ("Nil");
     var tval1 = _l.n ("Just", [5]);
+    var tval2 = _l.n ("Cell", [1, _l.n("Cell", [2, _l.n("Nil")])]);
     info(tval.show);
     info(tval1.show);
+    info(tval2.show);
+
     //info(Types);
 
 }
 
-tests();
+function calculator() {
+    var calcADT = _l.data ("Expr", {
+        Value: [Types.Number],
+        Add: [Types.__SELF__, Types.__SELF__],
+        Mul: [Types.__SELF__, Types.__SELF__]
+    });
+    info(calcADT.show);
 
+    var valE = _l.n ("Value",[10]);
+    info(valE.show);
 
+    var addE = _l.n ("Add", [valE, _l.n("Value", [20])]);
+    info (addE.show);
 
+    // evaluation function
+    var eval = function (e) {
+        // how many params to match
+        _l.match (e, { Value: 'x'}, function(x) {console.log(x);});
+        _l.match (e, { Add:
+                        [{ Value: 'x'},
+                         { Value: 'y'}]
+                     }, function(x,y) {return false;});
+    }
 
-/*
-var just = new ProductConstructor("Just", [{name: "0", type: Types.Any}]);
-var nothing = new ProductConstructor("Nothing");
-
-var just1 = just.create({0: 1});
-
-nothing.show();
-just.show();
-//just1.show();
-
-var maybea = new SumType("Maybe", [nothing, just]);
-console.log(maybea);
-
-var cons = new ProductConstructor("Cons", [{name: "0", type: "any"}, {name: "0", type: "List"}] );
-
-console.log(Types);
-
-t = new Value(Types.Any);
-console.log(t);
-k = new Value(10);
-
-var List = {
-    Nil: "Nil"
+    eval(valE);
+    //eval(addE);
 }
 
-var Cons = function (val, list) {
-    ret = {};
-    ret[0] = val;
-    ret[1] = list;
-    return ret;
-}
-
-var l1 = Cons (1, Cons(2, Cons (3, List.Nil)));
-
-console.log (l1);
-*/
+//tests();
+calculator();
