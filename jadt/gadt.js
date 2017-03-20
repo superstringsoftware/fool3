@@ -262,12 +262,16 @@ function tests() {
     info(mt.C.Just.create([1]).show);
     info(mt.C.Just.create(["hello"]).show);
     console.log("\nList a = Nil | Cell a (List a)");
-    var lt = new SumType("List a",
+    var lt = new SumType("List",
                          [
                              new ProductConstructor("Nil"),
                              new ProductConstructor("Cell", [Types.Any, Types.__SELF__])
                          ]);
     info(lt.show);
+    var vl = Types.List.C.Cell.create([1,
+             Types.List.C.Cell.create([2,
+             Types.List.C.Nil.create()]) ]   );
+    info(vl.show);
     //console.log("\nAll types dump:");
     //info(Types);
 
