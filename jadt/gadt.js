@@ -44,6 +44,13 @@ function SumType (name, constructors) {
     // mapping constructors for named access
     for (var i = 0; i<constructors.length; i++) {
         this._consMap[constructors[i]._name] = constructors[i];
+        for (prop in constructors[i]._fields) {
+            var t = constructors[i]._fields[prop];
+            if (t === Types.__SELF__) {
+                //console.log("Found recursion!");
+                constructors[i]._fields[prop] = this;
+            }
+        }
     }
     // processing recursion
     Types[name] = this;
@@ -63,10 +70,13 @@ SumType.prototype = {
     },
     // pretty print type signature
     get show() {
+        if (this._SHOW_RECURSION_) return ("("+this._name+")");
+        this._SHOW_RECURSION_ = true;
         str = this._name + " = ";
         for (var prop in this._consMap)
             str += this._consMap[prop].show + " | ";
         str = str.substring(0, str.length-3);
+        this._SHOW_RECURSION_ = false;
         return str;
     }
 }
