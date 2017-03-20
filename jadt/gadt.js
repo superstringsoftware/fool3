@@ -23,6 +23,17 @@ var Types = {
         return ((tp instanceof BuiltinType) ||
                 (tp instanceof ProductConstructor) ||
                 (tp instanceof SumType));
+    },
+
+    // find a constructor by name
+    findConstructor: function(name) {
+        for (tp in this) {
+            if (this[tp] instanceof SumType) {
+                //console.log(tp, typeof this[tp]);
+                if (this[tp].C[name]) return this[tp].C[name];
+            }
+        }
+        throw "Constructor " + name + " doesn't exist";
     }
 
 }
@@ -44,6 +55,7 @@ function SumType (name, constructors) {
     // mapping constructors for named access
     for (var i = 0; i<constructors.length; i++) {
         this._consMap[constructors[i]._name] = constructors[i];
+        // processing any recursive type definitions if found
         for (prop in constructors[i]._fields) {
             var t = constructors[i]._fields[prop];
             if (t === Types.__SELF__) {
@@ -70,13 +82,14 @@ SumType.prototype = {
     },
     // pretty print type signature
     get show() {
+        // _SHOW_RECURSION_ is used to display recursive types properly
         if (this._SHOW_RECURSION_) return ("("+this._name+")");
         this._SHOW_RECURSION_ = true;
-        str = this._name + " = ";
+        str = "data " + this._name + " = ";
         for (var prop in this._consMap)
             str += this._consMap[prop].show + " | ";
         str = str.substring(0, str.length-3);
-        this._SHOW_RECURSION_ = false;
+        delete this._SHOW_RECURSION_;
         return str;
     }
 }
@@ -214,6 +227,35 @@ ProductConstructor.prototype = {
 };
 
 
+var _l = {
+    // definition of a new datatype
+    /* _l.data ("Tree", {
+                 Leaf: [Types.Any],
+                 Branches: [Types.__SELF__, Types.__SELF__]
+             });
+    ) */
+    data: function(name, cons) {
+        var constructors = [];
+        for (prop in cons) {
+            constructors.push(new ProductConstructor(prop,cons[prop]));
+        }
+        //console.log(constructors);
+        var ret = new SumType(name, constructors);
+        //console.log(ret);
+        return ret;
+    },
+
+    T: Types, // alias for Types
+
+    //instanciate new value based on a constructor name
+    // _l.n ("Just", [5]) --> Just 5
+    n: function (consName, values) {
+        var cons = Types.findConstructor(consName);
+        //console.log(cons);
+        return cons.create(values);
+    }
+}
+
 
 // ****************************************************************************
 
@@ -248,7 +290,7 @@ function tests() {
     console.log(t1.isValue(v1));
     console.log(t2.isValue(v1));
     console.log("\nMaybe a = Nothing | Just a");
-    var mt = new SumType("Maybe a",
+    var mt = new SumType("Maybe",
                          [
                              new ProductConstructor("Nothing"),
                              new ProductConstructor("Just", [Types.Any])
@@ -274,10 +316,30 @@ function tests() {
     info(vl.show);
     //console.log("\nAll types dump:");
     //info(Types);
+    var x = Types.findConstructor("Nil");
+    //console.log(x);
+    //Types.findConstructor("Nilasf");
+    var tree = _l.data ("Tree", {
+                 Leaf: [Types.Any],
+                 Branches: [Types.__SELF__, Types.__SELF__]
+             }
+    );
+    var booltype = _l.data ("Bool", {True: [], False: []});
+    info(tree.show);
+    info(booltype.show);
+    info(_l.n("True").show);
+
+    var tval = _l.n ("Nil");
+    var tval1 = _l.n ("Just", [5]);
+    info(tval.show);
+    info(tval1.show);
+    //info(Types);
 
 }
 
 tests();
+
+
 
 
 /*
