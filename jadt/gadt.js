@@ -278,7 +278,7 @@ function tests() {
     var t01 = new ProductConstructor("Weird", [Types.Any]);
     var vt1 = t0.create([1]);
     var vt2 = t01.create([vt1]);
-    //info(vt2);
+    info(vt2);
     info(vt2.show);
 
     console.log("\nanonymous record type:");
@@ -346,7 +346,7 @@ function tests() {
     info(tval1.show);
     info(tval2.show);
 
-    //info(Types);
+    info(Types);
 
 }
 
@@ -378,5 +378,5 @@ function calculator() {
     //eval(addE);
 }
 
-//tests();
+tests();
 calculator();

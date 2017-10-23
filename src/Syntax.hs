@@ -48,3 +48,22 @@ instance Show Expr where
     show (ERROR s) = "[ERROR] " ++ s
     show (GlobalVar v def) = "Var " ++ v ++ " ≡ " ++ (show def)
 -}
+
+
+-- next attempt, based on what's in docs/base. For now it's basically incorrect,
+-- need to handle the hierarchy of TypeFunction --> TypeConstructor --> Value correctly
+
+-- types in the system
+data AllTypes = BOTTOM | TOP | EMPTY | UNIT | Type deriving Show
+
+-- record holding generic variable that can be indexing values or types
+data Variable = Variable String AllTypes deriving Show
+
+data TypeFunction = TypeFunction Name [Variable] deriving Show
+
+data Expr2
+  = PrimFloat !Double -- primitive values
+  | PrimInt !Int
+  | PrimByte !Word8
+
+  deriving (Eq, Ord, Show)
