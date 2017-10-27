@@ -1,0 +1,7 @@
+def fn (x y) x+y;
+
+var t = 100;
+
+var vec = <1,2,3,4>;
+
+def main() fn (4,5);

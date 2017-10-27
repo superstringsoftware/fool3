@@ -15,12 +15,10 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib
-                     , Lexer
+  exposed-modules:     Lexer
                      , Syntax
                      , Parser
-                     , Typesystem
-                     , Typesystem2
+                     , Core
                      , Interpreter
                      , TermColors
   build-depends:       base >= 4.7 && < 5
@@ -28,6 +26,7 @@ library
                      , vector
                      , hashtables
                      , text
+                     , directory
   default-language:    Haskell2010
 
 executable fool-exe
@@ -38,6 +37,7 @@ executable fool-exe
                      , fool
                      , mtl
                      , haskeline
+                     , directory
   default-language:    Haskell2010
 
 test-suite fool-test

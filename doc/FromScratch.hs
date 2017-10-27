@@ -6,6 +6,37 @@ rec = name:String * age:Int * dob:Date -- record with named fields
 tuple = Int * Int -- unnamed fields
 typeTuple = a:Type * b:Type * v:F(Type, Int) -- tuple with type variables and a type constructor that takes Type and Int
 
+-- what if we want to do something like:
+-- defining data fields and then a getter function that returns full name  
+data Person = Person {fname, lname:String; age:Int; dob:Date; name = fname + " " + lname; } 
+data Company = Company {name:String; address: Address}
+
+data Entities = Person + Company -- SumType meaning that both Person and Company are parts of it. Can we do it?
+
+data Subsidiary = Company * parent:Company -- how about this? Extending via ProductType?
+data ExtPerson = Person * siblings:List Person
+
+data Strange a = Strange (Int * String * List a) + End
+
+data List a = Cell (:a * :List a) + Nil
+data Maybe a = Just :a + Nothing 
+
+-- record syntax - same keywords as unnamed tuples, the only difference - tuples don't have field names
+data Person = Person (
+      fname:String
+    * lname:String
+    * age:Int
+    * dob:Date
+    * siblings:[Person]
+  )
+
+-- then we can do function calls with named parameters e.g.:
+square (length:Float, width:Float) = length * width
+-- then we can do
+square 4 5
+-- or
+sq10 = square (width=10) -- partial application with the 2nd parameter
+
 -- collections:
 -- {} - generic Set, simply a bunch of different elements together
 -- <> - Vector, array based hi-performance

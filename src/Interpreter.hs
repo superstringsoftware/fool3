@@ -73,8 +73,8 @@ processExpr st e@(BinaryOp name _ _) = do
 
 -- executing function call
 processExpr st e@(Call _ _) = do
+    putStrLn "Evaluation:"
     res <- evalStep e st
-    -- putStrLn "Evaluation:"
     putStrLn $ show res
     return st
 

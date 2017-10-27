@@ -12,7 +12,7 @@
 module Parser where
 
 import Text.Parsec
-import Text.Parsec.String (Parser)
+import Text.Parsec.String (Parser, parseFromFile)
 import Control.Applicative ((<$>))
 
 import qualified Text.Parsec.Expr as Ex
@@ -126,7 +126,7 @@ binarydef = do
   reserved "binary"
   o <- op
   prec <- int <?> "integer: precedence value for the operator definition"
-  args <- parens $ many identifier
+  args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
   body <- expr
   return $ Function o args body
 
@@ -167,6 +167,9 @@ parseExpr s = parse (contents expr) "<stdin>" s
 
 parseToplevel :: String -> Either ParseError [Expr]
 parseToplevel s = parse (contents toplevel) "<stdin>" s
+
+-- parse a given file
+parseToplevelFile name = parseFromFile (contents toplevel) name
 
 
 -- adding new stuff
