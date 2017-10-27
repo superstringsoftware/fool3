@@ -84,14 +84,10 @@ loop = do
 
 main :: IO ()
 main = do
-    -- initializing interpreter state
-    state <- initializeInterpreter
-    evalStateT (put state) state
-
-    -- dir <- getCurrentDirectory
-    -- putStrLn dir 
-
-    -- going into the loop
+    
+    -- setting up Haskeline loop
     let act = runInputT defaultSettings {historyFile=Just "./.fool_history"} loop
-    evalStateT act state
+    
+    -- getting to the right monad in our crazy monad stack
+    initializeInterpreter >>= evalStateT act
       
