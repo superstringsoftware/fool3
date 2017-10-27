@@ -15,6 +15,10 @@ data Expr
   | VFloat (U.Vector Double)
   | VByte (U.Vector Word8)
   | Var String -- variable symbol with a name
+  | DataDef Name [Expr] [Expr] -- data Name, then type vars, then constructors: data List a = Cell a (List a) | Nil
+  | Constructor Name [Expr] -- constructor only, Name then Types or Vars: Cell a (List a)
+  | ParametricType Name [Expr] -- Parametric type call used in constructor definitions, e.g. List a inside Cell
+  | Type Name -- Concrete type
   | Call Name [Expr] -- function call; should we move operator calls here???
   | Function Name [Name] Expr -- function definition: name, variable names, expr
   | Extern Name [Name] -- external function declaration
@@ -54,16 +58,10 @@ instance Show Expr where
 -- need to handle the hierarchy of TypeFunction --> TypeConstructor --> Value correctly
 
 -- types in the system
-data AllTypes = BOTTOM | TOP | EMPTY | UNIT | Type deriving Show
+-- data AllTypes = BOTTOM | TOP | EMPTY | UNIT | Type deriving Show
 
 -- record holding generic variable that can be indexing values or types
-data Variable = Variable String AllTypes deriving Show
+-- data Variable = Variable String AllTypes deriving Show
 
-data TypeFunction = TypeFunction Name [Variable] deriving Show
+-- data TypeFunction = TypeFunction Name [Variable] deriving Show
 
-data Expr2
-  = PrimFloat !Double -- primitive values
-  | PrimInt !Int
-  | PrimByte !Word8
-
-  deriving (Eq, Ord, Show)

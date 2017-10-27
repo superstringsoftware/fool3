@@ -1,6 +1,27 @@
 -- from scratch definition attempt, bottom up
 -- starting with primitive types basis - int, float, byte, ref and their arrays (vectors?)
 
+-- Tuple:
+tuple = (x1, x2, x3...) -- xi can be any value, *including* types!
+record = (n1:t1, n2:t2, n3:t3...)
+
+-- data constructors
+F (x1:t1, x2:t2...) = (x1, x2, ...) -- returns a tuple
+Just (x:a) = x
+Nothing () = ()
+
+Cell (x:a, l:List (a)) = (x, l) -- returns a tuple
+Nil = ()
+
+Point (x:Float, y:Float) = (x, y)
+Rectangle (p:Point, w, h: Float) = p * w * h
+
+Vector (n:Int, a:Type) = (size = n, data = newArray(n,a)):Vector(n,a)
+Vector (4, Float) = (4, newArray(4, Float)):Vector(4, Float)
+
+ 
+
+
 -- Product type (record, named or unnamed):
 rec = name:String * age:Int * dob:Date -- record with named fields
 tuple = Int * Int -- unnamed fields
@@ -29,6 +50,17 @@ data Person = Person (
     * dob:Date
     * siblings:[Person]
   )
+
+-- syntactic sugar for same type variables
+data Person = Person (
+      fname, lname:String
+    * age:Int
+    * dob:Date
+    * siblings:<Person>
+  )
+
+data List a:* = Cell :a :(List a) + Nil
+ 
 
 -- then we can do function calls with named parameters e.g.:
 square (length:Float, width:Float) = length * width

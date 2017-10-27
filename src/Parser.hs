@@ -48,6 +48,10 @@ binops = [[binary "=" Ex.AssocLeft]
           binary "-" Ex.AssocLeft]]
         -- ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
 
+-- helper parsers: lower case and upper case
+lIdentifier = skipMany space >> lookAhead lower >> identifier
+uIdentifier = skipMany space >> lookAhead upper >> identifier
+
 expr :: Parser Expr
 expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
 
@@ -130,6 +134,30 @@ binarydef = do
   body <- expr
   return $ Function o args body
 
+
+-- this, parametricType and dataDef parses haskell based data hello = Text a b | Nil type of data definitions
+constructor :: Parser Expr
+constructor = do
+  name <- uIdentifier
+  types <- many $ try (Type <$> uIdentifier) <|> try (Var <$> lIdentifier) <|> (parens parametricType) 
+  return $ Constructor name types
+
+parametricType :: Parser Expr
+parametricType = do
+  name <- uIdentifier
+  vars <- many1 $ try (Type <$> uIdentifier) <|> try (Var <$> lIdentifier) <|> (parens parametricType)
+  return $ ParametricType name vars 
+
+dataDef :: Parser Expr
+dataDef = do
+  reserved "data"
+  name <- uIdentifier
+  vars <- many variable
+  reservedOp "="
+  fields <- sepBy1 constructor (char '|')
+  return $ DataDef name vars fields
+
+
 factor :: Parser Expr
 factor = try floating
       <|> try int
@@ -142,6 +170,7 @@ factor = try floating
 
 defn :: Parser Expr
 defn = try extern
+    <|> try dataDef
     <|> try function
     <|> try unarydef
     <|> try binarydef

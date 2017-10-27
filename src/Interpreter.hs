@@ -18,6 +18,7 @@ data InterpreterState = InterpreterState {
     funTable :: ExpressionTable, -- global function and operator table
     symTable :: ExpressionTable, -- global symbol table for variable bidnings
     localSymTable :: ExpressionTable, -- local table in the current scope (e.g., when processing a function call)
+    typeTable :: ExpressionTable,
     logs     :: [String]
 } deriving Show
 
@@ -44,14 +45,27 @@ resolveFunction st name = do
         let (Just x) = fun
         return x
 
+
+-- resolve a function in a global scope (should we have it in local as well, lambdas for instance?)
+resolveType :: InterpreterState -> Name -> IO Expr
+resolveType st name = do
+    fun <- H.lookup (typeTable st) name
+    if (fun == Nothing) then return $ ERROR $ "Couldn't resolve function " ++ name
+    else do
+        let (Just x) = fun
+        return x
+
+
 -- initializing starting state with tables etc
 initializeInterpreter :: IO InterpreterState
 initializeInterpreter = do
     ft <- H.new
     st <- H.new
     lt <- H.new
+    tt <- H.new
     return $ InterpreterState {
                 funTable = ft,
+                typeTable = tt,
                 symTable = st,
                 localSymTable = lt,
                 logs = []
@@ -63,7 +77,7 @@ processExpr :: InterpreterState -> Expr -> IO InterpreterState
 processExpr st e@(Function _ _ _) = addExpression e (funTable st) >> return st
 -- processExpr st e@(BinaryDef _ _ _) = addExpression e (funTable st) >> return st
 -- processExpr st e@(UnaryDef _ _ _) = addExpression e (funTable st) >> return st
-
+processExpr st e@(DataDef _ _ _) = addExpression e (typeTable st) >> return st
 -- executing binary op
 processExpr st e@(BinaryOp name _ _) = do
     res <- evalStep e st
@@ -90,6 +104,7 @@ addExpression :: Expr -> ExpressionTable -> IO () -- FunctionTable
 addExpression e@(Function name _ _) ft = H.insert ft name e
 -- addExpression e@(BinaryDef name _ _) ft = H.insert ft ("operator"++name) e
 -- addExpression e@(UnaryDef name _ _) ft = H.insert ft ("operator"++name) e
+addExpression e@(DataDef name _ _) tt = H.insert tt name e
 addExpression _ ft = return ()
 
 -- add a variable binding to a table, String is a
@@ -190,6 +205,11 @@ execPrimitiveBinaryOp op e1 e2 = ERROR ("Not implemented op: (" ++ (show e1) ++ 
 evalExprStep :: Expr -> FunctionTable -> IO()
 evalExprStep e@(Function _ _ _) ft = funTable >>= addFunction e
 -}
+
+-- print types
+prettyPrintTT :: ExpressionTable -> IO ()
+prettyPrintTT ft = H.mapM_ f ft where
+    f (k,v) = putStrLn $ show v
 
 -- print functions
 prettyPrintFT :: ExpressionTable -> IO ()

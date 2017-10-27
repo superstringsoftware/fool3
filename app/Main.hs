@@ -29,6 +29,7 @@ processCommand :: [String] -> InterpreterState ->IO InterpreterState
 processCommand (":quit":_) st = putStrLn "Goodbye." >> exitSuccess
 processCommand (":vars":_) st = prettyPrintST (symTable st) >> return st
 processCommand (":functions":_) st = prettyPrintFT (funTable st) >> return st
+processCommand (":types":_) st = prettyPrintTT (typeTable st) >> return st
 processCommand (":load":xs) st = loadFile (head xs) st >>= return
 processCommand (":run":_) st = run st >>= return
 processCommand _ st = do return st
@@ -58,6 +59,7 @@ showHelp = do
     putStrLn ":quit -- quit"
     putStrLn ":vars -- list all global vars"
     putStrLn ":functions -- list all global functions"
+    putStrLn ":types -- list all types"
     putStrLn ":load <name> -- load and interpret file <name>"
     putStrLn ":run -- execute main() if it is present"
 
