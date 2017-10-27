@@ -11,6 +11,11 @@ import Parser
 
 import Control.Monad (zipWithM_)
 
+import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
+import Control.Monad.IO.Class (liftIO)
+
+type IntState a = StateT InterpreterState IO a
+
 type HashTable k v = H.BasicHashTable k v
 type ExpressionTable = HashTable Name Expr
 
@@ -23,11 +28,12 @@ data InterpreterState = InterpreterState {
 } deriving Show
 
 -- resolves a symbol by name starting with local scope and going up
-resolveSymbol :: InterpreterState -> Name -> IO Expr
-resolveSymbol st name = do
-    loc <- H.lookup (localSymTable st) name
+resolveSymbol :: Name -> IntState Expr
+resolveSymbol name = do
+    st <- get
+    loc <- liftIO $ H.lookup (localSymTable st) name
     if (loc == Nothing) then do
-        glob <- H.lookup (symTable st) name
+        glob <- liftIO $ H.lookup (symTable st) name
         if (glob == Nothing) then return $ ERROR $ "Couldn't resolve symbol " ++ name
         else do
             let (Just x) = glob
@@ -37,9 +43,10 @@ resolveSymbol st name = do
         return x
 
 -- resolve a function in a global scope (should we have it in local as well, lambdas for instance?)
-resolveFunction :: InterpreterState -> Name -> IO Expr
-resolveFunction st name = do
-    fun <- H.lookup (funTable st) name
+resolveFunction :: Name -> IntState Expr
+resolveFunction name = do
+    st <- get
+    fun <- liftIO $ H.lookup (funTable st) name
     if (fun == Nothing) then return $ ERROR $ "Couldn't resolve function " ++ name
     else do
         let (Just x) = fun
@@ -47,10 +54,11 @@ resolveFunction st name = do
 
 
 -- resolve a function in a global scope (should we have it in local as well, lambdas for instance?)
-resolveType :: InterpreterState -> Name -> IO Expr
-resolveType st name = do
-    fun <- H.lookup (typeTable st) name
-    if (fun == Nothing) then return $ ERROR $ "Couldn't resolve function " ++ name
+resolveType :: Name -> IntState Expr
+resolveType name = do
+    st <- get
+    fun <- liftIO $ H.lookup (typeTable st) name
+    if (fun == Nothing) then return $ ERROR $ "Couldn't resolve type " ++ name
     else do
         let (Just x) = fun
         return x
@@ -72,30 +80,34 @@ initializeInterpreter = do
              }
 
 -- process a single expression and alter the interpreter state correspondigly
-processExpr :: InterpreterState -> Expr -> IO InterpreterState
+processExpr :: Expr -> IntState ()
 -- binding functions and ops
-processExpr st e@(Function _ _ _) = addExpression e (funTable st) >> return st
+processExpr e@(Function name _ _) = do
+    st <- get 
+    liftIO $ H.insert (funTable st) name e
 -- processExpr st e@(BinaryDef _ _ _) = addExpression e (funTable st) >> return st
 -- processExpr st e@(UnaryDef _ _ _) = addExpression e (funTable st) >> return st
-processExpr st e@(DataDef _ _ _) = addExpression e (typeTable st) >> return st
+processExpr e@(DataDef name _ _) = do
+    st <- get
+    liftIO $ H.insert (typeTable st) name e
 -- executing binary op
-processExpr st e@(BinaryOp name _ _) = do
-    res <- evalStep e st
+processExpr e@(BinaryOp name _ _) = do
+    res <- evalStep e
     -- putStrLn "Evaluation:"
-    putStrLn $ show res
-    return st
+    liftIO $ putStrLn $ show res
 
 -- executing function call
-processExpr st e@(Call _ _) = do
-    putStrLn "Evaluation:"
-    res <- evalStep e st
-    putStrLn $ show res
-    return st
+processExpr e@(Call _ _) = do
+    liftIO $ putStrLn "Evaluation:"
+    res <- evalStep e
+    liftIO $ putStrLn $ show res
 
 -- binding a global variable
-processExpr st (GlobalVar name ex) = addBinding (symTable st) name ex >> return st
+processExpr (GlobalVar name ex) = do
+    st <- get 
+    liftIO $ addBinding (symTable st) name ex
 
-processExpr st _ = return st
+processExpr _ = do return ()
 
 
 
@@ -130,54 +142,55 @@ loadModule exs st = do
 findMain :: ExpressionTable -> IO (Maybe Expr)
 findMain ft = H.lookup ft "main"
 
-evalStep :: Expr -> InterpreterState -> IO Expr
+evalStep :: Expr -> IntState Expr
 -- basic terminals first
-evalStep e@(PInt _) _ = return e
-evalStep e@(PFloat _) _= return e
+evalStep e@(PInt _) = return e
+evalStep e@(PFloat _) = return e
 
 -- primitive operators (what can't be defined via functions)
-evalStep e@(BinaryOp "+" e1 e2) state =
+evalStep e@(BinaryOp "+" e1 e2) =
     case (e1, e2) of
         (PInt x1, PInt x2) -> return $ PInt $ x1 + x2
         (PInt x1, PFloat x2) -> return $ PFloat $ (fromIntegral x1) + x2
         (PFloat x1, PInt x2) -> return $ PFloat $ (fromIntegral x2) + x1
         (PFloat x1, PFloat x2) -> return $ PFloat $ x1 + x2
         otherwise -> do
-            e1' <- evalStep e1 state
-            e2' <- evalStep e2 state
-            evalStep (BinaryOp "+" e1' e2') state
+            e1' <- evalStep e1
+            e2' <- evalStep e2
+            evalStep (BinaryOp "+" e1' e2')
 
 
 
 -- evaluate variable - check bindings, if there are - substituting, if not - returning as is
-evalStep e@(Var n) st = do
-    res <- resolveSymbol st n
+evalStep e@(Var n) = do
+    res <- resolveSymbol n
     case res of
         (ERROR _) -> return e
         otherwise -> return res
 
 
 -- the most important - executing a call
-evalStep e@(Call fname vals') state = do
+evalStep e@(Call fname vals') = do
     -- try resolving vals in case they are variables (need it for stacked calls)
-    vals <- mapM ((flip evalStep) state) vals'
-    fn <- resolveFunction state fname
+    vals <- mapM evalStep vals'
+    fn <- resolveFunction fname
     case fn of
         f@(Function _ vars body) -> do
+            state <- get
 
             -- first, bind vals from (Call) to vars in Function
-            zipWithM_ (addBinding $ localSymTable state) vars vals
-            putStrLn $ "Binding variables in a call of " ++ (show f)
-            prettyPrintST (localSymTable state)
+            liftIO $ zipWithM_ (addBinding $ localSymTable state) vars vals
+            liftIO $ putStrLn $ "Binding variables in a call of " ++ (show f)
+            liftIO $ prettyPrintST (localSymTable state)
             -- now, evaluating the body with variables bound
-            putStrLn $ "Evaluating body " ++ (show body)
-            res <- evalStep body state
+            liftIO $ putStrLn $ "Evaluating body " ++ (show body)
+            res <- evalStep body
             -- now clearing local symtable
-            mapM_ (H.delete $ localSymTable state) vars
+            liftIO $ mapM_ (H.delete $ localSymTable state) vars
             return res
         otherwise -> return fn
 
-evalStep e _ = return $ ERROR ("Not implemented eval: " ++ (show e))
+evalStep e = return $ ERROR ("Not implemented eval: " ++ (show e))
 
 -- evalTrace :: Expr -> IO()
 -- evalTrace e = case e of

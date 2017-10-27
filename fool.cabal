@@ -27,6 +27,7 @@ library
                      , hashtables
                      , text
                      , directory
+                     , transformers
   default-language:    Haskell2010
 
 executable fool-exe
@@ -38,6 +39,7 @@ executable fool-exe
                      , mtl
                      , haskeline
                      , directory
+                     , transformers
   default-language:    Haskell2010
 
 test-suite fool-test

@@ -13,45 +13,52 @@ import System.Exit
 
 import qualified TermColors as TC
 
-process :: String -> InterpreterState -> IO InterpreterState
-process line st = do
+import Control.Monad.IO.Class (liftIO)
+
+import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
+
+type InputTState a = InputT (StateT InterpreterState IO) a
+
+process :: String -> IntState ()
+process line = do
   let res = parseToplevel line
   case res of
-    Left err -> print err >> return st
+    Left err -> liftIO $ print err 
     Right ex -> do
         -- processing parsed input
-        putStrLn $ (TC.ansifyString [TC.bold, TC.underlined] "Received expressions: ") ++ (show $ length ex)
-        mapM_ print ex -- show what was parsed first
-        mapM_ (processExpr st) ex -- processing expressions one by one - need to figure out how to pass STATE properly
-        return st
+        liftIO $ putStrLn $ (TC.ansifyString [TC.bold, TC.underlined] "Received expressions: ") ++ (show $ length ex)
+        liftIO $ mapM_ print ex -- show what was parsed first
+        mapM_ processExpr ex -- processing expressions one by one - need to figure out how to pass STATE properly
+        
 
-processCommand :: [String] -> InterpreterState ->IO InterpreterState
-processCommand (":quit":_) st = putStrLn "Goodbye." >> exitSuccess
-processCommand (":vars":_) st = prettyPrintST (symTable st) >> return st
-processCommand (":functions":_) st = prettyPrintFT (funTable st) >> return st
-processCommand (":types":_) st = prettyPrintTT (typeTable st) >> return st
-processCommand (":load":xs) st = loadFile (head xs) st >>= return
-processCommand (":run":_) st = run st >>= return
-processCommand _ st = do return st
+processCommand :: [String] -> IntState ()
+processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
+processCommand (":vars":_) = get >>= liftIO . prettyPrintST . symTable
+processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
+processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
+processCommand (":load":xs) = loadFile (head xs)
+processCommand (":run":_) = run
+processCommand _ = do return ()
 
-loadFile :: String -> InterpreterState -> IO InterpreterState
-loadFile nm st = do
-    putStrLn $ "Loading file: " ++ nm
-    res <- parseToplevelFile nm
-    putStrLn $ show res
+loadFile :: String -> IntState ()
+loadFile nm = do
+    st <- get
+    liftIO $ putStrLn $ "Loading file: " ++ nm
+    res <- liftIO $ parseToplevelFile nm
+    liftIO $ putStrLn $ show res
     case res of
-      Left err -> print err
-      Right exprs -> mapM_ (processExpr st) exprs 
-    return st
+      Left err -> liftIO $ print err
+      Right exprs -> mapM_ processExpr exprs 
 
-run :: InterpreterState -> IO InterpreterState
-run st = do
-  putStrLn "Running"
-  mn <- findMain $ funTable st
-  putStrLn $ show mn
+run :: IntState ()
+run = do
+  st <- get
+  liftIO $ putStrLn "Running"
+  mn <- liftIO $ findMain $ funTable st
+  liftIO $ putStrLn $ show mn
   case mn of
-    Nothing -> putStrLn "main() does not exist!" >> return st
-    Just (Function _ _ f) -> putStrLn ("Found main: " ++ (show f)) >> processExpr st f >>= return
+    Nothing -> liftIO $ putStrLn "main() does not exist!"
+    Just (Function _ _ f) -> processExpr f
 
 showHelp :: IO ()
 showHelp = do
@@ -63,24 +70,28 @@ showHelp = do
     putStrLn ":load <name> -- load and interpret file <name>"
     putStrLn ":run -- execute main() if it is present"
 
-main :: IO ()
-main = do
-    -- initializing interpreter state
-    state <- initializeInterpreter
-
-    dir <- getCurrentDirectory
-    putStrLn dir 
-
-    -- going into the loop
-    runInputT defaultSettings {historyFile=Just "./.fool_history"} (loop state)
-      where
-      loop st = do
+loop :: InputTState ()
+loop = do
         minput <- getInputLine  "fool>"
         case minput of
           Nothing -> outputStrLn "Goodbye."
           Just input -> case input of
-              ([]) -> liftIO showHelp >> (loop st)
+              ([]) -> liftIO showHelp >> loop
               -- if starts with ":" - then it's a command
-              (':':_) -> (liftIO $ processCommand (words input) st) >>= loop
+              (':':_) -> (lift $ processCommand (words input)) >> loop
               -- otherwise parsing our language input
-              otherwise -> (liftIO $ process input st) >>= loop
+              otherwise -> (lift $ process input) >> loop
+
+main :: IO ()
+main = do
+    -- initializing interpreter state
+    state <- initializeInterpreter
+    evalStateT (put state) state
+
+    -- dir <- getCurrentDirectory
+    -- putStrLn dir 
+
+    -- going into the loop
+    let act = runInputT defaultSettings {historyFile=Just "./.fool_history"} loop
+    evalStateT act state
+      
