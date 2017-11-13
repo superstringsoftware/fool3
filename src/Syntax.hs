@@ -5,6 +5,7 @@ import Data.Word
 import qualified Data.Vector.Unboxed as U
 
 import Core
+import Data.Text
 
 -- type Name = String
 type TypedVar = (String, String) -- simple alias for a typed variable
@@ -22,7 +23,9 @@ data Expr
   | Type Type -- type from Core
   | TypeDef Name [Var] [Expr] -- data Name, then type vars, then constructors: data List a = Cell a (List a) | Nil
   | Constructor Name [Expr] -- constructor only, Name then Types or Vars: Cell a (List a)
-  | Call Name [Expr] -- function call; should we move operator calls here???
+  | App Expr Expr -- function call; should we move operator calls here???
+  | SymId Name -- again, for Apps
+  | NoArgs -- dummy value that is used when we are building App hierarchy when something is called without args. There's probably a better way to do it!
   | Function Name [Var] Expr -- function definition: name, variables names, body expr
   | Extern Name [Name] -- external function declaration
   | BinaryOp Name Expr Expr
@@ -35,6 +38,13 @@ data Expr
   | GlobalVar Name Expr -- binding for a global var, interpreter only
   | ERROR String -- debugging only?
   deriving (Eq, Ord, Show)
+
+prettyPrint :: Expr -> String
+prettyPrint (PFloat x) = show x
+prettyPrint (PInt x) = show x
+prettyPrint (VFloat x) = show x
+prettyPrint (VInt x) = show x
+-- prettyPrint (Var )
 
 {-
 

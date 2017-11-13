@@ -12,7 +12,7 @@
 module Parser where
 
 import Text.Parsec
-import Text.Parsec.String (Parser, parseFromFile)
+-- import Text.Parsec.String (parseFromFile)
 import Control.Applicative ((<$>), liftA2)
 import Control.Monad (foldM)
 
@@ -55,7 +55,7 @@ lIdentifier = skipMany space >> lookAhead lower >> identifier
 uIdentifier = skipMany space >> lookAhead upper >> identifier
 
 expr :: Parser Expr
-expr = try vector <|> Ex.buildExpressionParser (binops ++ [[binop]]) factor
+expr = Ex.buildExpressionParser (binops ++ [[binop]]) factor
 -- expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
 
 -- concrete type or type application
@@ -136,7 +136,12 @@ call :: Parser Expr
 call = do
   name <- identifier
   args <- many $ try expr <|> parens expr
-  return $ Call name args
+  let acc = SymId name
+  if (length args == 0) then return $ acc
+  else let e = foldl f acc args in return e -- type application
+  where f acc arg = App acc arg
+
+  -- return $ Call name args
 
 ifthen :: Parser Expr
 ifthen = do
@@ -196,12 +201,14 @@ binarydef = do
   return $ Function o args body
 
 factor :: Parser Expr
-factor = try floating
-      <|> try int
-      <|> try call
+factor = try vector
       <|> try ifthen
       <|> try letins
       <|> (parens expr)
+      <|> try floating
+      <|> try int
+      <|> try call
+
 
 -- <|> try variable
 -- <|> try for
@@ -212,14 +219,13 @@ defn = try extern
     <|> try function
     <|> try unarydef
     <|> try binarydef
-    <|> try globalvar
-    <|> expr
+    -- <|> expr
 
 -- <|> try record
 
-contents :: Parser a -> Parser a
+-- contents :: Parser a -> Parser a
 contents p = do
-  Tok.whiteSpace lexer
+  whitespace
   r <- p
   eof
   return r
@@ -230,15 +236,20 @@ toplevel = many $ do
     reservedOp ";"
     return def
 
-parseExpr :: String -> Either ParseError Expr
-parseExpr s = parse (contents expr) "<stdin>" s
+-- parseExpr :: String -> Either ParseError Expr
+parseExpr s = runParserT (contents expr) initialParserState "<stdin>" s
 
-parseToplevel :: String -> Either ParseError [Expr]
-parseToplevel s = parse (contents toplevel) "<stdin>" s
+--parseToplevel :: String -> Either ParseError [Expr]
+parseToplevel s = runParserT (contents expr) initialParserState "<stdin>" s
 
 -- parse a given file
-parseToplevelFile name = parseFromFile (contents toplevel) name
+parseToplevelFile name = parseFromFile (contents toplevel) name initialParserState
 
+-- parseFromFile :: Parser a -> String -> IO (Either ParseError a)
+-- redefining parse from file to work with our state - just a quick and dirty fix
+parseFromFile p fname st
+    = do input <- readFile fname
+         return (runP p st fname input)
 
 -- adding new stuff
 
@@ -252,15 +263,6 @@ record = do
   fields <- braces $ semiSep expr
   return $ Record name [] fields
 -}
-
--- global vars - for the interpreter only
-globalvar :: Parser Expr
-globalvar = do
-  reserved "var"
-  var <- identifier
-  reservedOp "="
-  val <- expr
-  return $ GlobalVar var val
 
 -- polymorphic list: [x, 2+4, 1.3]
 list :: Parser Expr

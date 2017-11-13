@@ -17,20 +17,22 @@ import Control.Monad.IO.Class (liftIO)
 
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 
+import Data.Functor.Identity
+
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
 process :: String -> IntState ()
 process line = do
-  let res = parseToplevel line
+  let res = runIdentity $ parseToplevel line
   case res of
-    Left err -> liftIO $ print err 
+    Left err -> liftIO $ print err
     Right ex -> do
         -- processing parsed input
-        liftIO $ putStrLn $ (TC.ansifyString [TC.bold, TC.underlined] "Received expressions: ") ++ (show $ length ex)
-        liftIO $ mapM_ print ex -- show what was parsed first
-        mapM_ processExpr ex -- processing expressions one by one - need to figure out how to pass STATE properly
-        
+        liftIO $ putStrLn $ (TC.ansifyString [TC.bold, TC.underlined] "Received expressions: ") -- ++ (show $ length ex)
+        liftIO $ print ex -- show what was parsed first
+        processExpr ex -- processing expressions one by one - need to figure out how to pass STATE properly
+
 
 processCommand :: [String] -> IntState ()
 processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
@@ -49,7 +51,7 @@ loadFile nm = do
     liftIO $ putStrLn $ show res
     case res of
       Left err -> liftIO $ print err
-      Right exprs -> mapM_ processExpr exprs 
+      Right exprs -> mapM_ processExpr exprs
 
 run :: IntState ()
 run = do
@@ -89,4 +91,3 @@ main = do
     -- setting up Haskeline loop
     -- getting to the right monad in our crazy monad stack
     initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} loop)
-      

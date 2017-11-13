@@ -103,7 +103,7 @@ processExpr e@(BinaryOp name _ _) = do
     liftIO $ putStrLn $ show res
 
 -- executing function call
-processExpr e@(Call _ _) = do
+processExpr e@(App _ _) = do
     liftIO $ putStrLn "Evaluation:"
     res <- evalStep e
     liftIO $ putStrLn $ show res

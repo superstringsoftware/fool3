@@ -1,13 +1,17 @@
 fn x y = x + y;
 
-tx = True;
-compare x y = if x < y then True else False;
+# tx = True;
+# compare x y = if x < y then True else False;
 
-longf a b c d = compare a b c d + False;
+# longf a b c d = compare a b c d + False;
 
-var t = 100;
+val x = Cell 4 (Cell x Nil);
 
-var vec = <1,2,3,4>;
+t = 100;
+
+folded = map compare (val 7);
+
+vec = <1,2,3,4>;
 
 data Bool = True | False;
 data List a = Cell a (List a) | Nil;
@@ -15,6 +19,12 @@ data Maybe a = Just a | Nothing;
 data Silly = Struct Int String Float;
 data Either a b = Left a | Right b;
 
-data Person = Person {name:String, age : Int, dob: Date} | Fun Int String;
+data Person = Person {name:String, age : Int, dob: Maybe Date, pm : List a} | Fun Int String;
+
+# fact 0 = 1;
+fact n = n * fact (n - 1);
+fuct n = n + fuct (n ** 3 );
+
+fop x y = x ==-> (y + 15);
 
 main = fn 4 (5 + y);
