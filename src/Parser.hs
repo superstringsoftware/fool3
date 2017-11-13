@@ -13,7 +13,8 @@ module Parser where
 
 import Text.Parsec
 import Text.Parsec.String (Parser, parseFromFile)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), liftA2)
+import Control.Monad (foldM)
 
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
@@ -22,6 +23,7 @@ import qualified Data.Vector.Unboxed as U
 
 import Lexer
 import Syntax
+import Core
 
 int :: Parser Expr
 int = PInt <$> fromInteger <$> integer
@@ -45,38 +47,95 @@ binops = [[binary "=" Ex.AssocLeft]
         ,[binary "*" Ex.AssocLeft,
           binary "/" Ex.AssocLeft]
         ,[binary "+" Ex.AssocLeft,
-          binary "-" Ex.AssocLeft]]
-        -- ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
+          binary "-" Ex.AssocLeft]
+        ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
 
 -- helper parsers: lower case and upper case
 lIdentifier = skipMany space >> lookAhead lower >> identifier
 uIdentifier = skipMany space >> lookAhead upper >> identifier
 
 expr :: Parser Expr
-expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
+expr = try vector <|> Ex.buildExpressionParser (binops ++ [[binop]]) factor
+-- expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
 
+-- concrete type or type application
+typeAp :: Parser Expr
+typeAp = do
+  name <- uIdentifier
+  vars <- many $ try (Type <$> TCon <$> uIdentifier) <|> try ( Type <$> TVar <$> lIdentifier ) <|> (parens typeAp)
+  let tcon = TCon name
+  if (length vars == 0) then return $ Type tcon -- concrete type
+  else return $ Type $ foldl f tcon vars -- type application
+  where f acc t = TApp acc (extractType t)
+
+-- helper function to extract Type and Var from Expr
+extractType (Type t) = t
+extractVar (Var v) = v
+
+-- variable with type
 variable :: Parser Expr
-variable = Var <$> identifier
+variable = do
+  name <- lIdentifier
+  typ <- try (reservedOp ":" *> typeVariable) <|>
+         try (reservedOp ":" *> typeAp) <|>
+         try (reservedOp ":" *> parens typeAp) <|>
+         pure (Type ToDerive)
+  return $ Var (Id name (extractType typ))
+
+-- type variable - Kind is always '*', needs to be adjusted at later stages
+typeVariable :: Parser Expr
+typeVariable = do
+  name <- lIdentifier
+  return $ Var (TyVar name KStar)
+
+-- this, parametricType and dataDef parses haskell based data hello = Text a b | Nil type of data definitions
+constructor :: Parser Expr
+constructor = do
+  name <- uIdentifier
+  vars <- many $ try (Var <$> (Id "") <$> TCon <$> uIdentifier) <|> -- concrete type
+                 try ( Var <$> (Id "") <$> TVar <$> lIdentifier) <|> -- type var
+                 (Var <$> (Id "") <$>  extractType <$> (parens typeAp)) -- complex type, like List a
+  return $ Constructor name vars
+
+recordConstructor :: Parser Expr
+recordConstructor = do
+  name <- uIdentifier
+  whitespace >> char '{' >> whitespace
+  vars <- commaSep variable
+  whitespace >> char '}' >> whitespace
+  return $ Constructor name vars
+
+constructors = try recordConstructor <|> constructor
+
+-- simple ADT
+typeDef :: Parser Expr
+typeDef = do
+  reserved "data"
+  name <- uIdentifier
+  vars <- many (extractVar <$> typeVariable)
+  reservedOp "="
+  fields <- sepBy1 constructors (char '|')
+  return $ TypeDef name vars fields
 
 function :: Parser Expr
 function = do
-  reserved "def"
-  name <- identifier
-  args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
+  name <- lIdentifier
+  args <- many (extractVar <$> variable)   -- (parens $ many identifier) <|> (parens $ commaSep identifier)
+  reservedOp "="
   body <- expr
   return $ Function name args body
 
 extern :: Parser Expr
 extern = do
   reserved "extern"
-  name <- identifier
+  name <- lIdentifier
   args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
   return $ Extern name args
 
 call :: Parser Expr
 call = do
   name <- identifier
-  args <- parens $ commaSep expr
+  args <- many $ try expr <|> parens expr
   return $ Call name args
 
 ifthen :: Parser Expr
@@ -107,7 +166,7 @@ letins :: Parser Expr
 letins = do
   reserved "let"
   defs <- commaSep $ do
-    var <- identifier
+    var <- lIdentifier
     reservedOp "="
     val <- expr
     return (var, val)
@@ -120,7 +179,8 @@ unarydef = do
   reserved "def"
   reserved "unary"
   o <- op
-  args <- parens $ many identifier
+  args <- many (extractVar <$> variable)
+  reservedOp "="
   body <- expr
   return $ Function o args body
 
@@ -130,53 +190,32 @@ binarydef = do
   reserved "binary"
   o <- op
   prec <- int <?> "integer: precedence value for the operator definition"
-  args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
+  args <- many (extractVar <$> variable)
+  reservedOp "="
   body <- expr
   return $ Function o args body
-
-
--- this, parametricType and dataDef parses haskell based data hello = Text a b | Nil type of data definitions
-constructor :: Parser Expr
-constructor = do
-  name <- uIdentifier
-  types <- many $ try (Type <$> uIdentifier) <|> try (Var <$> lIdentifier) <|> (parens parametricType) 
-  return $ Constructor name types
-
-parametricType :: Parser Expr
-parametricType = do
-  name <- uIdentifier
-  vars <- many1 $ try (Type <$> uIdentifier) <|> try (Var <$> lIdentifier) <|> (parens parametricType)
-  return $ ParametricType name vars 
-
-dataDef :: Parser Expr
-dataDef = do
-  reserved "data"
-  name <- uIdentifier
-  vars <- many variable
-  reservedOp "="
-  fields <- sepBy1 constructor (char '|')
-  return $ DataDef name vars fields
-
 
 factor :: Parser Expr
 factor = try floating
       <|> try int
       <|> try call
-      <|> try variable
-      <|> ifthen
+      <|> try ifthen
       <|> try letins
-      <|> for
       <|> (parens expr)
+
+-- <|> try variable
+-- <|> try for
 
 defn :: Parser Expr
 defn = try extern
-    <|> try dataDef
+    <|> try typeDef
     <|> try function
     <|> try unarydef
     <|> try binarydef
-    <|> try record
     <|> try globalvar
     <|> expr
+
+-- <|> try record
 
 contents :: Parser a -> Parser a
 contents p = do
@@ -203,14 +242,16 @@ parseToplevelFile name = parseFromFile (contents toplevel) name
 
 -- adding new stuff
 
+{-
 -- simple (flat) record
 record :: Parser Expr
 record = do
   reserved "data"
-  name <- identifier
+  name <- uIdentifier
   reservedOp "="
   fields <- braces $ semiSep expr
   return $ Record name [] fields
+-}
 
 -- global vars - for the interpreter only
 globalvar :: Parser Expr

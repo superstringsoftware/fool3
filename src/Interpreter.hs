@@ -6,6 +6,7 @@ import qualified Data.Vector.Unboxed as U
 
 import qualified Data.HashTable.IO as H
 
+import Core
 import Syntax
 import Parser
 
@@ -83,13 +84,18 @@ initializeInterpreter = do
 processExpr :: Expr -> IntState ()
 -- binding functions and ops
 processExpr e@(Function name _ _) = do
-    st <- get 
+    st <- get
     liftIO $ H.insert (funTable st) name e
 -- processExpr st e@(BinaryDef _ _ _) = addExpression e (funTable st) >> return st
 -- processExpr st e@(UnaryDef _ _ _) = addExpression e (funTable st) >> return st
-processExpr e@(DataDef name _ _) = do
+processExpr e@(TypeDef name _ _) = do
     st <- get
     liftIO $ H.insert (typeTable st) name e
+{-
+processExpr e@(Record name _ _) = do
+    st <- get
+    liftIO $ H.insert (typeTable st) name e
+-}
 -- executing binary op
 processExpr e@(BinaryOp name _ _) = do
     res <- evalStep e
@@ -104,7 +110,7 @@ processExpr e@(Call _ _) = do
 
 -- binding a global variable
 processExpr (GlobalVar name ex) = do
-    st <- get 
+    st <- get
     liftIO $ addBinding (symTable st) name ex
 
 processExpr _ = do return ()
@@ -116,7 +122,7 @@ addExpression :: Expr -> ExpressionTable -> IO () -- FunctionTable
 addExpression e@(Function name _ _) ft = H.insert ft name e
 -- addExpression e@(BinaryDef name _ _) ft = H.insert ft ("operator"++name) e
 -- addExpression e@(UnaryDef name _ _) ft = H.insert ft ("operator"++name) e
-addExpression e@(DataDef name _ _) tt = H.insert tt name e
+addExpression e@(TypeDef name _ _) tt = H.insert tt name e
 addExpression _ ft = return ()
 
 -- add a variable binding to a table, String is a
@@ -163,12 +169,12 @@ evalStep e@(BinaryOp "+" e1 e2) =
 
 -- evaluate variable - check bindings, if there are - substituting, if not - returning as is
 evalStep e@(Var n) = do
-    res <- resolveSymbol n
+    res <- resolveSymbol (getVarName n)
     case res of
         (ERROR _) -> return e
         otherwise -> return res
 
-
+{-
 -- the most important - executing a call
 evalStep e@(Call fname vals') = do
     -- try resolving vals in case they are variables (need it for stacked calls)
@@ -189,7 +195,7 @@ evalStep e@(Call fname vals') = do
             liftIO $ mapM_ (H.delete $ localSymTable state) vars
             return res
         otherwise -> return fn
-
+-}
 evalStep e = return $ ERROR ("Not implemented eval: " ++ (show e))
 
 -- evalTrace :: Expr -> IO()

@@ -1,5 +1,10 @@
 fn x y = x + y;
 
+tx = True;
+compare x y = if x < y then True else False;
+
+longf a b c d = compare a b c d + False;
+
 var t = 100;
 
 var vec = <1,2,3,4>;
@@ -10,6 +15,6 @@ data Maybe a = Just a | Nothing;
 data Silly = Struct Int String Float;
 data Either a b = Left a | Right b;
 
-data Person = Person name:String, age : Int, dob: Date;
+data Person = Person {name:String, age : Int, dob: Date} | Fun Int String;
 
-def main() fn (4,5);
+main = fn 4 (5 + y);

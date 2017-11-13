@@ -17,6 +17,7 @@ import Control.Monad.IO.Class (liftIO)
 
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 
+-- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
 process :: String -> IntState ()
@@ -70,6 +71,7 @@ showHelp = do
     putStrLn ":load <name> -- load and interpret file <name>"
     putStrLn ":run -- execute main() if it is present"
 
+-- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()
 loop = do
         minput <- getInputLine  "fool>"
@@ -84,10 +86,7 @@ loop = do
 
 main :: IO ()
 main = do
-    
     -- setting up Haskeline loop
-    let act = runInputT defaultSettings {historyFile=Just "./.fool_history"} loop
-    
     -- getting to the right monad in our crazy monad stack
-    initializeInterpreter >>= evalStateT act
+    initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} loop)
       

@@ -4,7 +4,10 @@ module Syntax where
 import Data.Word
 import qualified Data.Vector.Unboxed as U
 
-type Name = String
+import Core
+
+-- type Name = String
+type TypedVar = (String, String) -- simple alias for a typed variable
 
 data Expr
   = PFloat !Double -- primitive values
@@ -14,7 +17,36 @@ data Expr
   | VInt (U.Vector Int) -- vectors of primitive values
   | VFloat (U.Vector Double)
   | VByte (U.Vector Word8)
-  | Var String -- variable symbol with a name
+  -- concrete specific types are over
+  | Var Var -- variable from Core
+  | Type Type -- type from Core
+  | TypeDef Name [Var] [Expr] -- data Name, then type vars, then constructors: data List a = Cell a (List a) | Nil
+  | Constructor Name [Expr] -- constructor only, Name then Types or Vars: Cell a (List a)
+  | Call Name [Expr] -- function call; should we move operator calls here???
+  | Function Name [Var] Expr -- function definition: name, variables names, body expr
+  | Extern Name [Name] -- external function declaration
+  | BinaryOp Name Expr Expr
+  | UnaryOp Name Expr
+  | If Expr Expr Expr
+  | For Name Expr Expr Expr Expr
+  | Let Name Expr Expr -- let x=1, y=2 in x*y; - bound expression blocks, is it basically lambda??
+  -- | BinaryDef Name [Name] Expr -- operator definitions - move to function definition??
+  -- | UnaryDef Name [Name] Expr
+  | GlobalVar Name Expr -- binding for a global var, interpreter only
+  | ERROR String -- debugging only?
+  deriving (Eq, Ord, Show)
+
+{-
+
+data Expr
+  = PFloat !Double -- primitive values
+  | PInt !Int
+  | PByte !Word8
+  | ListExpr [Expr] -- polymorphic list, just a placeholder for now
+  | VInt (U.Vector Int) -- vectors of primitive values
+  | VFloat (U.Vector Double)
+  | VByte (U.Vector Word8)
+  | Var String String -- variable symbol with a name and a type
   | DataDef Name [Expr] [Expr] -- data Name, then type vars, then constructors: data List a = Cell a (List a) | Nil
   | Constructor Name [Expr] -- constructor only, Name then Types or Vars: Cell a (List a)
   | ParametricType Name [Expr] -- Parametric type call used in constructor definitions, e.g. List a inside Cell
@@ -35,7 +67,8 @@ data Expr
   | Record Name [(Name,Name)] [Expr] -- simple record, named, [(fieldName, typeName)]
   deriving (Eq, Ord, Show)
 
-{-
+
+
 instance Show Expr where
     show (PFloat x) = show x
     show (PInt x) = show x
@@ -64,4 +97,3 @@ instance Show Expr where
 -- data Variable = Variable String AllTypes deriving Show
 
 -- data TypeFunction = TypeFunction Name [Variable] deriving Show
-
