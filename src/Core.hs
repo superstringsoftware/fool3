@@ -2,6 +2,8 @@
 
 module Core where
 
+import TermColors
+
 type Name = String
 
 data EExpr
@@ -94,3 +96,28 @@ instance Alpha Kind where
   aeq KPrim KPrim = True
   aeq (KArr a b) (KArr c d) = aeq a c && aeq b d
   aeq _ _ = False
+
+-------------------------------------------------------------------------------
+-- Pretty Print typeclass
+-------------------------------------------------------------------------------
+class PrettyPrint a where
+  prettyPrint :: a -> String
+
+instance PrettyPrint Type where
+  prettyPrint (TVar nm) = nm
+  prettyPrint (TCon nm) = as [yellow, bold] nm
+  prettyPrint ToDerive  = as [red, bold] "?"
+  prettyPrint (TApp t1 t2) = prettyPrint t1 ++ " " ++ prettyPrint t2
+  prettyPrint e = show e
+{-
+  | TArr Type Type
+  | TForall [Pred] [TVar] Type
+-}
+
+instance PrettyPrint Var where
+  prettyPrint (Id nm tp)   = nm ++ ":" ++ prettyPrint tp
+  prettyPrint (TyVar nm k) = nm ++ ":" ++ prettyPrint k
+
+instance PrettyPrint Kind where
+  prettyPrint KStar = "*"
+  prettyPrint k = show k

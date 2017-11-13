@@ -3,12 +3,12 @@ module Syntax where
 
 import Data.Word
 import qualified Data.Vector.Unboxed as U
+import qualified Data.Vector.Generic as V
 
 import Core
-import Data.Text
+-- import Data.Text
 
--- type Name = String
-type TypedVar = (String, String) -- simple alias for a typed variable
+import TermColors
 
 data Expr
   = PFloat !Double -- primitive values
@@ -39,11 +39,28 @@ data Expr
   | ERROR String -- debugging only?
   deriving (Eq, Ord, Show)
 
-prettyPrint :: Expr -> String
-prettyPrint (PFloat x) = show x
-prettyPrint (PInt x) = show x
-prettyPrint (VFloat x) = show x
-prettyPrint (VInt x) = show x
+instance PrettyPrint Expr where
+  prettyPrint (PFloat x) = as [lred] (show x)
+  prettyPrint (PInt x) = as [lred] (show x)
+  prettyPrint (VFloat v) = as [bold] "< " ++ V.foldl fn (as [lred] (show $ V.head v)) (V.tail v) ++ as [bold] " >"
+                           where fn acc x = acc ++ ", " ++ as [lred] (show x)
+  prettyPrint (VInt x) = as [green, bold] (show x)
+  prettyPrint (Var v) = prettyPrint v
+  -- prettyPrint (Var (Id nm tp)) = nm ++ ":" ++ show tp
+  prettyPrint (Function fn v ex) = as [dgray, bold] "func " ++ as [green, bold] fn ++ " " ++
+                                   fn1 v ++ " = " ++ prettyPrint ex
+                                   where fn1 [] = ""
+                                         fn1 (v:vs) = foldl (\acc x -> acc ++ " " ++ prettyPrint x) (prettyPrint v) vs
+  prettyPrint (TypeDef tn vs ex) = as [dgray, bold] "type " ++
+                                   as [red, bold] tn ++ " " ++
+                                   foldl fn "" vs ++ "= " ++ fn1 ex
+                                   where fn  acc v = acc ++ prettyPrint v ++ " "
+                                         fn1 ex = if null ex then ""
+                                                  else foldl fn2 (prettyPrint $ head ex) (tail ex)
+                                                  where fn2 acc e = acc ++ as [bold] "| " ++ prettyPrint e
+  prettyPrint (Constructor nm ex) = as [red, bold] nm ++ " " ++ foldl fn "" ex
+                                    where fn acc e = acc ++ prettyPrint e ++ " "
+  prettyPrint e = show e
 -- prettyPrint (Var )
 
 {-

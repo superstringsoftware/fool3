@@ -39,16 +39,22 @@ processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
 processCommand (":vars":_) = get >>= liftIO . prettyPrintST . symTable
 processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
 processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
+processCommand (":all":_) = do
+  st <- get
+  liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
+  liftIO $ prettyPrintTT $ typeTable st
+  liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
+  liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFile (head xs)
 processCommand (":run":_) = run
-processCommand _ = do return ()
+processCommand _ = liftIO $ print "Unknown command. Type :help to show available list."
 
 loadFile :: String -> IntState ()
 loadFile nm = do
     st <- get
     liftIO $ putStrLn $ "Loading file: " ++ nm
     res <- liftIO $ parseToplevelFile nm
-    liftIO $ putStrLn $ show res
+    liftIO $ print res
     case res of
       Left err -> liftIO $ print err
       Right exprs -> mapM_ processExpr exprs
@@ -58,20 +64,21 @@ run = do
   st <- get
   liftIO $ putStrLn "Running"
   mn <- liftIO $ findMain $ funTable st
-  liftIO $ putStrLn $ show mn
+  liftIO $ print mn
   case mn of
     Nothing -> liftIO $ putStrLn "main() does not exist!"
     Just (Function _ _ f) -> processExpr f
 
 showHelp :: IO ()
 showHelp = do
-    putStrLn "Available commands:"
-    putStrLn ":quit -- quit"
-    putStrLn ":vars -- list all global vars"
-    putStrLn ":functions -- list all global functions"
-    putStrLn ":types -- list all types"
-    putStrLn ":load <name> -- load and interpret file <name>"
-    putStrLn ":run -- execute main() if it is present"
+    putStrLn $ TC.as [TC.bold, TC.underlined] "Available commands:"
+    putStrLn ":quit           -- quit"
+    putStrLn ":vars           -- list all global vars"
+    putStrLn ":functions      -- list all global functions"
+    putStrLn ":types          -- list all types"
+    putStrLn ":all            -- list everything"
+    putStrLn ":load <name>    -- load and interpret file <name>"
+    putStrLn ":run            -- execute main() if it is present"
 
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()
@@ -80,14 +87,14 @@ loop = do
         case minput of
           Nothing -> outputStrLn "Goodbye."
           Just input -> case input of
-              ([]) -> liftIO showHelp >> loop
+              [] -> liftIO showHelp >> loop
               -- if starts with ":" - then it's a command
-              (':':_) -> (lift $ processCommand (words input)) >> loop
+              (':':_) -> lift (processCommand (words input)) >> loop
               -- otherwise parsing our language input
-              otherwise -> (lift $ process input) >> loop
+              _ -> lift (process input) >> loop
 
 main :: IO ()
-main = do
+main =
     -- setting up Haskeline loop
     -- getting to the right monad in our crazy monad stack
     initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} loop)

@@ -228,12 +228,12 @@ evalExprStep e@(Function _ _ _) ft = funTable >>= addFunction e
 -- print types
 prettyPrintTT :: ExpressionTable -> IO ()
 prettyPrintTT ft = H.mapM_ f ft where
-    f (k,v) = putStrLn $ show v
+    f (k,v) = putStrLn $ prettyPrint v
 
 -- print functions
 prettyPrintFT :: ExpressionTable -> IO ()
 prettyPrintFT ft = H.mapM_ f ft where
-    f (k,v) = putStrLn $ show v
+    f (k,v) = putStrLn $ prettyPrint v
 
 -- print symbols
 prettyPrintST :: ExpressionTable -> IO ()
