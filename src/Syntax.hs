@@ -40,10 +40,10 @@ data Expr
   deriving (Eq, Ord, Show)
 
 instance PrettyPrint Expr where
-  prettyPrint (PFloat x) = as [lred] (show x)
-  prettyPrint (PInt x) = as [lred] (show x)
-  prettyPrint (VFloat v) = as [bold] "< " ++ V.foldl fn (as [lred] (show $ V.head v)) (V.tail v) ++ as [bold] " >"
-                           where fn acc x = acc ++ ", " ++ as [lred] (show x)
+  prettyPrint (PFloat x) = as [lmagenta] (show x)
+  prettyPrint (PInt x) = as [lmagenta] (show x)
+  prettyPrint (VFloat v) = as [bold] "< " ++ V.foldl fn (as [lmagenta] (show $ V.head v)) (V.tail v) ++ as [bold] " >"
+                           where fn acc x = acc ++ ", " ++ as [lmagenta] (show x)
   prettyPrint (VInt x) = as [green, bold] (show x)
   prettyPrint (Var v) = prettyPrint v
   -- prettyPrint (Var (Id nm tp)) = nm ++ ":" ++ show tp

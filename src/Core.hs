@@ -106,7 +106,7 @@ class PrettyPrint a where
 instance PrettyPrint Type where
   prettyPrint (TVar nm) = nm
   prettyPrint (TCon nm) = as [yellow, bold] nm
-  prettyPrint ToDerive  = as [red, bold] "?"
+  prettyPrint ToDerive  = as [dgray, bold] "?"
   prettyPrint (TApp t1 t2) = prettyPrint t1 ++ " " ++ prettyPrint t2
   prettyPrint e = show e
 {-
