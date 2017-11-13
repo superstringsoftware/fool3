@@ -31,11 +31,12 @@ data Expr
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | If Expr Expr Expr
-  | For Name Expr Expr Expr Expr
-  | Let Name Expr Expr -- let x=1, y=2 in x*y; - bound expression blocks, is it basically lambda??
+  | Let [Expr] Expr -- changed format, first [Expr] will basically be an array of function definitions, since values *are* functions
+  -- | For Name Expr Expr Expr Expr
+  -- | Let Name Expr Expr -- let x=1, y=2 in x*y; - bound expression blocks, is it basically lambda??
   -- | BinaryDef Name [Name] Expr -- operator definitions - move to function definition??
   -- | UnaryDef Name [Name] Expr
-  | GlobalVar Name Expr -- binding for a global var, interpreter only
+  -- | GlobalVar Name Expr -- binding for a global var, interpreter only
   | ERROR String -- debugging only?
   deriving (Eq, Ord, Show)
 

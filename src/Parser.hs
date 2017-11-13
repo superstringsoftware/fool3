@@ -68,6 +68,11 @@ typeAp = do
   else return $ Type $ foldl f tcon vars -- type application
   where f acc t = TApp acc (extractType t)
 
+-- concrete type only
+concreteType :: Parser Expr
+concreteType = uIdentifier >>= return . Type . TCon
+
+
 -- helper function to extract Type and Var from Expr
 extractType (Type t) = t
 extractVar (Var v) = v
@@ -76,9 +81,11 @@ extractVar (Var v) = v
 variable :: Parser Expr
 variable = do
   name <- lIdentifier
-  typ <- try (reservedOp ":" *> typeVariable) <|>
-         try (reservedOp ":" *> typeAp) <|>
-         try (reservedOp ":" *> parens typeAp) <|>
+  typ <- try (reservedOp ":" *> parens typeAp) <|>
+         try (reservedOp ":" *> concreteType) <|>
+         try (reservedOp ":" *> typeVariable) <|>
+
+
          pure (Type ToDerive)
   return $ Var (Id name (extractType typ))
 
@@ -153,31 +160,13 @@ ifthen = do
   fl <- expr
   return $ If cond tr fl
 
-for :: Parser Expr
-for = do
-  reserved "for"
-  var <- identifier
-  reservedOp "="
-  start <- expr
-  reservedOp ","
-  cond <- expr
-  reservedOp ","
-  step <- expr
-  reserved "in"
-  body <- expr
-  return $ For var start cond step body
-
 letins :: Parser Expr
 letins = do
   reserved "let"
-  defs <- commaSep $ do
-    var <- lIdentifier
-    reservedOp "="
-    val <- expr
-    return (var, val)
+  defs <- commaSep function
   reserved "in"
   body <- expr
-  return $ foldr (uncurry Let) body defs
+  return $ Let defs body
 
 unarydef :: Parser Expr
 unarydef = do
@@ -262,6 +251,34 @@ record = do
   reservedOp "="
   fields <- braces $ semiSep expr
   return $ Record name [] fields
+
+letins :: Parser Expr
+letins = do
+  reserved "let"
+  defs <- semiSep $ do
+    var <- lIdentifier
+    reservedOp "="
+    val <- expr
+    return (var, val)
+  reserved "in"
+  body <- expr
+  return $ foldr (uncurry Let) body defs
+
+
+for :: Parser Expr
+for = do
+  reserved "for"
+  var <- identifier
+  reservedOp "="
+  start <- expr
+  reservedOp ","
+  cond <- expr
+  reservedOp ","
+  step <- expr
+  reserved "in"
+  body <- expr
+  return $ For var start cond step body
+
 -}
 
 -- polymorphic list: [x, 2+4, 1.3]

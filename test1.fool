@@ -1,15 +1,15 @@
 fn x y = x + y;
 
-# tx = True;
-# compare x y = if x < y then True else False;
+tx = True;
+compare x y = if x < y then True else False;
 
-# longf a b c d = compare a b c d + False;
+longf a b c d = compare a b c d + False;
 
 val x = Cell 4 (Cell x Nil);
 
 t = 100;
 
-folded = map compare (val 7);
+folded f = map f (val 7);
 
 vec = <1,2,3,4>;
 
@@ -22,9 +22,9 @@ data Either a b = Left a | Right b;
 data Person = Person {name:String, age : Int, dob: Maybe Date, pm : List a} | Fun Int String | Weird;
 
 # fact 0 = 1;
-fact n = n * fact (n - 1);
-fuct n = n + fuct (n ** 3 );
+fact n = if n == 0 then 1 else n * fact (n - 1);
+fuct n = let fn x = x ** 3, k = 4 in k + fn n;
 
 fop x y = x ==-> (y + 15);
 
-main = fn 4 (5 + y);
+main = folded compare;

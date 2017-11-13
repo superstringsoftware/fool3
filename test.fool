@@ -1,15 +1,7 @@
-fn x y = x + y;
+# new generation: trying to work with fully dependent types
+# this means there's no difference between a function and a type function
 
-var t = 100;
+# constructor function that creates a pair where 2nd el is always bigger
+depPair x:Int y:Float = if x < y then DepPair x y else DepPair y x;
 
-var vec = <1,2,3,4>;
-
-data Bool = True | False;
-data List a = Cell a (List a) | Nil;
-data Maybe a = Just a | Nothing;
-data Silly = Struct Int String Float;
-data Either a b = Left a | Right b;
-
-data Person = Person name:String, age : Int, dob: Date;
-
-def main() fn (4,5);
+vecRand n a = Vec (Array a) n;

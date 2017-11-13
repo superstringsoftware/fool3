@@ -19,13 +19,15 @@ type IntState a = StateT InterpreterState IO a
 
 type HashTable k v = H.BasicHashTable k v
 type ExpressionTable = HashTable Name Expr
+type CoreExpressionTable = HashTable Name DExpr
 
 data InterpreterState = InterpreterState {
     funTable :: ExpressionTable, -- global function and operator table
     symTable :: ExpressionTable, -- global symbol table for variable bidnings
     localSymTable :: ExpressionTable, -- local table in the current scope (e.g., when processing a function call)
     typeTable :: ExpressionTable,
-    logs     :: [String]
+    logs     :: [String],
+    lambdas  :: CoreExpressionTable -- here we will store named lambda expressions for *both Constructors AND normal functions!!!*
 } deriving Show
 
 -- resolves a symbol by name starting with local scope and going up
@@ -33,9 +35,9 @@ resolveSymbol :: Name -> IntState Expr
 resolveSymbol name = do
     st <- get
     loc <- liftIO $ H.lookup (localSymTable st) name
-    if (loc == Nothing) then do
+    if loc == Nothing then do
         glob <- liftIO $ H.lookup (symTable st) name
-        if (glob == Nothing) then return $ ERROR $ "Couldn't resolve symbol " ++ name
+        if glob == Nothing then return $ ERROR $ "Couldn't resolve symbol " ++ name
         else do
             let (Just x) = glob
             return x
@@ -72,12 +74,14 @@ initializeInterpreter = do
     st <- H.new
     lt <- H.new
     tt <- H.new
-    return $ InterpreterState {
+    lam <- H.new
+    return InterpreterState {
                 funTable = ft,
                 typeTable = tt,
                 symTable = st,
                 localSymTable = lt,
-                logs = []
+                logs = [],
+                lambdas = lam
              }
 
 -- process a single expression and alter the interpreter state correspondigly
@@ -107,11 +111,6 @@ processExpr e@(App _ _) = do
     liftIO $ putStrLn "Evaluation:"
     res <- evalStep e
     liftIO $ putStrLn $ show res
-
--- binding a global variable
-processExpr (GlobalVar name ex) = do
-    st <- get
-    liftIO $ addBinding (symTable st) name ex
 
 processExpr _ = do return ()
 
