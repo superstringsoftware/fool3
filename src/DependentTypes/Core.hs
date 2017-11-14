@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Core where
+module DependentTypes.Core where
 
 import TermColors
 
@@ -39,12 +39,6 @@ Widget.x w:Widget = case w of Box -> Widget.Box.x
 
 Something like that.
 -}
-data DExpr
-  = DLit Literal
-  | DVar Name -- for bound variables and functions???
-  | DLam Var DExpr
-  | DApp DExpr DExpr
-    deriving (Eq, Ord, Show)
 
 {-
 Refresher on lambdas.
@@ -61,33 +55,46 @@ Just = DLam (Id a TStar) (DLam (Id x (TVar a))  DApp (DVar x) ??? )
 this way, we annotate types by the last Expression in application tree.
 -}
 
+-- Core AST type
+data Expr
+  = Lit Literal
+  | Var Name -- for bound variables and functions???
+  | Lam Var  Expr
+  | App Expr Expr
+  deriving (Eq, Ord, Show)
+
+
 data Literal = LInt !Int | LFloat !Double | LChar !Char deriving (Eq, Ord, Show)
 
-data Var
-  = Id Name Type
-  | TyVar Name Kind
+data Var = Id Name Type | TyVar Name Kind
   deriving (Show, Eq, Ord)
 
-getVarName (Id n _) = n
-getVarName (TyVar n _) = n
+type TVar = Var -- type synonim to handle Forall predicates
 
+varName (Id n _) = n
+varType (Id _ t) = t
+
+-- anything that can be on the right side of ':' in expressions - so a type or a kind or type function that may depend on values etc
 data Type
-  = TVar Name -- TVar
-  | TCon Name -- TyCon
-  | TApp Type Type
-  | TArr Type Type
+  = TVar TVar -- a:* - careful, we CANNOT use 'Id' constructor from Var here
+  | TCon TyCon -- Maybe, String, Int etc - just a name of the constructor
+  | TApp Type Type -- Constructor application - Maybe Int, List a etc
+  | TArr Type Type -- Function sig - Maybe a -> String etc
   | TForall [Pred] [TVar] Type
   | ToDerive -- added it to handle initial parsing
-  | TStar -- what if we are doing fully dependent types - then there should be no difference between Kinds and types,
-    -- we will represent KStar as TStar, then * -> * would be TApp TStar TStar, but at the same time we can build different
-    -- crazy functions that can take types, values etc arguments and construct any kind of stuff.
   deriving (Show, Eq, Ord)
 
+-- Since we are doing dependent types, we need to be able to do both the standard:
+-- Maybe :: * -> * as well as something for Vector a:* n:Int which would look like:
+-- Vector :: * -> Int -> *
+-- We are using KTerm constructor to describe it - just need to be careful, since valid value there is only
+-- *Concrete* type!
 data Kind
   = KStar
   | KArr Kind Kind
   | KPrim
   | KVar Name
+  | KTerm Type
   deriving (Show, Eq, Ord)
 
 data TyCon
@@ -99,37 +106,6 @@ data Pred
   = IsIn Name Type
   deriving (Show, Eq, Ord)
 
--------------------------------------------------------------------------------
--- Type Variables
--------------------------------------------------------------------------------
-
-data TVar = TV
-  { tvName   :: Name
-  } deriving (Show, Eq, Ord)
-
-
--------------------------------------------------------------------------------
--- Alpha Equivalence
--------------------------------------------------------------------------------
-
-class Alpha a where
-  aeq :: a -> a -> Bool
-
-instance Alpha TVar where
-  aeq _ _ = True
-
-instance Alpha Type where
-  aeq (TVar _) (TVar _)     = True
-  aeq (TApp a b) (TApp c d) = aeq a c && aeq b d
-  aeq (TArr a b) (TArr c d) = aeq a c && aeq b d
-  aeq (TCon a) (TCon b)     = a == b
-  aeq _ _                   = False
-
-instance Alpha Kind where
-  aeq KStar KStar = True
-  aeq KPrim KPrim = True
-  aeq (KArr a b) (KArr c d) = aeq a c && aeq b d
-  aeq _ _ = False
 
 -------------------------------------------------------------------------------
 -- Pretty Print typeclass
@@ -138,8 +114,8 @@ class PrettyPrint a where
   prettyPrint :: a -> String
 
 instance PrettyPrint Type where
-  prettyPrint (TVar nm) = nm
-  prettyPrint (TCon nm) = as [yellow, bold] nm
+  --prettyPrint (TVar nm) = nm
+  --prettyPrint (TCon nm) = as [yellow, bold] nm
   prettyPrint ToDerive  = as [dgray, bold] "?"
   prettyPrint (TApp t1 t2) = prettyPrint t1 ++ " " ++ prettyPrint t2
   prettyPrint e = show e
