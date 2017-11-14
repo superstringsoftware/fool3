@@ -18,10 +18,11 @@ library
   exposed-modules:     Lexer
                      , Syntax
                      , Parser
-                     , Core
                      , Interpreter
                      , TermColors
                      , DependentTypes.Core
+                     , DependentTypes.Eval
+                     , State
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , vector

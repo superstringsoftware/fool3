@@ -18,6 +18,7 @@ data List a = Cell a (List a) | Nil;
 data Maybe a = Just a | Nothing;
 data Silly = Struct Int String Float;
 data Either a b = Left a | Right b;
+data Pair a b = Pair a b;
 
 data Person = Person { name:String, age : Int, dob: Maybe Date, pm : List a} | Fun Int String | Weird;
 
@@ -27,4 +28,10 @@ fuct n = let fn x = x ** 3, k = 4 in k + fn n;
 
 fop x y = x ==-> (y + 15);
 
-main = folded compare;
+main = square 4;
+
+square x = x * x;
+
+# testing product type construction
+productDataTest = Person :*: (dob:Date) :*: 4;
+sumDataTest = Person :+: (Maybe a) :+: (Cons a Int);

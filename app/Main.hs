@@ -19,6 +19,8 @@ import Control.Monad.Trans.State.Strict -- trying state monad transformer to mai
 
 import Data.Functor.Identity
 
+import State
+
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
@@ -39,6 +41,8 @@ processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
 processCommand (":vars":_) = get >>= liftIO . prettyPrintST . symTable
 processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
 processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
+processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
+processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
 processCommand (":all":_) = do
   st <- get
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
@@ -77,6 +81,7 @@ showHelp = do
     putStrLn ":functions      -- list all global functions"
     putStrLn ":types          -- list all types"
     putStrLn ":all            -- list everything"
+    putStrLn ":core           -- dump core"
     putStrLn ":load <name>    -- load and interpret file <name>"
     putStrLn ":run            -- execute main() if it is present"
 

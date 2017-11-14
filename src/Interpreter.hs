@@ -6,32 +6,23 @@ import qualified Data.Vector.Unboxed as U
 
 import qualified Data.HashTable.IO as H
 
-import Core
+import DependentTypes.Core
 import Syntax
 import Parser
+
+import TermColors
+import Data.Char (isUpper)
 
 import Control.Monad (zipWithM_)
 
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 import Control.Monad.IO.Class (liftIO)
 
-type IntState a = StateT InterpreterState IO a
-
-type HashTable k v = H.BasicHashTable k v
-type ExpressionTable = HashTable Name Expr
-type CoreExpressionTable = HashTable Name DExpr
-
-data InterpreterState = InterpreterState {
-    funTable :: ExpressionTable, -- global function and operator table
-    symTable :: ExpressionTable, -- global symbol table for variable bidnings
-    localSymTable :: ExpressionTable, -- local table in the current scope (e.g., when processing a function call)
-    typeTable :: ExpressionTable,
-    logs     :: [String],
-    lambdas  :: CoreExpressionTable -- here we will store named lambda expressions for *both Constructors AND normal functions!!!*
-} deriving Show
+import State
+import DependentTypes.Eval
 
 -- resolves a symbol by name starting with local scope and going up
-resolveSymbol :: Name -> IntState Expr
+resolveSymbol :: Name -> IntState FlExpr
 resolveSymbol name = do
     st <- get
     loc <- liftIO $ H.lookup (localSymTable st) name
@@ -46,7 +37,7 @@ resolveSymbol name = do
         return x
 
 -- resolve a function in a global scope (should we have it in local as well, lambdas for instance?)
-resolveFunction :: Name -> IntState Expr
+resolveFunction :: Name -> IntState FlExpr
 resolveFunction name = do
     st <- get
     fun <- liftIO $ H.lookup (funTable st) name
@@ -57,7 +48,7 @@ resolveFunction name = do
 
 
 -- resolve a function in a global scope (should we have it in local as well, lambdas for instance?)
-resolveType :: Name -> IntState Expr
+resolveType :: Name -> IntState FlExpr
 resolveType name = do
     st <- get
     fun <- liftIO $ H.lookup (typeTable st) name
@@ -85,39 +76,43 @@ initializeInterpreter = do
              }
 
 -- process a single expression and alter the interpreter state correspondigly
-processExpr :: Expr -> IntState ()
+processExpr :: FlExpr -> IntState ()
 -- binding functions and ops
 processExpr e@(Function name _ _) = do
     st <- get
     liftIO $ H.insert (funTable st) name e
+    liftIO $ H.insert (lambdas st) name (foolToCore e)
 -- processExpr st e@(BinaryDef _ _ _) = addExpression e (funTable st) >> return st
 -- processExpr st e@(UnaryDef _ _ _) = addExpression e (funTable st) >> return st
-processExpr e@(TypeDef name _ _) = do
+processExpr e@(TypeDef name vars cons) = do
     st <- get
     liftIO $ H.insert (typeTable st) name e
+    liftIO $ H.insert (lambdas st) name (foolToCore e)
+    -- mapM_ (fn (lambdas st)) cons
+    -- where fn ls cs@(Constructor nm _) = liftIO $ H.insert ls nm (foolToCore cs)
 {-
 processExpr e@(Record name _ _) = do
     st <- get
     liftIO $ H.insert (typeTable st) name e
 -}
 -- executing binary op
-processExpr e@(BinaryOp name _ _) = do
-    res <- evalStep e
-    -- putStrLn "Evaluation:"
-    liftIO $ putStrLn $ show res
-
+processExpr e@(BinaryOp name _ _) = processExprGeneric True e
 -- executing function call
-processExpr e@(App _ _) = do
-    liftIO $ putStrLn "Evaluation:"
-    res <- evalStep e
-    liftIO $ putStrLn $ show res
+processExpr e@(FlApp _ _) = processExprGeneric True e
 
 processExpr _ = do return ()
+
+processExprGeneric b e = do
+    let e1 = foolToCore e
+    liftIO $ putStrLn $ as [bold, underlined] "Converted to:"
+    liftIO $ putStrLn $ prettyPrint e1
+    res <- evalExpr b e1
+    liftIO $ putStrLn $ prettyPrint res
 
 
 
 -- adds function or operator definition to the table
-addExpression :: Expr -> ExpressionTable -> IO () -- FunctionTable
+addExpression :: FlExpr -> ExpressionTable -> IO () -- FunctionTable
 addExpression e@(Function name _ _) ft = H.insert ft name e
 -- addExpression e@(BinaryDef name _ _) ft = H.insert ft ("operator"++name) e
 -- addExpression e@(UnaryDef name _ _) ft = H.insert ft ("operator"++name) e
@@ -125,7 +120,7 @@ addExpression e@(TypeDef name _ _) tt = H.insert tt name e
 addExpression _ ft = return ()
 
 -- add a variable binding to a table, String is a
-addBinding :: ExpressionTable -> String -> Expr -> IO ()
+addBinding :: ExpressionTable -> String -> FlExpr -> IO ()
 addBinding st sym ex =
     case ex of
         (Function _ _ _)  -> errf
@@ -133,21 +128,22 @@ addBinding st sym ex =
         otherwise -> do H.insert st sym ex
     where errf = do putStrLn "[ERROR] Can't bind a Function / Operator or a Var declaration!"
 
-ftoList :: ExpressionTable -> IO [(Name,Expr)]
+ftoList :: ExpressionTable -> IO [(Name,FlExpr)]
 ftoList = H.toList
 
 -- process one module (file) and building top-level operator and function table
-loadModule :: [Expr] -> InterpreterState -> IO InterpreterState
+loadModule :: [FlExpr] -> InterpreterState -> IO InterpreterState
 loadModule exs st = do
     let ft = funTable st
     mapM_ (flip addExpression $ ft) exs
     return st
 
 -- getting main function from the function table
-findMain :: ExpressionTable -> IO (Maybe Expr)
+findMain :: ExpressionTable -> IO (Maybe FlExpr)
 findMain ft = H.lookup ft "main"
 
-evalStep :: Expr -> IntState Expr
+{-
+evalStep :: FlExpr -> IntState FlExpr
 -- basic terminals first
 evalStep e@(PInt _) = return e
 evalStep e@(PFloat _) = return e
@@ -168,12 +164,12 @@ evalStep e@(BinaryOp "+" e1 e2) =
 
 -- evaluate variable - check bindings, if there are - substituting, if not - returning as is
 evalStep e@(Var n) = do
-    res <- resolveSymbol (getVarName n)
+    res <- resolveSymbol (varName n)
     case res of
         (ERROR _) -> return e
         otherwise -> return res
 
-{-
+
 -- the most important - executing a call
 evalStep e@(Call fname vals') = do
     -- try resolving vals in case they are variables (need it for stacked calls)
@@ -194,10 +190,12 @@ evalStep e@(Call fname vals') = do
             liftIO $ mapM_ (H.delete $ localSymTable state) vars
             return res
         otherwise -> return fn
--}
-evalStep e = return $ ERROR ("Not implemented eval: " ++ (show e))
 
--- evalTrace :: Expr -> IO()
+evalStep e = return $ ERROR ("Not implemented eval: " ++ (show e))
+-}
+
+
+-- evalTrace :: FlExpr -> IO()
 -- evalTrace e = case e of
 
 nameToOp :: String -> (forall a. Num a => a->a->a)
@@ -211,8 +209,8 @@ isPrimitive (PFloat _) = True
 isPrimitive _ = False
 
 
--- evalBinaryOp :: Expr -> Expr
-execPrimitiveBinaryOp :: (forall a. Num a => a->a->a)->Expr->Expr->Expr
+-- evalBinaryOp :: FlExpr -> FlExpr
+execPrimitiveBinaryOp :: (forall a. Num a => a->a->a)->FlExpr->FlExpr->FlExpr
 execPrimitiveBinaryOp op (PInt x1) (PInt x2) = PInt (op x1 x2)
 execPrimitiveBinaryOp op (PFloat x1) (PFloat x2) = PFloat (op x1 x2)
 execPrimitiveBinaryOp op (PInt x1) (PFloat x2) = PFloat (op (fromIntegral x1) x2)
@@ -220,7 +218,7 @@ execPrimitiveBinaryOp op (PFloat x1) (PInt x2) = PFloat (op x1 (fromIntegral x2)
 execPrimitiveBinaryOp op e1 e2 = ERROR ("Not implemented op: (" ++ (show e1) ++ ", " ++ (show e2) ++ ")")
 
 {-
-evalExprStep :: Expr -> FunctionTable -> IO()
+evalExprStep :: FlExpr -> FunctionTable -> IO()
 evalExprStep e@(Function _ _ _) ft = funTable >>= addFunction e
 -}
 
@@ -239,6 +237,13 @@ prettyPrintST :: ExpressionTable -> IO ()
 prettyPrintST ft = H.mapM_ f ft where
     f (k,v) = putStrLn $ (k ++ " ≡ " ++ (show v))
 
-testPrg = "def id(x) x; def binary --> 2 (x y) x*y*x;\
-\ def fg(x y) x+(y*y);\
-\ def main() 4 --> fg(4,17.0) - id(4);"
+
+prettyPrintLS :: CoreExpressionTable -> IO ()
+prettyPrintLS ls = H.mapM_ f ls where
+    f (k,v) = putStrLn $ clr k ++ " = " ++ prettyPrint v
+              where clr s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
+
+showLS :: CoreExpressionTable -> IO ()
+showLS ls = H.mapM_ f ls
+          where f (k,v) = putStrLn $ clr k ++ " = " ++ show v
+                          where clr s = if isUpper (head s) then as [bold, red] s else as [bold, green] s

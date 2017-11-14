@@ -23,12 +23,12 @@ import qualified Data.Vector.Unboxed as U
 
 import Lexer
 import Syntax
-import Core
+import DependentTypes.Core
 
-int :: Parser Expr
+int :: Parser FlExpr
 int = PInt <$> fromInteger <$> integer
 
-floating :: Parser Expr
+floating :: Parser FlExpr
 floating = PFloat <$> float
 
 binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
@@ -54,12 +54,12 @@ binops = [[binary "=" Ex.AssocLeft]
 lIdentifier = skipMany space >> lookAhead lower >> identifier
 uIdentifier = skipMany space >> lookAhead upper >> identifier
 
-expr :: Parser Expr
+expr :: Parser FlExpr
 expr = Ex.buildExpressionParser (binops ++ [[binop]]) factor
 -- expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
 
 -- concrete type or type application
-typeAp :: Parser Expr
+typeAp :: Parser FlExpr
 typeAp = do
   name <- uIdentifier
   vars <- many $ try (Type <$> TCon <$> uIdentifier) <|> try ( Type <$> TVar <$> lIdentifier ) <|> (parens typeAp)
@@ -69,16 +69,16 @@ typeAp = do
   where f acc t = TApp acc (extractType t)
 
 -- concrete type only
-concreteType :: Parser Expr
+concreteType :: Parser FlExpr
 concreteType = uIdentifier >>= return . Type . TCon
 
 
--- helper function to extract Type and Var from Expr
+-- helper function to extract Type and Var from FlExpr
 extractType (Type t) = t
 extractVar (Var v) = v
 
 -- variable with type
-variable :: Parser Expr
+variable :: Parser FlExpr
 variable = do
   name <- lIdentifier
   typ <- try (reservedOp ":" *> parens typeAp) <|>
@@ -88,31 +88,31 @@ variable = do
   return $ Var (Id name (extractType typ))
 
 -- variables in records need to be handled differently
-varInRecord :: Parser Expr
+varInRecord :: Parser Var
 varInRecord = do
   name <- lIdentifier
   typ <- try (reservedOp ":" *> parens typeAp) <|>
          try (reservedOp ":" *> typeVariable) <|>
          (reservedOp ":" *> typeAp)
-  return $ Var (Id name (extractType typ))
+  return $ Id name (extractType typ)
 
 -- type variable - Kind is always '*', needs to be adjusted at later stages
-typeVariable :: Parser Expr
+typeVariable :: Parser FlExpr
 typeVariable = do
   name <- lIdentifier
   return $ Var (TyVar name KStar)
 
 -- this, parametricType and dataDef parses haskell based data hello = Text a b | Nil type of data definitions
-constructor :: Parser Expr
+constructor :: Parser FlExpr
 constructor = do
   name <- uIdentifier
-  vars <- many  (try (Var <$> (Id "") <$> TCon <$> uIdentifier) <|> -- concrete type
-                 try ( Var <$> (Id "") <$> TVar <$> lIdentifier) <|> -- type var
-                 (Var <$> (Id "") <$>  extractType <$> (parens typeAp)) -- complex type, like List a
+  vars <- many  (try ((Id "") <$> TCon <$> uIdentifier) <|> -- concrete type
+                 try ((Id "") <$> TVar <$> lIdentifier) <|> -- type var
+                 ((Id "") <$>  extractType <$> (parens typeAp)) -- complex type, like List a
                  <?> "regular constructor failed")
   return $ Constructor name vars
 
-recordConstructor :: Parser Expr
+recordConstructor :: Parser FlExpr
 recordConstructor = do
   name <- uIdentifier
   whitespace >> char '{' >> whitespace
@@ -123,7 +123,7 @@ recordConstructor = do
 constructors = try recordConstructor <|> constructor
 
 -- simple ADT
-typeDef :: Parser Expr
+typeDef :: Parser FlExpr
 typeDef = do
   reserved "data"
   name <- uIdentifier
@@ -132,7 +132,7 @@ typeDef = do
   fields <- sepBy1 constructors (char '|')
   return $ TypeDef name vars fields
 
-function :: Parser Expr
+function :: Parser FlExpr
 function = do
   name <- lIdentifier
   args <- many (extractVar <$> variable)   -- (parens $ many identifier) <|> (parens $ commaSep identifier)
@@ -140,25 +140,25 @@ function = do
   body <- expr
   return $ Function name args body
 
-extern :: Parser Expr
+extern :: Parser FlExpr
 extern = do
   reserved "extern"
   name <- lIdentifier
   args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
   return $ Extern name args
 
-call :: Parser Expr
+call :: Parser FlExpr
 call = do
   name <- identifier
   args <- many $ try expr <|> parens expr
   let acc = SymId name
   if (length args == 0) then return $ acc
   else let e = foldl f acc args in return e -- type application
-  where f acc arg = App acc arg
+  where f acc arg = FlApp acc arg
 
   -- return $ Call name args
 
-ifthen :: Parser Expr
+ifthen :: Parser FlExpr
 ifthen = do
   reserved "if"
   cond <- expr
@@ -166,17 +166,17 @@ ifthen = do
   tr <- expr
   reserved "else"
   fl <- expr
-  return $ If cond tr fl
+  return $ FlIf cond tr fl
 
-letins :: Parser Expr
+letins :: Parser FlExpr
 letins = do
   reserved "let"
   defs <- commaSep function
   reserved "in"
   body <- expr
-  return $ Let defs body
+  return $ FlLet defs body
 
-unarydef :: Parser Expr
+unarydef :: Parser FlExpr
 unarydef = do
   reserved "def"
   reserved "unary"
@@ -186,7 +186,7 @@ unarydef = do
   body <- expr
   return $ Function o args body
 
-binarydef :: Parser Expr
+binarydef :: Parser FlExpr
 binarydef = do
   reserved "def"
   reserved "binary"
@@ -197,7 +197,7 @@ binarydef = do
   body <- expr
   return $ Function o args body
 
-factor :: Parser Expr
+factor :: Parser FlExpr
 factor = try vector
       <|> try ifthen
       <|> try letins
@@ -210,13 +210,13 @@ factor = try vector
 -- <|> try variable
 -- <|> try for
 
-defn :: Parser Expr
+defn :: Parser FlExpr
 defn = try extern
     <|> try typeDef
     <|> try function
     <|> try unarydef
     <|> try binarydef
-    -- <|> expr
+    <|> expr
 
 -- <|> try record
 
@@ -227,7 +227,7 @@ contents p = do
   eof
   return r
 
-toplevel :: Parser [Expr]
+toplevel :: Parser [FlExpr]
 toplevel = many $ do
     def <- defn
     reservedOp ";"
@@ -289,14 +289,8 @@ for = do
 
 -}
 
--- polymorphic list: [x, 2+4, 1.3]
-list :: Parser Expr
-list = do
-  args <- brackets $ commaSep expr
-  return $ ListExpr args
-
 -- numeric vector: <1,2,3.4>
-vector :: Parser Expr
+vector :: Parser FlExpr
 vector = do
     -- we are checking something is between <>
     -- then separating this input by commas

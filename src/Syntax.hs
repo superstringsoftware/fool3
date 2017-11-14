@@ -5,42 +5,63 @@ import Data.Word
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Generic as V
 
-import Core
+import DependentTypes.Core
 -- import Data.Text
 
 import TermColors
 
-data Expr
+-- Surface language AST syntax
+data FlExpr
   = PFloat !Double -- primitive values
   | PInt !Int
   | PByte !Word8
-  | ListExpr [Expr] -- polymorphic list, just a placeholder for now
   | VInt (U.Vector Int) -- vectors of primitive values
   | VFloat (U.Vector Double)
   | VByte (U.Vector Word8)
   -- concrete specific types are over
   | Var Var -- variable from Core
   | Type Type -- type from Core
-  | TypeDef Name [Var] [Expr] -- data Name, then type vars, then constructors: data List a = Cell a (List a) | Nil
-  | Constructor Name [Expr] -- constructor only, Name then Types or Vars: Cell a (List a)
-  | App Expr Expr -- function call; should we move operator calls here???
+  | TypeDef Name [Var] [FlExpr] -- data Name, then type vars, then constructors: data List a = Cell a (List a) | Nil
+  | Constructor Name [Var] -- constructor only, Name then Types or Vars: Cell a (List a)
+  | FlApp FlExpr FlExpr -- function call; should we move operator calls here???
   | SymId Name -- again, for Apps
   | NoArgs -- dummy value that is used when we are building App hierarchy when something is called without args. There's probably a better way to do it!
-  | Function Name [Var] Expr -- function definition: name, variables names, body expr
+  | Function Name [Var] FlExpr -- function definition: name, variables names, body expr
   | Extern Name [Name] -- external function declaration
-  | BinaryOp Name Expr Expr
-  | UnaryOp Name Expr
-  | If Expr Expr Expr
-  | Let [Expr] Expr -- changed format, first [Expr] will basically be an array of function definitions, since values *are* functions
-  -- | For Name Expr Expr Expr Expr
-  -- | Let Name Expr Expr -- let x=1, y=2 in x*y; - bound expression blocks, is it basically lambda??
-  -- | BinaryDef Name [Name] Expr -- operator definitions - move to function definition??
-  -- | UnaryDef Name [Name] Expr
-  -- | GlobalVar Name Expr -- binding for a global var, interpreter only
+  | BinaryOp Name FlExpr FlExpr
+  | UnaryOp Name FlExpr
+  | FlIf FlExpr FlExpr FlExpr
+  | FlLet [FlExpr] FlExpr -- changed format, first [Expr] will basically be an array of function definitions, since values *are* functions
   | ERROR String -- debugging only?
   deriving (Eq, Ord, Show)
 
-instance PrettyPrint Expr where
+-------------------------------------------------------------------------------
+-- Converting Fl to Core
+-------------------------------------------------------------------------------
+foolToCore :: FlExpr -> Expr
+foolToCore (Constructor nm vars) = foldr Lam (Tuple nm (reverse $ fst $ genList vars) (Tp ToDerive)) vars
+    where genList = foldr (\x (l, i) -> ( VarIn i:l, i+1)  ) ([],0)
+    -- looks complex but it's not, simply passing 2 accumulators - index and a list - at once in a pair
+
+foolToCore (TypeDef nm vars cons) = foldr Lam (Tuple nm consList (Tp ToDerive)) vars
+    where consList = map foolToCore cons
+foolToCore (Function nm vars ex) = foldr Lam (foolToCore ex) vars
+foolToCore (FlApp e1 e2) = App (foolToCore e1) (foolToCore e2)
+foolToCore (SymId nm) = VarId nm
+foolToCore (BinaryOp nm e1 e2) = App (App (VarId $ "("++nm++")") (foolToCore e1)) (foolToCore e2)
+foolToCore (PInt x) = Lit $ LInt x
+foolToCore (FlIf e1 e2 e3) = If (foolToCore e1) (foolToCore e2) (foolToCore e3)
+foolToCore (FlLet exs e) = foldr fn (foolToCore e) exs -- unwinding List into the tree
+    where fn x@(Function nm _ _) = Let nm (foolToCore x)
+
+foolToCore e = VarId $ "NOT IMPLEMENTED: " ++ show e
+
+-- foolToCore (TypeDef nm vars cons) =
+
+-------------------------------------------------------------------------------
+-- Pretty Print typeclass
+-------------------------------------------------------------------------------
+instance PrettyPrint FlExpr where
   prettyPrint (PFloat x) = as [lmagenta] (show x)
   prettyPrint (PInt x) = as [lmagenta] (show x)
   prettyPrint (VFloat v) = as [bold] "< " ++ V.foldl fn (as [lmagenta] (show $ V.head v)) (V.tail v) ++ as [bold] " >"
@@ -63,65 +84,3 @@ instance PrettyPrint Expr where
                                     where fn acc e = acc ++ prettyPrint e ++ " "
   prettyPrint e = show e
 -- prettyPrint (Var )
-
-{-
-
-data Expr
-  = PFloat !Double -- primitive values
-  | PInt !Int
-  | PByte !Word8
-  | ListExpr [Expr] -- polymorphic list, just a placeholder for now
-  | VInt (U.Vector Int) -- vectors of primitive values
-  | VFloat (U.Vector Double)
-  | VByte (U.Vector Word8)
-  | Var String String -- variable symbol with a name and a type
-  | DataDef Name [Expr] [Expr] -- data Name, then type vars, then constructors: data List a = Cell a (List a) | Nil
-  | Constructor Name [Expr] -- constructor only, Name then Types or Vars: Cell a (List a)
-  | ParametricType Name [Expr] -- Parametric type call used in constructor definitions, e.g. List a inside Cell
-  | Type Name -- Concrete type
-  | Call Name [Expr] -- function call; should we move operator calls here???
-  | Function Name [Name] Expr -- function definition: name, variable names, expr
-  | Extern Name [Name] -- external function declaration
-  | BinaryOp Name Expr Expr
-  | UnaryOp Name Expr
-  | If Expr Expr Expr
-  | For Name Expr Expr Expr Expr
-  | Let Name Expr Expr -- let x=1, y=2 in x*y; - bound expression blocks, is it basically lambda??
-  -- | BinaryDef Name [Name] Expr -- operator definitions - move to function definition??
-  -- | UnaryDef Name [Name] Expr
-  | GlobalVar Name Expr -- binding for a global var, interpreter only
-  | ERROR String -- debugging only?
-  -- beginning of types
-  | Record Name [(Name,Name)] [Expr] -- simple record, named, [(fieldName, typeName)]
-  deriving (Eq, Ord, Show)
-
-
-
-instance Show Expr where
-    show (PFloat x) = show x
-    show (PInt x) = show x
-    show (PByte x) = show x
-    show (VInt v) = show v
-    show (VFloat v) = show v
-    show (VByte v) = show v
-    show (Var s) = "(Var " ++ s ++ ")"
-    show (Call nm ex) = nm ++ (show ex)
-    show (Function nm vars defn) = nm ++ (show vars) ++ " ≡ " ++ (show defn)
-    show (BinaryOp nm x y) = (show x) ++ nm ++ (show y)
-    -- show (BinaryDef nm vars defn) = "operator " ++ nm ++ " " ++ (show vars) ++ " ≡ " ++ (show defn)
-    show (Let nm e1 e2) = "let " ++ nm ++ (show e1) ++ (show e2)
-    show (ERROR s) = "[ERROR] " ++ s
-    show (GlobalVar v def) = "Var " ++ v ++ " ≡ " ++ (show def)
--}
-
-
--- next attempt, based on what's in docs/base. For now it's basically incorrect,
--- need to handle the hierarchy of TypeFunction --> TypeConstructor --> Value correctly
-
--- types in the system
--- data AllTypes = BOTTOM | TOP | EMPTY | UNIT | Type deriving Show
-
--- record holding generic variable that can be indexing values or types
--- data Variable = Variable String AllTypes deriving Show
-
--- data TypeFunction = TypeFunction Name [Variable] deriving Show
