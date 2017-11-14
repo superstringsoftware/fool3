@@ -96,9 +96,9 @@ processExpr e@(Record name _ _) = do
     liftIO $ H.insert (typeTable st) name e
 -}
 -- executing binary op
-processExpr e@(BinaryOp name _ _) = processExprGeneric True e
+processExpr e@(BinaryOp name _ _) = processExprGeneric False e
 -- executing function call
-processExpr e@(FlApp _ _) = processExprGeneric True e
+processExpr e@(FlApp _ _) = processExprGeneric False e
 
 processExpr _ = do return ()
 
@@ -106,8 +106,9 @@ processExprGeneric b e = do
     let e1 = foolToCore e
     liftIO $ putStrLn $ as [bold, underlined] "Converted to:"
     liftIO $ putStrLn $ prettyPrint e1
-    res <- evalExpr b e1
-    liftIO $ putStrLn $ prettyPrint res
+    evalExpr b e1
+    -- liftIO $ putStrLn $ prettyPrint res
+    return ()
 
 
 

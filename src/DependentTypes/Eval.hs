@@ -33,7 +33,7 @@ data Expr
 evalExpr :: Bool -> Expr -> IntState Expr
 evalExpr b ex = do
   ex' <- evalStep b ex
-  if ex == ex' then return ex else evalExpr b ex'
+  if ex == ex' then return ex else (liftIO $ putStrLn $ prettyPrint ex') >> evalExpr b ex'
 
 -- small evaluation step
 -- if True, printing stacktrace, if False, quiet
