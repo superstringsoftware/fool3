@@ -19,7 +19,7 @@ data Maybe a = Just a | Nothing;
 data Silly = Struct Int String Float;
 data Either a b = Left a | Right b;
 
-data Person = Person {name:String, age : Int, dob: Maybe Date, pm : List a} | Fun Int String | Weird;
+data Person = Person { name:String, age : Int, dob: Maybe Date, pm : List a} | Fun Int String | Weird;
 
 # fact 0 = 1;
 fact n = if n == 0 then 1 else n * fact (n - 1);

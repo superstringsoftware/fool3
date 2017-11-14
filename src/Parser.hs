@@ -84,9 +84,16 @@ variable = do
   typ <- try (reservedOp ":" *> parens typeAp) <|>
          try (reservedOp ":" *> concreteType) <|>
          try (reservedOp ":" *> typeVariable) <|>
-
-
          pure (Type ToDerive)
+  return $ Var (Id name (extractType typ))
+
+-- variables in records need to be handled differently
+varInRecord :: Parser Expr
+varInRecord = do
+  name <- lIdentifier
+  typ <- try (reservedOp ":" *> parens typeAp) <|>
+         try (reservedOp ":" *> typeVariable) <|>
+         (reservedOp ":" *> typeAp)
   return $ Var (Id name (extractType typ))
 
 -- type variable - Kind is always '*', needs to be adjusted at later stages
@@ -99,16 +106,17 @@ typeVariable = do
 constructor :: Parser Expr
 constructor = do
   name <- uIdentifier
-  vars <- many $ try (Var <$> (Id "") <$> TCon <$> uIdentifier) <|> -- concrete type
+  vars <- many  (try (Var <$> (Id "") <$> TCon <$> uIdentifier) <|> -- concrete type
                  try ( Var <$> (Id "") <$> TVar <$> lIdentifier) <|> -- type var
                  (Var <$> (Id "") <$>  extractType <$> (parens typeAp)) -- complex type, like List a
+                 <?> "regular constructor failed")
   return $ Constructor name vars
 
 recordConstructor :: Parser Expr
 recordConstructor = do
   name <- uIdentifier
   whitespace >> char '{' >> whitespace
-  vars <- commaSep variable
+  vars <- commaSep varInRecord
   whitespace >> char '}' >> whitespace
   return $ Constructor name vars
 
