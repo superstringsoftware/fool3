@@ -95,7 +95,7 @@ etc.
 -}
 
 
-data Literal = LInt !Int | LFloat !Double | LChar !Char deriving (Eq, Ord, Show)
+data Literal = LInt !Int | LFloat !Double | LChar !Char | LBool Bool deriving (Eq, Ord, Show)
 
 data Var = Id Name Type | TyVar Name Kind
   deriving (Show, Eq, Ord)
@@ -180,6 +180,8 @@ instance PrettyPrint Expr where
 
 instance PrettyPrint Literal where
   prettyPrint (LInt x) = show x
+  prettyPrint (LFloat x) = show x
+  prettyPrint (LBool x) = show x
   prettyPrint e = show e
 
 instance PrettyPrint Type where

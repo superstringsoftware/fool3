@@ -31,6 +31,10 @@ fop x y = x ==-> (y + 15);
 main = square 4;
 
 square x = x * x;
+quadr x = (square x) * (square x);
+tert x = x * (square x);
+
+succ x = succ succ x;
 
 # testing product type construction
 productDataTest = Person :*: (dob:Date) :*: 4;

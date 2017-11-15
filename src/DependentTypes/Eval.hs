@@ -14,8 +14,8 @@ import Control.Monad.IO.Class (liftIO)
 -- Eval: we are only doing it on core!
 -------------------------------------------------------------------------------
 -- litToPrim :: Expr -> forall a. Num a => a
-litToPrim (Lit (LInt x)) = fromIntegral x
-litToPrim (Lit (LFloat x)) = x
+litToPrim (LInt x) = fromIntegral x
+litToPrim (LFloat x) = x
 
 {-
 data Expr
@@ -29,22 +29,40 @@ data Expr
   | Tuple Name [Expr] TypeOrKind
 -}
 
--- evaluate expression until it stops simplifying (how do we know when to stop?)
+-- evaluate expression until it stops simplifying
 evalExpr :: Bool -> Expr -> IntState Expr
 evalExpr b ex = do
   ex' <- evalStep b ex
-  if ex == ex' then return ex else (liftIO $ putStrLn $ prettyPrint ex') >> evalExpr b ex'
+  if ex == ex' then return ex
+  else (liftIO $ putStrLn $ prettyPrint ex') >> evalExpr b ex'
+
+-- helper in arithmetic ops for eval
+findPrimOp "(+)" = Just (+)
+findPrimOp "(-)" = Just (-)
+findPrimOp "(*)" = Just (*)
+findPrimOp "(/)" = Just (/)
+findPrimOp _ = Nothing
+
+findBoolOp "(==)" = Just (==)
+findBoolOp "(<=)" = Just (<=)
+findBoolOp "(>=)" = Just (>=)
+findBoolOp "(>)" = Just (>)
+findBoolOp "(<)" = Just (<)
+findBoolOp _ = Nothing
 
 -- small evaluation step
 -- if True, printing stacktrace, if False, quiet
 evalStep :: Bool -> Expr -> IntState Expr
 -- built-in operators. There must be a better way of doing this.
-{-
-evalStep b (App (App (VarId "(+)") e1) e2) = do
-  e1' <- evalStep b e1
-  e2' <- evalStep b e2
-  return $ Lit $ LFloat $ litToPrim e1' + litToPrim e2'
--}
+evalStep b e@(App (App v@(VarId nm) (Lit e1)) (Lit e2)) = do
+  let pmop = findPrimOp nm
+  case pmop of Just op -> return $ Lit $ LFloat $ op (litToPrim e1) (litToPrim e2)
+               Nothing -> do
+                  let bmop = findBoolOp nm
+                  case bmop of Nothing -> evalStep b v >>= \newV -> return (App (App newV (Lit e1)) (Lit e2))
+                               Just bop -> return $ Lit $ LBool $ bop (litToPrim e1) (litToPrim e2)
+
+
 
 -- applying a Lambda - substituting
 evalStep b e@(App (Lam var expr) val) = do
@@ -65,6 +83,14 @@ evalStep b (App e1 e2) = do
   e1' <- evalStep b e1
   e2' <- evalStep b e2
   return $ App e1' e2'
+
+-- If now calculates ok for arithmetic
+evalStep b (If e1 e2 e3) = do
+  e1' <- evalStep b e1
+  case e1' of (Lit (LBool bool)) -> if bool then evalStep b e2 else evalStep b e3
+              _ -> return $ If e1' e2 e3
+
+
 
 evalStep b e = if b then return e else return e -- liftIO (print e) >>
 

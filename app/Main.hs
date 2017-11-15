@@ -3,24 +3,15 @@ module Main where
 import Parser
 import Interpreter
 import Syntax
-
 import Control.Monad.Trans
 import System.Console.Haskeline
-
 import System.Directory
-
 import System.Exit
-
 import qualified TermColors as TC
-
 import Control.Monad.IO.Class (liftIO)
-
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
-
 import Data.Functor.Identity
-
 import State
-
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
@@ -33,7 +24,7 @@ process line = do
         -- processing parsed input
         liftIO $ putStrLn $ (TC.ansifyString [TC.bold, TC.underlined] "Received expressions: ") -- ++ (show $ length ex)
         liftIO $ print ex -- show what was parsed first
-        processExpr ex -- processing expressions one by one - need to figure out how to pass STATE properly
+        processExpr ex -- processing expressions one by one
 
 
 processCommand :: [String] -> IntState ()
@@ -58,10 +49,10 @@ loadFile nm = do
     st <- get
     liftIO $ putStrLn $ "Loading file: " ++ nm
     res <- liftIO $ parseToplevelFile nm
-    liftIO $ print res
+    -- liftIO $ print res
     case res of
       Left err -> liftIO $ print err
-      Right exprs -> mapM_ processExpr exprs
+      Right exprs -> mapM_ processExpr exprs >> processCommand [":all"]
 
 run :: IntState ()
 run = do
@@ -88,7 +79,7 @@ showHelp = do
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()
 loop = do
-        minput <- getInputLine  "fool>"
+        minput <- getInputLine  "λfool3. "
         case minput of
           Nothing -> outputStrLn "Goodbye."
           Just input -> case input of
@@ -99,7 +90,14 @@ loop = do
               _ -> lift (process input) >> loop
 
 main :: IO ()
-main =
+main = do
+    greetings
     -- setting up Haskeline loop
     -- getting to the right monad in our crazy monad stack
     initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} loop)
+
+greetings = do
+  putStrLn "Welcome to Functional Object Oriented Low-Level Language (FOOL3)!"
+  putStrLn "Version 0.0.1"
+  putStrLn "(c) Copyright 2016-2017 by J X-Ray Ho"
+  putStrLn "Type :help for help on commands or :load a file.\n\n"
