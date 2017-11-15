@@ -10,7 +10,6 @@ type Name = String
 data Expr
   = Lit Literal
   | VarId Name -- for bound variables and functions???
-  | VarIn Int  -- variable index for building constructor function values mostly
   | Lam Var  Expr
   | App Expr Expr
   | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
@@ -115,7 +114,6 @@ class PrettyPrint a where
 
 instance PrettyPrint Expr where
   prettyPrint (VarId n) = n
-  prettyPrint (VarIn n) = "v" ++ show n
   prettyPrint (Lam v e) = as [bold, dgray] "λ" ++ prettyPrint v ++ ". " ++ prettyPrint e
   prettyPrint (Tuple nm exs tp) = as [magenta] nm ++ fn exs --  : " ++ prettyPrint tp - not showing types for now
       where fn [] = ""

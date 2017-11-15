@@ -39,10 +39,7 @@ data FlExpr
 -- Converting Fl to Core
 -------------------------------------------------------------------------------
 foolToCore :: FlExpr -> Expr
-foolToCore (Constructor nm vars) = foldr Lam (Tuple nm (reverse $ fst $ genList vars) (Tp ToDerive)) vars
-    where genList = foldr (\x (l, i) -> ( VarIn i:l, i+1)  ) ([],0)
-    -- looks complex but it's not, simply passing 2 accumulators - index and a list - at once in a pair
-
+foolToCore (Constructor nm vars) = foldr Lam (Tuple nm (map (\x -> VarId "") vars) (Tp ToDerive)) vars
 foolToCore (TypeDef nm vars cons) = foldr Lam (Tuple nm consList (Tp ToDerive)) vars
     where consList = map foolToCore cons
 foolToCore (Function nm vars ex) = foldr Lam (foolToCore ex) vars
