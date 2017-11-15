@@ -147,6 +147,10 @@ extern = do
   args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
   return $ Extern name args
 
+symbolId :: Parser FlExpr
+symbolId = identifier >>= return . SymId
+
+{-
 call :: Parser FlExpr
 call = do
   name <- identifier
@@ -155,8 +159,7 @@ call = do
   if (length args == 0) then return $ acc
   else let e = foldl f acc args in return e -- type application
   where f acc arg = FlApp acc arg
-
-  -- return $ Call name args
+-}
 
 ifthen :: Parser FlExpr
 ifthen = do
@@ -197,14 +200,23 @@ binarydef = do
   body <- expr
   return $ Function o args body
 
-factor :: Parser FlExpr
-factor = try vector
+
+argument :: Parser FlExpr
+argument = try (parens expr)
+      <|> try vector
       <|> try ifthen
-      <|> try letins
-      <|> (parens expr)
       <|> try floating
       <|> try int
-      <|> try call
+      <|> symbolId
+
+arguments :: Parser FlExpr
+arguments = do
+  args <- many1 argument
+  return $ foldl FlApp (head args) (tail args)
+
+
+factor :: Parser FlExpr
+factor = try letins <|> arguments
 
 
 -- <|> try variable

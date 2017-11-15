@@ -70,7 +70,8 @@ evalStep b e@(App (App v@(VarId nm) (Lit e1)) (Lit e2)) = do
 -- applying a Lambda - substituting
 evalStep b e@(App (Lam var expr) val) = do
   let ex = replaceSymbolWithExpr (varName var) expr val
-  if b then (liftIO $ putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr) >> return ex
+  if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
+    >> return ex
   else return ex
 
 evalStep b e@(VarId nm) = do
@@ -78,7 +79,7 @@ evalStep b e@(VarId nm) = do
   case excan of
     Nothing -> return e
     Just ex ->
-      if b then (liftIO $ putStrLn $ "Substituting " ++ nm ++ " to " ++ prettyPrint ex) >> return ex
+      if b then liftIO (putStrLn $ "Substituting " ++ nm ++ " to " ++ prettyPrint ex) >> return ex
       else return ex
 
 -- small step semantics
@@ -95,7 +96,7 @@ evalStep b (If e1 e2 e3) = do
 
 
 
-evalStep b e = if b then return e else return e -- liftIO (print e) >>
+evalStep b e = if b then liftIO (print e) >> return e else return e
 
 -- substituting a var with an expr: walking the tree and applying changes
 -- this has to be abstracted and generalized
@@ -104,6 +105,7 @@ replaceSymbolWithExpr nm e@(VarId vname) val = if nm == vname then val else e
 replaceSymbolWithExpr nm (Lam v e) val = Lam v (replaceSymbolWithExpr nm e val)
 replaceSymbolWithExpr nm (App e1 e2) val = App (replaceSymbolWithExpr nm e1 val) (replaceSymbolWithExpr nm e2 val)
 replaceSymbolWithExpr nm (If e1 e2 e3) val = If (replaceSymbolWithExpr nm e1 val) (replaceSymbolWithExpr nm e2 val) (replaceSymbolWithExpr nm e3 val)
+-- replaceSymbolWithExpr nm (Tuple tnm exs tp) val = Tuple tnm (map replaceSymbolWithExpr nm )
 replaceSymbolWithExpr nm e val = e
 
 lookupGlobalSymbol :: Name -> IntState (Maybe Expr)
