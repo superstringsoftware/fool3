@@ -1,82 +1,73 @@
-FOOL = Functional Object Oriented Language
+FOOL3 = Functional Object Oriented Low-Level Language
 ===========================================
 
+The name is a bit of a joke, obviously. Currently, it's very much functional, might be reasonably low-level for better re-use of existing c-libraries, and most likely never really OO. In it's current state, it is quite useful for teaching Algebraic Data Types and lambda calculus, doing it in a user-friendly visual way:
+
+#### Source Code
+```haskell
+data Bool = True | False;
+data Maybe a = Just a | Nothing;
+data List a = Cell a (List a) | Nil;
+data Either a b = Left a | Right b;
+
+fact n = if n == 0 then 1 else n * fact (n - 1);
+square x = x * x;
+quad x = square x * square x;
+```
+
+#### Inspecting Core Language
+```haskell
+-- Types:
+type List a:* = Cell :a :(List a) | Nil 
+type Maybe a:* = Just :a | Nothing 
+type Either a:* b:* = Left :a | Right :b 
+type Bool = True | False 
+-- Functions:
+func square x:? = BinaryOp "*" (SymId "x") (SymId "x")
+func fact n:? = FlIf (BinaryOp "==" (SymId "n") (PInt 0)) (PInt 1) (BinaryOp "*" (SymId "n") (FlApp (SymId "fact") (BinaryOp "-" (SymId "n") (PInt 1))))
+func quad x:? = BinaryOp "*" (FlApp (SymId "square") (SymId "x")) (FlApp (SymId "square") (SymId "x"))
+```
+
+#### Tracing function calls step-by-step
+```
+λfool3. square 3
+Received expressions: 
+FlApp (SymId "square") (PInt 3)
+Converted to:
+square 3
+[1]	(λx:?. (*) x x)(3)
+[2]	((*) 3)(3)
+[3]	9.0
+
+λfool3. fact 2
+Received expressions: 
+FlApp (SymId "fact") (PInt 2)
+Converted to:
+fact 2
+[1]	(λn:?. if (==) n 0 then 1 else (*) n fact (-) n 1)(2)
+[2]	if (==) 2 0 then 1 else (*) 2 fact (-) 2 1
+[3]	((*) 2)(λn:?. if (==) n 0 then 1 else (*) n fact (-) n 1 1.0)
+[4]	((*) 2)(if (==) 1.0 0 then 1 else (*) 1.0 fact (-) 1.0 1)
+[5]	((*) 2)((*) 1.0 λn:?. if (==) n 0 then 1 else (*) n fact (-) n 1 0.0)
+[6]	((*) 2)((*) 1.0 if (==) 0.0 0 then 1 else (*) 0.0 fact (-) 0.0 1)
+[7]	((*) 2)((*) 1.0 1)
+[8]	((*) 2)(1.0)
+[9]	2.0
+```
+
+
+### Old Design Principles / Ideas to explore
+
 - Functional math-heavy foundation with efficient vectors and static ADT, pure, immutable etc
-- Dependent types (e.g., for Vector Float 4 support etc?)
+- Dependent types
+- *Everything* is a function (including types, which are first class values)
 - Dynamic product types (can form tuples of different types on the fly) -- subtyping should get there?
 - Mutable things support via Actions (vs pure Functions). Should References be implemented via Actions?
-- Records can have functions as members *if* these functions only operate on the record fields and are pure (e.g., Person = fname, lname : String; name = lname + fname : String;)
-- Built in Graph functionality support between records, with Arrows that are themselves records
-- Type function based support for Persistence - if we have a record Person, type MongoCollection Person stores it there and handles all functions etc
+- Built in Graph functionality support between records, with Arrows that are themselves records - for better real life / enterprise data modeling
 - Built-in security (or on top?)
 - Built-in computational nodes support - application can be aware of different containers, vms, servers, clients etc where parts of its' code are running and where the data lives
 - Pubsub, reactive and event based support (how??? have no idea at this point, needs design)
-- Compilation to C (eventually llvm) and JS
+- Compilation to C (eventually llvm), .Net and JS - via different *node targets*
 - VERY EASY FFI with C - to reuse all the libraries there are
 - OO part: Objects can contain base data types (records / Sum Types) and support mutation of state via Actions --> e.g., implement GVM and Nodes via Objects?
 
-Ideas to ponder on
------------------------------
-
-- Can we treat Actions as mapping pure data to / from a separate Category - e.g. printing to stdout is mapping pure data to terminal, showing on screen - same to computer screen (or Browser rendering engine), getting input from keyboard - same but mapping from Keyboard to our pure datatypes etc.?
-- How about .Net compilation for easy windows integration?
-- How about low-level functional approach - abstracting llvm / CPU a little bit, so that then we can write an OS easily?
-
-
-Initial code ideas with math-based syntax (needs unicode...)
---------------------------------------------------------
-
--- vector:
-map (f, X::Vector) ≡ <f (x) | ∀x ∊ X>
-
--- list
-map (f, X::List) ≡ [f (x) | ∀x ∊ X]
-
--- generic container, from whom we should be able to derive both Vector and List:
-map (f, X) ≡ {f (x) | ∀x ∊ X} -- it just means whatever container type is X the result is the same container type
-
--- range in a vector - needs to be defined via memcpy() or similar for efficiency
-range (k,n,X) = <xᵢ | ∀i ∊ {k..n}>
-
--- hashtable, one of the options where f touches only values not keys
--- using '{}' for generic container?
-map f X ≡ {key x → f (value x) | ∀x ∊ X}
-
--- iteration / 'for' cycle
-∀i ∊ {k..n} action(i,...)
-
--- build a Vector with a generator function
-v = <gen(i) | ∀i ∊ {k..n}>
--- e.g., random vector of size n
-v = <random | ∀i ∊ {0..n}>
--- since i is not used in a function call, can shorten:
-v = <random | {0..n}>
--- also we probably don't need the "forall" quantifier here
-
--- how about simply -
-v = <random | times n>
-
-example
-- generate vector of random ints
-- map a function on it
-- print the result
-
-
-extern random, print
-
-map (f, X) ≡ {f (x) | ∀x ∊ X}
-square (x) ≡ x * x
-
-v1 = <random | times 10>
-v2 = map (square, v1)
-
-print (v1, v2)
-
----------------------------
--- Records
-data Address = city, street, country : String;
-data Person = fname, lname : String; address : Address; dob : Date;
-
--- can form records on the fly, it's a dynamic product type after all,
--- useful e.g. in function calls like print above - can give arbitrary tuple
--- as an argument and it just calls print on all of them in order
