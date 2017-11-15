@@ -8,3 +8,5 @@ data Either a b = Left a | Right b;
 fact n = if n == 0 then 1 else n * fact (n - 1);
 square x = x * x;
 quad x = square x * square x;
+
+safeDiv x y = if y == 0 then Nothing else Just (x / y);

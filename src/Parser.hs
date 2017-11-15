@@ -140,6 +140,15 @@ function = do
   body <- expr
   return $ Function name args body
 
+-- \x -> x + 1 etc
+lambda :: Parser FlExpr
+lambda = parens $ do
+  char '\\'
+  args <- many (extractVar <$> variable)
+  reservedOp "->"
+  body <- expr
+  return $ Function "_LAMBDA_" args body
+
 extern :: Parser FlExpr
 extern = do
   reserved "extern"
@@ -202,7 +211,8 @@ binarydef = do
 
 
 argument :: Parser FlExpr
-argument = try (parens expr)
+argument = try lambda 
+      <|> try (parens expr)
       <|> try vector
       <|> try ifthen
       <|> try floating

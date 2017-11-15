@@ -91,7 +91,7 @@ showHelp = do
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()
 loop = do
-        minput <- getInputLine  "λfool3. "
+        minput <- getInputLine  (TC.as [TC.bold] "λfool3. ")
         case minput of
           Nothing -> outputStrLn "Goodbye."
           Just input -> case input of

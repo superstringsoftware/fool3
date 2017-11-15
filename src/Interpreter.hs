@@ -81,6 +81,7 @@ initializeInterpreter = do
 
 -- process a single expression and alter the interpreter state correspondigly
 processExpr :: FlExpr -> IntState ()
+
 -- binding functions and ops
 processExpr e@(Function name _ _) = do
     st <- get
@@ -88,17 +89,14 @@ processExpr e@(Function name _ _) = do
     liftIO $ H.insert (lambdas st) name (foolToCore e)
 -- processExpr st e@(BinaryDef _ _ _) = addExpression e (funTable st) >> return st
 -- processExpr st e@(UnaryDef _ _ _) = addExpression e (funTable st) >> return st
+
 processExpr e@(TypeDef name vars cons) = do
     st <- get
     liftIO $ H.insert (typeTable st) name e
     liftIO $ H.insert (lambdas st) name (foolToCore e)
     -- mapM_ (fn (lambdas st)) cons
     -- where fn ls cs@(Constructor nm _) = liftIO $ H.insert ls nm (foolToCore cs)
-{-
-processExpr e@(Record name _ _) = do
-    st <- get
-    liftIO $ H.insert (typeTable st) name e
--}
+
 -- executing binary op
 processExpr e@(BinaryOp name _ _) = processExprGeneric False e
 processExpr e@(FlApp _ _) = processExprGeneric False e
@@ -110,10 +108,9 @@ processExprGeneric b e = do
     let e1 = foolToCore e
     liftIO $ putStrLn $ as [bold, underlined] "Converted to:"
     liftIO $ putStrLn $ prettyPrint e1
-    evalExpr b e1
+    evalExpr False b e1 -- first True - then strict, otherwise lazy
     -- liftIO $ putStrLn $ prettyPrint res
     return ()
-
 
 
 -- adds function or operator definition to the table
@@ -147,85 +144,6 @@ loadModule exs st = do
 findMain :: ExpressionTable -> IO (Maybe FlExpr)
 findMain ft = H.lookup ft "main"
 
-{-
-evalStep :: FlExpr -> IntState FlExpr
--- basic terminals first
-evalStep e@(PInt _) = return e
-evalStep e@(PFloat _) = return e
-
--- primitive operators (what can't be defined via functions)
-evalStep e@(BinaryOp "+" e1 e2) =
-    case (e1, e2) of
-        (PInt x1, PInt x2) -> return $ PInt $ x1 + x2
-        (PInt x1, PFloat x2) -> return $ PFloat $ (fromIntegral x1) + x2
-        (PFloat x1, PInt x2) -> return $ PFloat $ (fromIntegral x2) + x1
-        (PFloat x1, PFloat x2) -> return $ PFloat $ x1 + x2
-        otherwise -> do
-            e1' <- evalStep e1
-            e2' <- evalStep e2
-            evalStep (BinaryOp "+" e1' e2')
-
-
-
--- evaluate variable - check bindings, if there are - substituting, if not - returning as is
-evalStep e@(Var n) = do
-    res <- resolveSymbol (varName n)
-    case res of
-        (ERROR _) -> return e
-        otherwise -> return res
-
-
--- the most important - executing a call
-evalStep e@(Call fname vals') = do
-    -- try resolving vals in case they are variables (need it for stacked calls)
-    vals <- mapM evalStep vals'
-    fn <- resolveFunction fname
-    case fn of
-        f@(Function _ vars body) -> do
-            state <- get
-
-            -- first, bind vals from (Call) to vars in Function
-            liftIO $ zipWithM_ (addBinding $ localSymTable state) vars vals
-            liftIO $ putStrLn $ "Binding variables in a call of " ++ (show f)
-            liftIO $ prettyPrintST (localSymTable state)
-            -- now, evaluating the body with variables bound
-            liftIO $ putStrLn $ "Evaluating body " ++ (show body)
-            res <- evalStep body
-            -- now clearing local symtable
-            liftIO $ mapM_ (H.delete $ localSymTable state) vars
-            return res
-        otherwise -> return fn
-
-evalStep e = return $ ERROR ("Not implemented eval: " ++ (show e))
--}
-
-
--- evalTrace :: FlExpr -> IO()
--- evalTrace e = case e of
-
-nameToOp :: String -> (forall a. Num a => a->a->a)
-nameToOp "*" = (*)
-nameToOp "+" = (+)
-nameToOp "-" = (-)
--- nameToOp "/" = (/)
-
-isPrimitive (PInt _) = True
-isPrimitive (PFloat _) = True
-isPrimitive _ = False
-
-
--- evalBinaryOp :: FlExpr -> FlExpr
-execPrimitiveBinaryOp :: (forall a. Num a => a->a->a)->FlExpr->FlExpr->FlExpr
-execPrimitiveBinaryOp op (PInt x1) (PInt x2) = PInt (op x1 x2)
-execPrimitiveBinaryOp op (PFloat x1) (PFloat x2) = PFloat (op x1 x2)
-execPrimitiveBinaryOp op (PInt x1) (PFloat x2) = PFloat (op (fromIntegral x1) x2)
-execPrimitiveBinaryOp op (PFloat x1) (PInt x2) = PFloat (op x1 (fromIntegral x2))
-execPrimitiveBinaryOp op e1 e2 = ERROR ("Not implemented op: (" ++ (show e1) ++ ", " ++ (show e2) ++ ")")
-
-{-
-evalExprStep :: FlExpr -> FunctionTable -> IO()
-evalExprStep e@(Function _ _ _) ft = funTable >>= addFunction e
--}
 
 -- print types
 prettyPrintTT :: ExpressionTable -> IO ()

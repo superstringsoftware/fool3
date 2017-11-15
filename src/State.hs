@@ -22,3 +22,5 @@ data InterpreterState = InterpreterState {
     logs     :: [String],
     lambdas  :: CoreExpressionTable -- here we will store named lambda expressions for *both Constructors AND normal functions!!!*
 } deriving Show
+
+-- type 

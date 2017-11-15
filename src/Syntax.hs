@@ -39,8 +39,8 @@ data FlExpr
 -- Converting Fl to Core
 -------------------------------------------------------------------------------
 foolToCore :: FlExpr -> Expr
-foolToCore (Constructor nm vars) = foldr Lam (Tuple nm (map (\x -> VarId "") vars) (Tp ToDerive)) vars
-foolToCore (TypeDef nm vars cons) = foldr Lam (Tuple nm consList (Tp ToDerive)) vars
+foolToCore (Constructor nm vars) = foldr Lam (Tuple nm (map (\x -> VarId "") vars) ) vars
+foolToCore (TypeDef nm vars cons) = foldr Lam (Tuple nm consList ) vars
     where consList = map foolToCore cons
 foolToCore (Function nm vars ex) = foldr Lam (foolToCore ex) vars
 foolToCore (FlApp e1 e2) = App (foolToCore e1) (foolToCore e2)

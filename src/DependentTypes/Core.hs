@@ -14,7 +14,7 @@ data Expr
   | App Expr Expr
   | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
   | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
-  | Tuple Name [Expr] TypeOrKind
+  | Tuple Name [Expr]
   deriving (Eq, Ord, Show)
 {-
 -- read a bunch of stuff in test.fool, it explains how we can do everything via tuples
@@ -94,6 +94,28 @@ data Pred
   = IsIn Name Type
   deriving (Show, Eq, Ord)
 
+{-
+-- GHC Core:
+type CoreExpr = Expr Var
+
+data Expr b	-- "b" for the type of binders,
+  = Var	  Id
+  | Lit   Literal
+  | App   (Expr b) (Arg b)
+  | Lam   b (Expr b)
+  | Let   (Bind b) (Expr b)
+  | Case  (Expr b) b Type [Alt b]
+  | Cast  (Expr b) Coercion
+  | Tick  (Tickish Id) (Expr b)
+  | Type  Type
+
+type Arg b = Expr b
+type Alt b = (AltCon, [b], Expr b)
+
+data AltCon = DataAlt DataCon | LitAlt  Literal | DEFAULT
+
+data Bind b = NonRec b (Expr b) | Rec [(b, (Expr b))]
+-}
 
 -------------------------------------------------------------------------------
 -- AST manipulation stuff
@@ -115,7 +137,7 @@ class PrettyPrint a where
 instance PrettyPrint Expr where
   prettyPrint (VarId n) = n
   prettyPrint (Lam v e) = as [bold, dgray] "λ" ++ prettyPrint v ++ ". " ++ prettyPrint e
-  prettyPrint (Tuple nm exs tp) = as [magenta] nm ++ fn exs --  : " ++ prettyPrint tp - not showing types for now
+  prettyPrint (Tuple nm exs) = as [magenta] nm ++ fn exs --  : " ++ prettyPrint tp - not showing types for now
       where fn [] = ""
             fn (e:es) = " {" ++ foldl (\acc x -> acc ++ ", " ++ prettyPrint x) (prettyPrint e) es ++ "} "
   prettyPrint (Lit l) = prettyPrint l

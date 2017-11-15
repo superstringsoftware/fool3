@@ -17,23 +17,12 @@ import Control.Monad.IO.Class (liftIO)
 litToPrim (LInt x) = fromIntegral x
 litToPrim (LFloat x) = x
 
-{-
-data Expr
-  = Lit Literal
-  | VarId Name -- for bound variables and functions???
-  | VarIn Int  -- variable index for building constructor function values mostly
-  | Lam Var  Expr
-  | App Expr Expr
-  | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
-  | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
-  | Tuple Name [Expr] TypeOrKind
--}
-
 -- evaluate expression until it stops simplifying and show it nicely
-evalExpr :: Bool -> Expr -> IntState Expr
-evalExpr b ex = fn 1 b ex
-  where fn i b ex = do
-                      ex' <- evalStep b ex
+evalExpr :: Bool -> Bool -> Expr -> IntState Expr
+evalExpr strict b ex = fn 1 b ex
+  where evalFunc = if strict then evalStepStrict else evalStep
+        fn i b ex = do
+                      ex' <- evalFunc b ex
                       if ex == ex' then return ex
                       else do
                         liftIO $ putStrLn $ "[" ++ show i ++ "]\t" ++ prettyPrintTopLevel ex'
@@ -88,8 +77,8 @@ evalStep b e@(VarId nm) = do
 
 -- small step semantics
 evalStep b (App e1 e2) = do
-  e1' <- evalStep b e1
   e2' <- evalStep b e2
+  e1' <- evalStep b e1
   return $ App e1' e2'
 
 -- If now calculates ok for arithmetic
@@ -101,6 +90,24 @@ evalStep b (If e1 e2 e3) = do
 
 
 evalStep b e = if b then liftIO (print e) >> return e else return e
+
+-------------------------------------------------------------------------------
+-- Strict Eval (kindof?)
+-------------------------------------------------------------------------------
+
+evalStepStrict b e@(App (Lam var expr) val) = do
+  val' <- evalStepStrict b val -- evaluating argument first!!! (the only difference with lazy)
+  let ex =  beta (varName var) expr val'
+  if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
+    >> return ex
+  else return ex
+
+evalStepStrict b e = evalStep b e
+
+
+-------------------------------------------------------------------------------
+-- Reductions
+-------------------------------------------------------------------------------
 
 -- beta reduction. substituting a var with an expr: walking the tree and applying changes
 -- this has to be abstracted and generalized
@@ -125,7 +132,7 @@ beta nm (If e1 e2 e3) val = If ( beta nm e1 val) ( beta nm e2 val) ( beta nm e3 
 beta nm (Let sym e1 e2) val = Let sym ( beta nm e1 val) ( beta nm e2 val)
 
 -- processing tuple
-beta nm (Tuple tnm exs tp) val = Tuple tnm (map fn exs) tp where fn ex = beta nm ex val
+beta nm (Tuple tnm exs) val = Tuple tnm (map fn exs) where fn ex = beta nm ex val
 beta nm e val = e
 
 lookupGlobalSymbol :: Name -> IntState (Maybe Expr)
