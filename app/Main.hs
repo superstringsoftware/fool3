@@ -63,8 +63,8 @@ loadFile nm = do
    res <- liftIO $ parseToplevelFile nm
    -- liftIO $ print res
    case res of
-     Left err -> liftIO $ print err
-     Right exprs -> mapM_ processExpr exprs
+     Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
+     Right exprs -> mapM_ processExpr exprs >> liftIO (putStrLn "... successfully loaded.")
 
 run :: IntState ()
 run = do
@@ -118,5 +118,5 @@ main = do
 greetings = do
   putStrLn "Welcome to Functional Object Oriented Low-Level Language (FOOL3)"
   putStrLn "Version 0.0.1"
-  putStrLn "(c) Copyright 2016-2017 by J X-Ray Ho"
-  putStrLn "Type :help for help on commands or :load a file.\n\n"
+  putStrLn "(c) Copyright 2016-2017 by J X-Ray Ho\n"
+  putStrLn "Type :help for help on commands or :load a file.\n"

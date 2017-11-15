@@ -29,7 +29,7 @@ data Expr
   | Tuple Name [Expr] TypeOrKind
 -}
 
--- evaluate expression until it stops simplifying
+-- evaluate expression until it stops simplifying and show it nicely
 evalExpr :: Bool -> Expr -> IntState Expr
 evalExpr b ex = fn 1 b ex
   where fn i b ex = do
@@ -56,7 +56,9 @@ findBoolOp _ = Nothing
 -- small evaluation step
 -- if True, printing stacktrace, if False, quiet
 evalStep :: Bool -> Expr -> IntState Expr
+
 -- built-in operators. There must be a better way of doing this.
+-- now implements basic comparisons and arithmetics that converts ints to floats
 evalStep b e@(App (App v@(VarId nm) (Lit e1)) (Lit e2)) = do
   let pmop = findPrimOp nm
   case pmop of Just op -> return $ Lit $ LFloat $ op (litToPrim e1) (litToPrim e2)
@@ -67,13 +69,15 @@ evalStep b e@(App (App v@(VarId nm) (Lit e1)) (Lit e2)) = do
 
 
 
--- applying a Lambda - substituting
+-- applying a Lambda - beta reduction
 evalStep b e@(App (Lam var expr) val) = do
-  let ex = replaceSymbolWithExpr (varName var) expr val
+  let ex =  beta (varName var) expr val
   if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
     >> return ex
   else return ex
 
+-- looking up global symbol by name: for now, only Functions
+-- need to make it work for types and process local contexts (letins)
 evalStep b e@(VarId nm) = do
   excan <- lookupGlobalSymbol nm
   case excan of
@@ -98,15 +102,31 @@ evalStep b (If e1 e2 e3) = do
 
 evalStep b e = if b then liftIO (print e) >> return e else return e
 
--- substituting a var with an expr: walking the tree and applying changes
+-- beta reduction. substituting a var with an expr: walking the tree and applying changes
 -- this has to be abstracted and generalized
-replaceSymbolWithExpr :: Name -> Expr -> Expr -> Expr
-replaceSymbolWithExpr nm e@(VarId vname) val = if nm == vname then val else e
-replaceSymbolWithExpr nm (Lam v e) val = Lam v (replaceSymbolWithExpr nm e val)
-replaceSymbolWithExpr nm (App e1 e2) val = App (replaceSymbolWithExpr nm e1 val) (replaceSymbolWithExpr nm e2 val)
-replaceSymbolWithExpr nm (If e1 e2 e3) val = If (replaceSymbolWithExpr nm e1 val) (replaceSymbolWithExpr nm e2 val) (replaceSymbolWithExpr nm e3 val)
--- replaceSymbolWithExpr nm (Tuple tnm exs tp) val = Tuple tnm (map replaceSymbolWithExpr nm )
-replaceSymbolWithExpr nm e val = e
+beta :: Name -> Expr -> Expr -> Expr
+
+-- simlpy "instantiating" a variable if names are the same (hence, need unique names!)
+beta nm e@(VarId vname) val = if nm == vname then val else e
+
+-- if we have a lambda inside, going deeper
+beta nm (Lam v e) val = Lam (upd v val) ( beta nm e val)
+  -- in case we are instantiating a type variable
+  where upd vr@(Id vrName (TVar tvarName)) val = if nm == tvarName then Id vrName (InsType val) else vr
+        upd vr val = vr
+
+-- If it's an application, simply going deeper
+beta nm (App e1 e2) val = App ( beta nm e1 val) ( beta nm e2 val)
+
+-- if it's an "if", going deeper
+beta nm (If e1 e2 e3) val = If ( beta nm e1 val) ( beta nm e2 val) ( beta nm e3 val)
+
+-- if it's a "letins", going deeper
+beta nm (Let sym e1 e2) val = Let sym ( beta nm e1 val) ( beta nm e2 val)
+
+-- processing tuple
+beta nm (Tuple tnm exs tp) val = Tuple tnm (map fn exs) tp where fn ex = beta nm ex val
+beta nm e val = e
 
 lookupGlobalSymbol :: Name -> IntState (Maybe Expr)
 lookupGlobalSymbol nm = do

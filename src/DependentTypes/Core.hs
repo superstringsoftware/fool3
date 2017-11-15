@@ -6,55 +6,6 @@ import TermColors
 
 type Name = String
 
-{-
--- Intermediate explicity typed IR
--- For now, we can't really represent records this way, or can we?
-Person { name:String, age:Int } translates into something like:
-\name:String. \age:Int. Person name string, i.e. named access field info is erased. Where do we store it?
-E.g., a person writes:
-p = Person "James" 23 -- and then
-f p = p.name ++ show p.age -- which goes something like:
-\p:Person. (++) (Person.name p) (show (Person.age p))
-which means we need to create some sort of qualified function name that accesses record fields?
-Or simply convert it to numbered accessor as in any anonymous pair?
-
-What if we have something like:
-data Widget = Box {x, y: Int, ...} | Point {x,y:Int, ...} - and we want a function
-f :: Widget -> Int
-f w = w.x * w.x
-b = Box ...; p = Point ...
-main = f b + f p -- what happens here??
-\w:Widget. (*) (.x w) (.x w)
-- we can't use numbered approach because what if x has completely different numeric representation in different Constructors?
-so, .x here would be = Box.x for Box and Point.x for Point, so it's sort of an implicit pattern match
-
-Ok, this is quite complicated, need to think it through.
-
-Using fully qualified names is probably way to go, at least explore it, so when creating a record we automatically create
-fully qualified accessor functions, e.g:
-Widget.Box.x w:Box = n-th accessor
-Widget.Point.x w:Point = k-th accessor
-Widget.x w:Widget = case w of Box -> Widget.Box.x
-                              Point -> Widget.Point.x
-
-Something like that.
--}
-
-{-
-Refresher on lambdas.
-Maybe a:
-Just = \a:Type \x:a. x : Maybe a
-Nothing = ()
-Pair = \a:Type \b:Type \x:a \y:b . (x y) : Pair a b
-
-It's all good, but how do we determine type of our lambdas???
-
-In IR above:
-Just = DLam (Id a TStar) (DLam (Id x (TVar a))  DApp (DVar x) ??? )
-- we can substitute ??? to our type info, something like DType (TApp (TCon Maybe) (TVar a))
-this way, we annotate types by the last Expression in application tree.
--}
-
 -- Core AST type
 data Expr
   = Lit Literal
@@ -103,6 +54,7 @@ data Var = Id Name Type | TyVar Name Kind
 type TVar = Var -- type synonim to handle Forall predicates
 
 varName (Id n _) = n
+varName (TyVar n _) = n
 varType (Id _ t) = t
 
 -- needed for mega-abstract tuple in Expr
@@ -116,6 +68,9 @@ data Type
   | TArr Type Type -- Function sig - Maybe a -> String etc
   | TForall [Pred] [TVar] Type
   | ToDerive -- added it to handle initial parsing
+  | InsType Expr -- this is probably a workaround - when we are beta-reducing Type lambdas for variables like \a. x:a
+  -- "a" needs to be able to become any kind of expression (since we are applying lambdas to expressions).
+  -- Type checking etc will fix this.
   deriving (Show, Eq, Ord)
 
 -- Since we are doing dependent types, we need to be able to do both the standard:
@@ -163,7 +118,7 @@ instance PrettyPrint Expr where
   prettyPrint (VarIn n) = "v" ++ show n
   prettyPrint (Lam v e) = as [bold, dgray] "λ" ++ prettyPrint v ++ ". " ++ prettyPrint e
   prettyPrint (Tuple nm exs tp) = as [magenta] nm ++ fn exs --  : " ++ prettyPrint tp - not showing types for now
-      where fn [] = " {}"
+      where fn [] = ""
             fn (e:es) = " {" ++ foldl (\acc x -> acc ++ ", " ++ prettyPrint x) (prettyPrint e) es ++ "} "
   prettyPrint (Lit l) = prettyPrint l
   prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
@@ -194,6 +149,7 @@ instance PrettyPrint Type where
   prettyPrint (TCon nm) = as [yellow, bold] nm
   prettyPrint ToDerive  = as [dgray, bold] "?"
   prettyPrint (TApp t1 t2) = "(" ++ prettyPrint t1 ++ " " ++ prettyPrint t2 ++")"
+  prettyPrint (InsType ex) = prettyPrint ex
   prettyPrint e = show e
 
 {-

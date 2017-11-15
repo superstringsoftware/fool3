@@ -6,3 +6,5 @@ data List a = Cell a (List a) | Nil;
 data Either a b = Left a | Right b;
 
 fact n = if n == 0 then 1 else n * fact (n - 1);
+
+fx x = let t = x + 2, j = 9 in t x + j;

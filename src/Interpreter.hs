@@ -101,8 +101,8 @@ processExpr e@(Record name _ _) = do
 -}
 -- executing binary op
 processExpr e@(BinaryOp name _ _) = processExprGeneric False e
--- executing function call
 processExpr e@(FlApp _ _) = processExprGeneric False e
+processExpr e@(SymId _) = processExprGeneric False e
 
 processExpr _ = do return ()
 
