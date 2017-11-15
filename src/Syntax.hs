@@ -49,11 +49,12 @@ foolToCore (Function nm vars ex) = foldr Lam (foolToCore ex) vars
 foolToCore (FlApp e1 e2) = App (foolToCore e1) (foolToCore e2)
 foolToCore (SymId nm) = VarId nm
 foolToCore (BinaryOp nm e1 e2) = App (App (VarId $ "("++nm++")") (foolToCore e1)) (foolToCore e2)
-foolToCore (PInt x) = Lit $ LInt x
 foolToCore (FlIf e1 e2 e3) = If (foolToCore e1) (foolToCore e2) (foolToCore e3)
 foolToCore (FlLet exs e) = foldr fn (foolToCore e) exs -- unwinding List into the tree
     where fn x@(Function nm _ _) = Let nm (foolToCore x)
 
+foolToCore (PInt x) = Lit $ LInt x
+foolToCore (PFloat x) = Lit $ LFloat x
 foolToCore e = VarId $ "NOT IMPLEMENTED: " ++ show e
 
 -- foolToCore (TypeDef nm vars cons) =

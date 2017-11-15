@@ -31,10 +31,13 @@ data Expr
 
 -- evaluate expression until it stops simplifying
 evalExpr :: Bool -> Expr -> IntState Expr
-evalExpr b ex = do
-  ex' <- evalStep b ex
-  if ex == ex' then return ex
-  else (liftIO $ putStrLn $ prettyPrint ex') >> evalExpr b ex'
+evalExpr b ex = fn 1 b ex
+  where fn i b ex = do
+                      ex' <- evalStep b ex
+                      if ex == ex' then return ex
+                      else do
+                        liftIO $ putStrLn $ "[" ++ show i ++ "]\t" ++ prettyPrintTopLevel ex'
+                        fn (i+1) b ex'
 
 -- helper in arithmetic ops for eval
 findPrimOp "(+)" = Just (+)

@@ -162,7 +162,7 @@ instance PrettyPrint Expr where
   prettyPrint (VarId n) = n
   prettyPrint (VarIn n) = "v" ++ show n
   prettyPrint (Lam v e) = as [bold, dgray] "λ" ++ prettyPrint v ++ ". " ++ prettyPrint e
-  prettyPrint (Tuple nm exs tp) = nm ++ fn exs --  : " ++ prettyPrint tp - not showing types for now
+  prettyPrint (Tuple nm exs tp) = as [magenta] nm ++ fn exs --  : " ++ prettyPrint tp - not showing types for now
       where fn [] = " {}"
             fn (e:es) = " {" ++ foldl (\acc x -> acc ++ ", " ++ prettyPrint x) (prettyPrint e) es ++ "} "
   prettyPrint (Lit l) = prettyPrint l
@@ -177,6 +177,11 @@ instance PrettyPrint Expr where
     = Lit Literal
     | App Expr Expr
 -}
+
+embrace s = as [bold, blue] "(" ++ s ++ as [bold, blue] ")"
+-- additional nicer formatting for output for top level expressions
+prettyPrintTopLevel (App e1 e2) = embrace (prettyPrint e1) ++ embrace (prettyPrint e2)
+prettyPrintTopLevel e = prettyPrint e
 
 instance PrettyPrint Literal where
   prettyPrint (LInt x) = show x

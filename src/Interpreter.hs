@@ -3,6 +3,8 @@ module Interpreter where
 
 import Data.Word
 import qualified Data.Vector.Unboxed as U
+import Data.List (sortBy)
+import Data.Function (on)
 
 import qualified Data.HashTable.IO as H
 
@@ -240,8 +242,11 @@ prettyPrintST ft = H.mapM_ f ft where
 
 
 prettyPrintLS :: CoreExpressionTable -> IO ()
-prettyPrintLS ls = H.mapM_ f ls where
-    f (k,v) = putStrLn $ clr k ++ " = " ++ prettyPrint v
+prettyPrintLS ls = do
+    list <- H.toList ls
+    let res = sortBy (compare `on` fst) list
+    mapM_ f res where
+    f (k,v) = putStrLn $ clr k ++ " = " ++ prettyPrintTopLevel v
               where clr s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
 
 showLS :: CoreExpressionTable -> IO ()

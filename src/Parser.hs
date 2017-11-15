@@ -237,7 +237,7 @@ toplevel = many $ do
 parseExpr s = runParserT (contents expr) initialParserState "<stdin>" s
 
 --parseToplevel :: String -> Either ParseError [Expr]
-parseToplevel s = runParserT (contents expr) initialParserState "<stdin>" s
+parseToplevel s = runParserT (contents defn) initialParserState "<stdin>" s
 
 -- parse a given file
 parseToplevelFile name = parseFromFile (contents toplevel) name initialParserState

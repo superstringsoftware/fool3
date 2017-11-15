@@ -28,8 +28,8 @@ process line = do
 
 
 processCommand :: [String] -> IntState ()
+processCommand (":help":_) = liftIO showHelp
 processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
-processCommand (":vars":_) = get >>= liftIO . prettyPrintST . symTable
 processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
 processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
 processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
@@ -42,7 +42,15 @@ processCommand (":all":_) = do
   liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFile (head xs)
 processCommand (":run":_) = run
-processCommand _ = liftIO $ print "Unknown command. Type :help to show available list."
+
+processCommand (":q":_) = processCommand [":quit"]
+processCommand (":h":_) = processCommand [":help"]
+processCommand (":c":"-d":_) = processCommand [":core","-d"]
+processCommand (":c":_) = processCommand [":core"]
+processCommand (":a":_) = processCommand [":all"]
+processCommand (":l":xs) = processCommand (":load":xs)
+
+processCommand _ = liftIO $ print "Unknown command. Type :h[elp] to show available list."
 
 loadFile :: String -> IntState ()
 loadFile nm = do
@@ -67,14 +75,14 @@ run = do
 showHelp :: IO ()
 showHelp = do
     putStrLn $ TC.as [TC.bold, TC.underlined] "Available commands:"
-    putStrLn ":quit           -- quit"
-    putStrLn ":vars           -- list all global vars"
-    putStrLn ":functions      -- list all global functions"
-    putStrLn ":types          -- list all types"
-    putStrLn ":all            -- list everything"
-    putStrLn ":core           -- dump core"
-    putStrLn ":load <name>    -- load and interpret file <name>"
-    putStrLn ":run            -- execute main() if it is present"
+    putStrLn ":h[elp]           -- this message"
+    putStrLn ":q[uit]           -- quit"
+    putStrLn ":a[ll]            -- list everything"
+    putStrLn ":c[ore]           -- list everything in core format"
+    putStrLn ":l[oad] <name>    -- load and interpret file <name>"
+    putStrLn ":functions        -- list all global functions"
+    putStrLn ":types            -- list all types"
+    putStrLn ":run              -- execute main() if it is present"
 
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()
@@ -97,7 +105,7 @@ main = do
     initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} loop)
 
 greetings = do
-  putStrLn "Welcome to Functional Object Oriented Low-Level Language (FOOL3)!"
+  putStrLn "Welcome to Functional Object Oriented Low-Level Language (FOOL3)"
   putStrLn "Version 0.0.1"
   putStrLn "(c) Copyright 2016-2017 by J X-Ray Ho"
   putStrLn "Type :help for help on commands or :load a file.\n\n"
