@@ -1,0 +1,8 @@
+# Base library: v0.0.1
+
+data Bool = True | False;
+data Maybe a = Just a | Nothing;
+data List a = Cell a (List a) | Nil;
+data Either a b = Left a | Right b;
+
+fact n = if n == 0 then 1 else n * fact (n - 1);

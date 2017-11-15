@@ -15,6 +15,10 @@ import State
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
+-- needs to go to settings!!!
+baseLibPath = "base.fool"
+
+
 process :: String -> IntState ()
 process line = do
   let res = runIdentity $ parseToplevel line
@@ -22,7 +26,7 @@ process line = do
     Left err -> liftIO $ print err
     Right ex -> do
         -- processing parsed input
-        liftIO $ putStrLn $ (TC.ansifyString [TC.bold, TC.underlined] "Received expressions: ") -- ++ (show $ length ex)
+        liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
         liftIO $ print ex -- show what was parsed first
         processExpr ex -- processing expressions one by one
 
@@ -54,13 +58,13 @@ processCommand _ = liftIO $ print "Unknown command. Type :h[elp] to show availab
 
 loadFile :: String -> IntState ()
 loadFile nm = do
-    st <- get
-    liftIO $ putStrLn $ "Loading file: " ++ nm
-    res <- liftIO $ parseToplevelFile nm
-    -- liftIO $ print res
-    case res of
-      Left err -> liftIO $ print err
-      Right exprs -> mapM_ processExpr exprs >> processCommand [":all"]
+   st <- get
+   liftIO $ putStrLn $ "Loading file: " ++ nm
+   res <- liftIO $ parseToplevelFile nm
+   -- liftIO $ print res
+   case res of
+     Left err -> liftIO $ print err
+     Right exprs -> mapM_ processExpr exprs
 
 run :: IntState ()
 run = do
@@ -97,12 +101,19 @@ loop = do
               -- otherwise parsing our language input
               _ -> lift (process input) >> loop
 
+runInterpreter :: InputTState ()
+runInterpreter = do
+  liftIO $ putStrLn "Loading base library..."
+  lift $ loadFile baseLibPath
+  lift $ processCommand [":all"]
+  loop
+
 main :: IO ()
 main = do
     greetings
     -- setting up Haskeline loop
     -- getting to the right monad in our crazy monad stack
-    initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} loop)
+    initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} runInterpreter)
 
 greetings = do
   putStrLn "Welcome to Functional Object Oriented Low-Level Language (FOOL3)"

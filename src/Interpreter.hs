@@ -23,6 +23,7 @@ import Control.Monad.IO.Class (liftIO)
 import State
 import DependentTypes.Eval
 
+
 -- resolves a symbol by name starting with local scope and going up
 resolveSymbol :: Name -> IntState FlExpr
 resolveSymbol name = do
@@ -76,6 +77,7 @@ initializeInterpreter = do
                 logs = [],
                 lambdas = lam
              }
+
 
 -- process a single expression and alter the interpreter state correspondigly
 processExpr :: FlExpr -> IntState ()
