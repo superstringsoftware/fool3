@@ -105,7 +105,7 @@ runInterpreter :: InputTState ()
 runInterpreter = do
   liftIO $ putStrLn "Loading base library..."
   lift $ loadFile baseLibPath
-  lift $ processCommand [":all"]
+  lift $ processCommand [":core"]
   loop
 
 main :: IO ()
