@@ -45,7 +45,7 @@ etc.
 -}
 
 
-data Literal = LInt !Int | LFloat !Double | LChar !Char | LBool Bool deriving (Eq, Ord, Show)
+data Literal = LInt !Int | LFloat !Double | LChar !Char | LString String | LBool Bool deriving (Eq, Ord, Show)
 
 data Var = Id Name Type | TyVar Name Kind
   deriving (Show, Eq, Ord)
@@ -159,9 +159,10 @@ prettyPrintTopLevel (App e1 e2) = embrace (prettyPrint e1) ++ embrace (prettyPri
 prettyPrintTopLevel e = prettyPrint e
 
 instance PrettyPrint Literal where
-  prettyPrint (LInt x) = show x
-  prettyPrint (LFloat x) = show x
-  prettyPrint (LBool x) = show x
+  prettyPrint (LInt x) = as [magenta] $ show x
+  prettyPrint (LFloat x) = as [magenta] $ show x
+  prettyPrint (LBool x) = as [magenta] $ show x
+  prettyPrint (LString s) = as [green] $ show s 
   prettyPrint e = show e
 
 instance PrettyPrint Type where

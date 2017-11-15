@@ -18,6 +18,7 @@ import Control.Monad (foldM)
 
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
+import Text.Parsec.Char (string)
 
 import qualified Data.Vector.Unboxed as U
 
@@ -30,6 +31,9 @@ int = PInt <$> fromInteger <$> integer
 
 floating :: Parser FlExpr
 floating = PFloat <$> float
+
+stringVal :: Parser FlExpr
+stringVal = PString <$> stringLit
 
 binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
 unop = Ex.Prefix (UnaryOp <$> op)
@@ -159,17 +163,6 @@ extern = do
 symbolId :: Parser FlExpr
 symbolId = identifier >>= return . SymId
 
-{-
-call :: Parser FlExpr
-call = do
-  name <- identifier
-  args <- many $ try expr <|> parens expr
-  let acc = SymId name
-  if (length args == 0) then return $ acc
-  else let e = foldl f acc args in return e -- type application
-  where f acc arg = FlApp acc arg
--}
-
 ifthen :: Parser FlExpr
 ifthen = do
   reserved "if"
@@ -211,13 +204,14 @@ binarydef = do
 
 
 argument :: Parser FlExpr
-argument = try lambda 
+argument = try lambda
       <|> try (parens expr)
-      <|> try vector
+      -- <|> try vector
       <|> try ifthen
       <|> try floating
       <|> try int
-      <|> symbolId
+      <|> try symbolId
+      <|> stringVal
 
 arguments :: Parser FlExpr
 arguments = do
@@ -272,46 +266,8 @@ parseFromFile p fname st
 
 -- adding new stuff
 
-{-
--- simple (flat) record
-record :: Parser Expr
-record = do
-  reserved "data"
-  name <- uIdentifier
-  reservedOp "="
-  fields <- braces $ semiSep expr
-  return $ Record name [] fields
-
-letins :: Parser Expr
-letins = do
-  reserved "let"
-  defs <- semiSep $ do
-    var <- lIdentifier
-    reservedOp "="
-    val <- expr
-    return (var, val)
-  reserved "in"
-  body <- expr
-  return $ foldr (uncurry Let) body defs
-
-
-for :: Parser Expr
-for = do
-  reserved "for"
-  var <- identifier
-  reservedOp "="
-  start <- expr
-  reservedOp ","
-  cond <- expr
-  reservedOp ","
-  step <- expr
-  reserved "in"
-  body <- expr
-  return $ For var start cond step body
-
--}
-
 -- numeric vector: <1,2,3.4>
+{-
 vector :: Parser FlExpr
 vector = do
     -- we are checking something is between <>
@@ -324,3 +280,4 @@ vector = do
         conv (PFloat f) = f
     let v = U.fromList l
     return $ VFloat v
+-}

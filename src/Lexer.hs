@@ -43,6 +43,7 @@ identifier = Tok.identifier lexer
 whitespace = Tok.whiteSpace lexer
 reserved   = Tok.reserved lexer
 reservedOp = Tok.reservedOp lexer
+stringLit  = Tok.stringLiteral lexer
 
 operator :: Parser String
 operator = do

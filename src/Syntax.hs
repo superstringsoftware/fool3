@@ -15,9 +15,8 @@ data FlExpr
   = PFloat !Double -- primitive values
   | PInt !Int
   | PByte !Word8
-  | VInt (U.Vector Int) -- vectors of primitive values
-  | VFloat (U.Vector Double)
-  | VByte (U.Vector Word8)
+  | PString String -- for parsing in the interpreter mostly, will probably go away
+  | FlTuple TupleType [FlExpr] -- generic container for parsing Vectors: <1,2,3>, Lists [1,2,3] and actual Tuples {1,Int,"hello"}
   -- concrete specific types are over
   | Var Var -- variable from Core
   | Type Type -- type from Core
@@ -35,6 +34,9 @@ data FlExpr
   | ERROR String -- debugging only?
   deriving (Eq, Ord, Show)
 
+-- helper type for parsing {}, [], <>
+data TupleType = TTVector | TTList | TTTuple deriving (Eq, Ord, Show)
+
 -------------------------------------------------------------------------------
 -- Converting Fl to Core
 -------------------------------------------------------------------------------
@@ -45,6 +47,7 @@ foolToCore (TypeDef nm vars cons) = foldr Lam (Tuple nm consList ) vars
 foolToCore (Function nm vars ex) = foldr Lam (foolToCore ex) vars
 foolToCore (FlApp e1 e2) = App (foolToCore e1) (foolToCore e2)
 foolToCore (SymId nm) = VarId nm
+foolToCore (PString s) = Lit $ LString s
 foolToCore (BinaryOp nm e1 e2) = App (App (VarId $ "("++nm++")") (foolToCore e1)) (foolToCore e2)
 foolToCore (FlIf e1 e2 e3) = If (foolToCore e1) (foolToCore e2) (foolToCore e3)
 foolToCore (FlLet exs e) = foldr fn (foolToCore e) exs -- unwinding List into the tree
@@ -62,9 +65,12 @@ foolToCore e = VarId $ "NOT IMPLEMENTED: " ++ show e
 instance PrettyPrint FlExpr where
   prettyPrint (PFloat x) = as [lmagenta] (show x)
   prettyPrint (PInt x) = as [lmagenta] (show x)
+  prettyPrint (PString s) = as [green] (show s)
+{-
   prettyPrint (VFloat v) = as [bold] "< " ++ V.foldl fn (as [lmagenta] (show $ V.head v)) (V.tail v) ++ as [bold] " >"
                            where fn acc x = acc ++ ", " ++ as [lmagenta] (show x)
   prettyPrint (VInt x) = as [green, bold] (show x)
+-}
   prettyPrint (Var v) = prettyPrint v
   -- prettyPrint (Var (Id nm tp)) = nm ++ ":" ++ show tp
   prettyPrint (Function fn v ex) = as [dgray, bold] "func " ++ as [green, bold] fn ++ " " ++
