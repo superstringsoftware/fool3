@@ -1,7 +1,7 @@
 FOOL3 = Functional Object Oriented Low-Level Language
 ===========================================
 
-The name is a bit of a joke, obviously. Currently, it's very much functional, might be reasonably low-level for better re-use of existing c-libraries, and most likely never really OO. In it's current state, it is quite useful for teaching Algebraic Data Types and lambda calculus, doing it in a user-friendly visual way:
+The name is a bit of a joke, obviously. Currently, it's very much functional, might be reasonably low-level for better re-use of existing c-libraries, and most likely never really OO. In it's current state, it is quite useful for teaching Algebraic Data Types and lambda calculus, doing it in a user-friendly visual way (it is colored in the terminal :)):
 
 #### Source Code
 ```haskell
