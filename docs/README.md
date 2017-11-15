@@ -15,17 +15,16 @@ square x = x * x;
 quad x = square x * square x;
 ```
 
-#### Inspecting Core Language
+#### Inspecting Core
 ```haskell
--- Types:
-type List a:* = Cell :a :(List a) | Nil 
-type Maybe a:* = Just :a | Nothing 
-type Either a:* b:* = Left :a | Right :b 
-type Bool = True | False 
--- Functions:
-func square x:? = BinaryOp "*" (SymId "x") (SymId "x")
-func fact n:? = FlIf (BinaryOp "==" (SymId "n") (PInt 0)) (PInt 1) (BinaryOp "*" (SymId "n") (FlApp (SymId "fact") (BinaryOp "-" (SymId "n") (PInt 1))))
-func quad x:? = BinaryOp "*" (FlApp (SymId "square") (SymId "x")) (FlApp (SymId "square") (SymId "x"))
+Bool = Bool {True, False} 
+Either = λa:*. λb:*. Either {λ:a. Left {v0} , λ:b. Right {v0} } 
+List = λa:*. List {λ:a. λ:(List a). Cell {v0, v1} , Nil} 
+Maybe = λa:*. Maybe {λ:a. Just {v0} , Nothing} 
+
+fact = λn:?. if (==) n 0 then 1 else (*) n fact (-) n 1
+quad = λx:?. (*) square x square x
+square = λx:?. (*) x x
 ```
 
 #### Tracing function calls step-by-step
