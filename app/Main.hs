@@ -47,6 +47,9 @@ processCommand (":all":_) = do
 processCommand (":load":xs) = loadFile (head xs)
 processCommand (":run":_) = run
 processCommand (":set":s:_) = processSet s
+processCommand (":env":_) = do
+  fl <- gets currentFlags
+  liftIO $ print fl
 
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
@@ -55,6 +58,7 @@ processCommand (":c":_) = processCommand [":core"]
 processCommand (":a":_) = processCommand [":all"]
 processCommand (":l":xs) = processCommand (":load":xs)
 processCommand (":s":xs) = processCommand (":set":xs)
+processCommand (":e":xs) = processCommand (":env":xs)
 
 processCommand _ = liftIO $ print "Unknown command. Type :h[elp] to show available list."
 
@@ -103,6 +107,7 @@ showHelp = do
     putStrLn ":c[ore]           -- list everything in core format"
     putStrLn ":l[oad] <name>    -- load and interpret file <name>"
     putStrLn ":s[et] <command>  -- set environment flags (:s strict or :s lazy)"
+    putStrLn ":e[nv]            -- show current environment"
     putStrLn ":functions        -- list all global functions"
     putStrLn ":types            -- list all types"
     putStrLn ":run              -- execute main() if it is present"

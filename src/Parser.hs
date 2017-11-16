@@ -217,7 +217,7 @@ argument = try vector
 arguments :: Parser FlExpr
 arguments = do
   args <- many1 argument
-  return $ foldr FlApp (head args) (tail args)
+  return $ foldr1 FlApp args
 
 
 factor :: Parser FlExpr

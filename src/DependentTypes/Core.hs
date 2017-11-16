@@ -15,6 +15,8 @@ data Expr
   | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
   | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
   | Tuple Name [Expr]
+  -- now for the types that are only used in the interpreter - potentially separate them
+  | CallPrim Name Literal Literal -- we will be changing all primops applications to this during the first pass in lazy eval 
   deriving (Eq, Ord, Show)
 {-
 -- read a bunch of stuff in test.fool, it explains how we can do everything via tuples
@@ -162,7 +164,7 @@ instance PrettyPrint Literal where
   prettyPrint (LInt x) = as [magenta] $ show x
   prettyPrint (LFloat x) = as [magenta] $ show x
   prettyPrint (LBool x) = as [magenta] $ show x
-  prettyPrint (LString s) = as [green] $ show s 
+  prettyPrint (LString s) = as [green] $ show s
   prettyPrint e = show e
 
 instance PrettyPrint Type where
