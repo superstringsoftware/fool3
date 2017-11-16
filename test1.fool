@@ -11,7 +11,7 @@ t = 100;
 
 folded f = map f (val 7);
 
-vec = <1,2,3,4>;
+# vec = <1,2,3,4>;
 
 data Bool = True | False;
 data List a = Cell a (List a) | Nil;
@@ -37,5 +37,5 @@ tert x = x * (square x);
 succ x = succ succ x;
 
 # testing product type construction
-productDataTest = Person :*: (dob:Date) :*: 4;
+# productDataTest = Person :*: (dob : Date) :*: 4;
 sumDataTest = Person :+: (Maybe a) :+: (Cons a Int);

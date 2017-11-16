@@ -3,7 +3,7 @@ module Lexer where
 -- import Text.Parsec.String (Parser)
 import Text.Parsec.Language (emptyDef)
 import Text.Parsec.Prim (many)
-import Text.Parsec ((<?>), Parsec)
+import Text.Parsec ((<?>), Parsec, ParsecT)
 
 import qualified Text.Parsec.Token as Tok
 
@@ -22,7 +22,7 @@ type Parser = Parsec String ParserState
 lexer :: Tok.TokenParser ParserState
 lexer = Tok.makeTokenParser style
   where
-    ops = ["+","*","-","/",";","=",",",".","|",":", "::", "<", ">"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
+    ops = ["+","*","-","/",";","=",",",".","|",":", "::","<",">"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
     names = ["def","extern","if","then","else","in","for"
             ,"binary", "unary", "var", "let", "data"]
     style = emptyDef {
@@ -44,9 +44,13 @@ whitespace = Tok.whiteSpace lexer
 reserved   = Tok.reserved lexer
 reservedOp = Tok.reservedOp lexer
 stringLit  = Tok.stringLiteral lexer
+symbol     = Tok.symbol lexer
+operator   = Tok.operator lexer
 
+{-
 operator :: Parser String
 operator = do
   c <- Tok.opStart emptyDef <?> "operator error"
   cs <- many (Tok.opLetter emptyDef) <?> "operator error 1"
   return (c:cs)
+-}

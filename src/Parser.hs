@@ -42,9 +42,9 @@ binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
 
 op :: Parser String
 op = do
-  whitespace
+  -- whitespace
   o <- operator
-  whitespace
+  -- whitespace
   return o
 
 binops = [[binary "=" Ex.AssocLeft]
@@ -59,7 +59,7 @@ lIdentifier = skipMany space >> lookAhead lower >> identifier
 uIdentifier = skipMany space >> lookAhead upper >> identifier
 
 expr :: Parser FlExpr
-expr = Ex.buildExpressionParser (binops ++ [[binop]]) factor
+expr = Ex.buildExpressionParser (binops ++ [[unop],[binop]]) factor
 -- expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
 
 -- concrete type or type application
@@ -204,11 +204,12 @@ binarydef = do
 
 
 argument :: Parser FlExpr
-argument = try lambda
+argument = try vector
+      <|> try lambda
       <|> try (parens expr)
-      -- <|> try vector
       <|> try ifthen
       <|> try floating
+      <|> try containers
       <|> try int
       <|> try symbolId
       <|> stringVal
@@ -266,18 +267,20 @@ parseFromFile p fname st
 
 -- adding new stuff
 
--- numeric vector: <1,2,3.4>
-{-
+-- vector: <1,2,3.4>
+-- list: [1,2,3,4]
+-- tuple: {1,int, "hello"}
+containers :: Parser FlExpr
+containers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
+        try  (FlTuple TTList   <$> brackets (commaSep expr))
+        <|>        FlTuple TTTuple  <$> braces   (commaSep expr)
+
 vector :: Parser FlExpr
-vector = do
-    -- we are checking something is between <>
-    -- then separating this input by commas
-    -- then for each expression - first trying to read it as a float then if it fails - as an int!
-    -- cool and beautiful!
-    args <- angles $ commaSep (try floating <|> int)
-    let l = map conv args where
-        conv (PInt i) = fromIntegral i
-        conv (PFloat f) = f
-    let v = U.fromList l
-    return $ VFloat v
--}
+vector = FlTuple TTVector <$> angles (commaSep arguments)
+  {-
+  st <- getParserState
+  reservedOp "<" <?> "parser: " ++ (stateInput st)
+  p2 <- commaSep expr <?> "commasep failed"
+  reservedOp ">" <?> "right angle failed"
+  return $ FlTuple TTVector p2
+  -}
