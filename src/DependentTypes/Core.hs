@@ -3,6 +3,7 @@
 module DependentTypes.Core where
 
 import TermColors
+import Data.Char (isUpper)
 
 type Name = String
 
@@ -114,7 +115,7 @@ class PrettyPrint a where
 
 instance PrettyPrint Expr where
   prettyPrint (VarId n) = n
-  prettyPrint (Lam n v e) = n ++ " " ++ prettyPrint v ++ prettyPrint e
+  prettyPrint (Lam n v e) = clrLam n ++ " " ++ prettyPrint v ++ prettyPrint e
   prettyPrint (Tuple tpl) = prettyPrint tpl
   prettyPrint (Lit l) = prettyPrint l
   prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
@@ -124,10 +125,11 @@ instance PrettyPrint Expr where
   prettyPrint (Let nm e1 e2) = as [bold, green] "let " ++ nm ++ " = " ++ prettyPrint e1 ++
                             as [bold, green] " in " ++ prettyPrint e2
 
-  prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2 
+  prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
   prettyPrint e = show e
+
+clrLam s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
 {-
-  | BinaryOp Name Expr Expr
   | UnaryOp  Name Expr
 
 data SizedTuple a = SzT { tuple :: [a], size :: Int}  deriving (Eq, Ord, Show)
