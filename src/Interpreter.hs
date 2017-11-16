@@ -75,7 +75,10 @@ initializeInterpreter = do
                 symTable = st,
                 localSymTable = lt,
                 logs = [],
-                lambdas = lam
+                lambdas = lam,
+                currentFlags = CurrentFlags {
+                  strict = True
+                }
              }
 
 
@@ -108,7 +111,8 @@ processExprGeneric b e = do
     let e1 = foolToCore e
     liftIO $ putStrLn $ as [bold, underlined] "Converted to:"
     liftIO $ putStrLn $ prettyPrint e1
-    evalExpr False b e1 -- first True - then strict, otherwise lazy
+    fl <- gets currentFlags
+    evalExpr (strict fl) b e1 -- first True - then strict, otherwise lazy
     -- liftIO $ putStrLn $ prettyPrint res
     return ()
 

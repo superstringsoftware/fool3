@@ -46,6 +46,7 @@ processCommand (":all":_) = do
   liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFile (head xs)
 processCommand (":run":_) = run
+processCommand (":set":s:_) = processSet s
 
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
@@ -53,8 +54,25 @@ processCommand (":c":"-d":_) = processCommand [":core","-d"]
 processCommand (":c":_) = processCommand [":core"]
 processCommand (":a":_) = processCommand [":all"]
 processCommand (":l":xs) = processCommand (":load":xs)
+processCommand (":s":xs) = processCommand (":set":xs)
 
 processCommand _ = liftIO $ print "Unknown command. Type :h[elp] to show available list."
+
+-- various environment settings
+processSet :: String -> IntState ()
+processSet "strict" = do
+  st <- get
+  let fl = (currentFlags st) { strict = True }
+  let newSt = st {currentFlags = fl}
+  put newSt
+  liftIO $ putStrLn $ "Set interpretation mode to " ++ TC.as [TC.bold] "strict"
+
+processSet "lazy" = do
+  st <- get
+  let fl = (currentFlags st) { strict = False }
+  let newSt = st {currentFlags = fl}
+  put newSt
+  liftIO $ putStrLn $ "Set interpretation mode to " ++ TC.as [TC.bold] "lazy"
 
 loadFile :: String -> IntState ()
 loadFile nm = do
@@ -84,6 +102,7 @@ showHelp = do
     putStrLn ":a[ll]            -- list everything"
     putStrLn ":c[ore]           -- list everything in core format"
     putStrLn ":l[oad] <name>    -- load and interpret file <name>"
+    putStrLn ":s[et] <command>  -- set environment flags (:s strict or :s lazy)"
     putStrLn ":functions        -- list all global functions"
     putStrLn ":types            -- list all types"
     putStrLn ":run              -- execute main() if it is present"

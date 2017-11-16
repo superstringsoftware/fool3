@@ -20,7 +20,10 @@ data InterpreterState = InterpreterState {
     localSymTable :: ExpressionTable, -- local table in the current scope (e.g., when processing a function call)
     typeTable :: ExpressionTable,
     logs     :: [String],
-    lambdas  :: CoreExpressionTable -- here we will store named lambda expressions for *both Constructors AND normal functions!!!*
+    lambdas  :: CoreExpressionTable, -- here we will store named lambda expressions for *both Constructors AND normal functions!!!*
+    currentFlags :: CurrentFlags
 } deriving Show
 
--- type 
+data CurrentFlags = CurrentFlags {
+    strict :: Bool -- true if strict, false if lazy
+} deriving Show
