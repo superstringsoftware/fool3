@@ -79,6 +79,7 @@ initializeInterpreter = do
                 lambdas = lam,
                 currentFlags = CurrentFlags {
                   strict = False
+                , pretty = False
                 }
              }
 
@@ -112,22 +113,24 @@ processExprGeneric b e = do
     let e1 = foolToCore e
     liftIO $ putStrLn $ as [bold, underlined] "Converted to:"
     liftIO $ putStrLn $ prettyPrint e1
-    fl <- gets currentFlags
-    evalExpr (strict fl) b e1 -- first True - then strict, otherwise lazy
+    evalExpr b e1 -- first True - then strict, otherwise lazy
     -- liftIO $ putStrLn $ prettyPrint res
     return ()
 
 
 -- evaluate expression until it stops simplifying and show it nicely
-evalExpr :: Bool -> Bool -> Expr -> IntState Expr
-evalExpr strict b ex = fn 1 b ex
-  where evalFunc = if strict then evalStepStrict else evalStep
-        fn i b ex = do
-                      ex' <- evalFunc b ex
+evalExpr :: Bool -> Expr -> IntState Expr
+evalExpr b ex = do
+  fl <- gets currentFlags
+  let evalFunc = if strict fl then evalStepStrict else evalStep
+  let printFunc = if pretty fl then prettyPrintTopLevel else show
+  fn 1 b ex evalFunc printFunc where
+        fn i b ex ef pf = do
+                      ex' <- ef b ex
                       if ex == ex' then return ex
                       else do
-                        liftIO $ putStrLn $ "[" ++ show i ++ "]\t" ++ prettyPrintTopLevel ex'
-                        fn (i+1) b ex'
+                        liftIO $ putStrLn $ "[" ++ show i ++ "]\t" ++ pf ex'
+                        fn (i+1) b ex' ef pf
 
 
 

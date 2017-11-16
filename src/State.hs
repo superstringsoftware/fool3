@@ -26,4 +26,5 @@ data InterpreterState = InterpreterState {
 
 data CurrentFlags = CurrentFlags {
     strict :: Bool -- true if strict, false if lazy
+  , pretty :: Bool -- pretty print or raw output
 } deriving Show

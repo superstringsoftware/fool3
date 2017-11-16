@@ -37,12 +37,13 @@ evalStep :: Bool -> Expr -> IntState Expr
 
 -- built-in operators. There must be a better way of doing this.
 -- now implements basic comparisons and arithmetics that converts ints to floats
-evalStep b e@(App (App v@(VarId nm) (Lit e1)) (Lit e2)) = do
+-- App (VarId nm) (App (Lit e1) (Lit e2))
+evalStep b e@(App v@(VarId nm) arg@(App (Lit e1) (Lit e2))) = do
   let pmop = findPrimOp nm
   case pmop of Just op -> return $ Lit $ LFloat $ op (litToPrim e1) (litToPrim e2)
                Nothing -> do
                   let bmop = findBoolOp nm
-                  case bmop of Nothing -> evalStep b v >>= \newV -> return (App (App newV (Lit e1)) (Lit e2))
+                  case bmop of Nothing -> evalStep b v >>= \newV -> return (App newV arg)
                                Just bop -> return $ Lit $ LBool $ bop (litToPrim e1) (litToPrim e2)
 
 
