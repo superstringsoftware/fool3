@@ -276,7 +276,7 @@ containers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
         <|>        FlTuple TTTuple  <$> braces   (commaSep expr)
 
 vector :: Parser FlExpr
-vector = FlTuple TTVector <$> angles (commaSep arguments)
+vector = FlTuple TTVector <$> angles (commaSep arguments) -- doesn't work with expr for some reason
   {-
   st <- getParserState
   reservedOp "<" <?> "parser: " ++ (stateInput st)
