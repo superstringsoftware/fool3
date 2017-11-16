@@ -35,6 +35,7 @@ findBoolOp _ = Nothing
 -- if True, printing stacktrace, if False, quiet
 evalStep :: Bool -> Expr -> IntState Expr
 
+{-
 -- built-in operators. There must be a better way of doing this.
 -- now implements basic comparisons and arithmetics that converts ints to floats
 -- App (VarId nm) (App (Lit e1) (Lit e2))
@@ -78,7 +79,7 @@ evalStep b (If e1 e2 e3) = do
               _ -> return $ If e1' e2 e3
 
 
-
+-}
 evalStep b e = if b then liftIO (print e) >> return e else return e
 
 
@@ -89,7 +90,7 @@ evalStep b e = if b then liftIO (print e) >> return e else return e
 -- beta reduction. substituting a var with an expr: walking the tree and applying changes
 -- this has to be abstracted and generalized
 beta :: Name -> Expr -> Expr -> Expr
-
+{-
 -- simlpy "instantiating" a variable if names are the same (hence, need unique names!)
 beta nm e@(VarId vname) val = if nm == vname then val else e
 
@@ -110,6 +111,7 @@ beta nm (Let sym e1 e2) val = Let sym ( beta nm e1 val) ( beta nm e2 val)
 
 -- processing tuple
 beta nm (Tuple tnm exs) val = Tuple tnm (map fn exs) where fn ex = beta nm ex val
+-}
 beta nm e val = e
 
 lookupGlobalSymbol :: Name -> IntState (Maybe Expr)

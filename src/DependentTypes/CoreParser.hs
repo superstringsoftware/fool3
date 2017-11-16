@@ -9,7 +9,7 @@
 --
 --------------------------------------------------------------------
 
-module Parser where
+module DependentTypes.CoreParser where
 
 import Text.Parsec
 -- import Text.Parsec.String (parseFromFile)
@@ -23,29 +23,24 @@ import Text.Parsec.Char (string)
 import qualified Data.Vector.Unboxed as U
 
 import Lexer
-import Syntax
-import DependentTypes.Core hiding (BinaryOp, UnaryOp)
+import DependentTypes.Core
 
-int :: Parser FlExpr
-int = PInt <$> fromInteger <$> integer
+int :: Parser Literal
+int = LInt . fromInteger <$> integer
 
-floating :: Parser FlExpr
-floating = PFloat <$> float
+floating :: Parser Literal
+floating = LFloat <$> float
 
-stringVal :: Parser FlExpr
-stringVal = PString <$> stringLit
+stringVal :: Parser Literal
+stringVal = LString <$> stringLit
 
-binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
-unop = Ex.Prefix (UnaryOp <$> op)
+binop = Ex.Infix  (BinaryOp <$> op) Ex.AssocLeft
+unop  = Ex.Prefix (UnaryOp <$> op)
 
 binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
 
 op :: Parser String
-op = do
-  -- whitespace
-  o <- operator
-  -- whitespace
-  return o
+op = operator
 
 binops = [[binary "=" Ex.AssocLeft]
         ,[binary "*" Ex.AssocLeft,
@@ -58,38 +53,34 @@ binops = [[binary "=" Ex.AssocLeft]
 lIdentifier = skipMany space >> lookAhead lower >> identifier
 uIdentifier = skipMany space >> lookAhead upper >> identifier
 
-expr :: Parser FlExpr
+expr :: Parser Expr
 expr = Ex.buildExpressionParser (binops ++ [[unop],[binop]]) factor
 -- expr = try vector <|> Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
 
 -- concrete type or type application
-typeAp :: Parser FlExpr
+typeAp :: Parser Type
 typeAp = do
   name <- uIdentifier
-  vars <- many $ try (Type <$> TCon <$> uIdentifier) <|> try ( Type <$> TVar <$> lIdentifier ) <|> (parens typeAp)
+  vars <- many $ try (TCon <$> uIdentifier) <|> try ( TVar <$> lIdentifier ) <|> parens typeAp
   let tcon = TCon name
-  if (length vars == 0) then return $ Type tcon -- concrete type
-  else return $ Type $ foldl f tcon vars -- type application
-  where f acc t = TApp acc (extractType t)
+  if null vars then return tcon -- concrete type
+  else return $ foldl TApp tcon vars -- type application
+
 
 -- concrete type only
-concreteType :: Parser FlExpr
-concreteType = uIdentifier >>= return . Type . TCon
+concreteType :: Parser Type
+concreteType = TCon <$> uIdentifier
 
-
--- helper function to extract Type and Var from FlExpr
-extractType (Type t) = t
-extractVar (Var v) = v
 
 -- variable with type
-variable :: Parser FlExpr
+variable :: Parser Var
 variable = do
   name <- lIdentifier
   typ <- try (reservedOp ":" *> parens typeAp) <|>
          try (reservedOp ":" *> concreteType) <|>
          try (reservedOp ":" *> typeVariable) <|>
-         pure (Type ToDerive)
-  return $ Var (Id name (extractType typ))
+         pure ToDerive
+  return $ Id name typ
 
 -- variables in records need to be handled differently
 varInRecord :: Parser Var
@@ -98,72 +89,79 @@ varInRecord = do
   typ <- try (reservedOp ":" *> parens typeAp) <|>
          try (reservedOp ":" *> typeVariable) <|>
          (reservedOp ":" *> typeAp)
-  return $ Id name (extractType typ)
+  return $ Id name typ
 
 -- type variable - Kind is always '*', needs to be adjusted at later stages
-typeVariable :: Parser FlExpr
+typeVariable :: Parser Type
 typeVariable = do
   name <- lIdentifier
-  return $ Var (TyVar name KStar)
+  return $ TVar name
 
 -- this, parametricType and dataDef parses haskell based data hello = Text a b | Nil type of data definitions
-constructor :: Parser FlExpr
+constructor :: Parser Expr
 constructor = do
   name <- uIdentifier
-  vars <- many  (try ((Id "") <$> TCon <$> uIdentifier) <|> -- concrete type
-                 try ((Id "") <$> TVar <$> lIdentifier) <|> -- type var
-                 ((Id "") <$>  extractType <$> (parens typeAp)) -- complex type, like List a
+  vars <- many  (try (Id "" . TCon <$> uIdentifier) <|> -- concrete type
+                 try (Id "" . TVar <$> lIdentifier) <|> -- type var
+                 (Id "" <$> parens typeAp) -- complex type, like List a
                  <?> "regular constructor failed")
-  return $ Constructor name vars
+  let t = map (\x -> VarId "") vars
+  let sz = length vars
+  return $ Lam name SzT { tuple = vars, size = sz } (Tuple SzT { tuple = t, size = sz})
 
-recordConstructor :: Parser FlExpr
+recordConstructor :: Parser Expr
 recordConstructor = do
   name <- uIdentifier
   whitespace >> char '{' >> whitespace
   vars <- commaSep varInRecord
   whitespace >> char '}' >> whitespace
-  return $ Constructor name vars
+  let t = map (\x -> VarId "") vars
+  let sz = length vars
+  return $ Lam name SzT { tuple = vars, size = sz } (Tuple SzT { tuple = t, size = sz})
+
 
 constructors = try recordConstructor <|> constructor
 
 -- simple ADT
-typeDef :: Parser FlExpr
+typeDef :: Parser Expr
 typeDef = do
   reserved "data"
   name <- uIdentifier
-  vars <- many (extractVar <$> typeVariable)
+  vars <- many typeVariable
+  let tvars = map (\(TVar n) -> TyVar n KStar) vars
   reservedOp "="
   fields <- sepBy1 constructors (char '|')
-  return $ TypeDef name vars fields
+  return $ Lam name SzT { tuple = tvars, size = length vars } (Tuple SzT { tuple = fields, size = length fields})
 
-function :: Parser FlExpr
+function :: Parser Expr
 function = do
   name <- lIdentifier
-  args <- many (extractVar <$> variable)   -- (parens $ many identifier) <|> (parens $ commaSep identifier)
+  args <- many variable   -- (parens $ many identifier) <|> (parens $ commaSep identifier)
   reservedOp "="
   body <- expr
-  return $ Function name args body
+  return $ Lam name SzT { tuple = args, size = length args } body
 
 -- \x -> x + 1 etc
-lambda :: Parser FlExpr
+lambda :: Parser Expr
 lambda = parens $ do
   char '\\'
-  args <- many (extractVar <$> variable)
+  args <- many variable
   reservedOp "->"
   body <- expr
-  return $ Function "_LAMBDA_" args body
-
+  return $ Lam "" SzT { tuple = args, size = length args } body
+{-
 extern :: Parser FlExpr
 extern = do
   reserved "extern"
   name <- lIdentifier
   args <- try (parens $ many identifier) <|> (parens $ commaSep identifier)
   return $ Extern name args
+-}
 
-symbolId :: Parser FlExpr
-symbolId = identifier >>= return . SymId
+symbolId :: Parser Expr
+symbolId = VarId <$> identifier
 
-ifthen :: Parser FlExpr
+ifthen :: Parser Expr
 ifthen = do
   reserved "if"
   cond <- expr
@@ -171,71 +169,66 @@ ifthen = do
   tr <- expr
   reserved "else"
   fl <- expr
-  return $ FlIf cond tr fl
+  return $ If cond tr fl
 
-letins :: Parser FlExpr
+{-
+letins :: Parser Expr
 letins = do
   reserved "let"
   defs <- commaSep function
   reserved "in"
   body <- expr
-  return $ FlLet defs body
+  return $ Let defs body
+-}
 
-unarydef :: Parser FlExpr
+unarydef :: Parser Expr
 unarydef = do
   reserved "def"
   reserved "unary"
   o <- op
-  args <- many (extractVar <$> variable)
+  arg <- variable
   reservedOp "="
   body <- expr
-  return $ Function o args body
+  return $ Lam ("("++o++")") SzT { tuple = [arg], size = 1 } body
 
-binarydef :: Parser FlExpr
+binarydef :: Parser Expr
 binarydef = do
   reserved "def"
   reserved "binary"
   o <- op
   prec <- int <?> "integer: precedence value for the operator definition"
-  args <- many (extractVar <$> variable)
+  arg1 <- variable
+  arg2 <- variable
   reservedOp "="
   body <- expr
-  return $ Function o args body
+  return $ Lam ("("++o++")") SzT { tuple = [arg1, arg2], size = 2 } body
 
 
-argument :: Parser FlExpr
-argument = try vector
-      <|> try lambda
+argument :: Parser Expr
+argument = try lambda
       <|> try (parens expr)
       <|> try ifthen
-      <|> try floating
-      <|> try containers
-      <|> try int
-      <|> try symbolId
-      <|> stringVal
+      <|> try (Lit <$> floating)
+      <|> try (Lit <$> int)
+      <|> try (Lit <$> stringVal)
+      <|> symbolId
 
-arguments :: Parser FlExpr
+arguments :: Parser Expr
 arguments = do
   args <- many1 argument
-  return $ foldr1 FlApp args
+  return $ foldr1 App args
 
 
-factor :: Parser FlExpr
-factor = try letins <|> arguments
+factor :: Parser Expr
+factor = arguments -- try letins <|>
 
-
--- <|> try variable
--- <|> try for
-
-defn :: Parser FlExpr
-defn = try extern
-    <|> try typeDef
+defn :: Parser Expr
+defn = try typeDef
     <|> try function
     <|> try unarydef
     <|> try binarydef
     <|> expr
 
--- <|> try record
 
 -- contents :: Parser a -> Parser a
 contents p = do
@@ -244,7 +237,7 @@ contents p = do
   eof
   return r
 
-toplevel :: Parser [FlExpr]
+toplevel :: Parser [Expr]
 toplevel = many $ do
     def <- defn
     reservedOp ";"
@@ -270,17 +263,44 @@ parseFromFile p fname st
 -- vector: <1,2,3.4>
 -- list: [1,2,3,4]
 -- tuple: {1,int, "hello"}
-containers :: Parser FlExpr
+{-
+containers :: Parser Expr
 containers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
         try  (FlTuple TTList   <$> brackets (commaSep expr))
         <|>        FlTuple TTTuple  <$> braces   (commaSep expr)
 
-vector :: Parser FlExpr
-vector = FlTuple TTVector <$> angles (commaSep arguments) -- doesn't work with expr for some reason
-  {-
-  st <- getParserState
-  reservedOp "<" <?> "parser: " ++ (stateInput st)
-  p2 <- commaSep expr <?> "commasep failed"
-  reservedOp ">" <?> "right angle failed"
-  return $ FlTuple TTVector p2
-  -}
+vector :: Parser Expr
+vector = FlTuple TTVector <$> angles (commaSep arguments)
+-}
+
+
+
+{-
+argument :: Parser Expr
+argument = try vector
+      <|> try lambda
+      <|> try (parens expr)
+      <|> try ifthen
+      <|> try (Lit <$> floating)
+      <|> try containers
+      <|> try int
+      <|> try symbolId
+      <|> stringVal
+
+arguments :: Parser Expr
+arguments = do
+  args <- many1 argument
+  return $ foldr1 FlApp args
+
+
+factor :: Parser Expr
+factor = try letins <|> arguments
+
+defn :: Parser Expr
+defn = try extern
+    <|> try typeDef
+    <|> try function
+    <|> try unarydef
+    <|> try binarydef
+    <|> expr
+-}

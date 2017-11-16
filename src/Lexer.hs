@@ -46,11 +46,3 @@ reservedOp = Tok.reservedOp lexer
 stringLit  = Tok.stringLiteral lexer
 symbol     = Tok.symbol lexer
 operator   = Tok.operator lexer
-
-{-
-operator :: Parser String
-operator = do
-  c <- Tok.opStart emptyDef <?> "operator error"
-  cs <- many (Tok.opLetter emptyDef) <?> "operator error 1"
-  return (c:cs)
--}

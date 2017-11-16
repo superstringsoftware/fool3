@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns, FlexibleInstances #-}
 
 module DependentTypes.Core where
 
@@ -6,47 +6,26 @@ import TermColors
 
 type Name = String
 
--- Core AST type
+{-
+Moving to new approach: everything is a tuple
+-}
+
+-- Core AST type to handle both lazy and strict hopefully a bit more efficiently
+-- So, no currying
 data Expr
   = Lit Literal
   | VarId Name -- for bound variables and functions???
-  | Lam Var  Expr
-  | App Expr Expr
+  | Lam Name (SizedTuple Var) Expr -- named function. To be non-partially applied, needs all arguments. size of a tuple is arity.
+  | Tuple    (SizedTuple Expr) -- polymorphic tuple
+  | App Expr Expr -- e1 can only be Lam, e2 can only be Tuple - so there should be a better way to handle this
   | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
   | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
-  | Tuple Name [Expr]
-  -- now for the types that are only used in the interpreter - potentially separate them
-  | CallPrim Name Literal Literal -- we will be changing all primops applications to this during the first pass in lazy eval 
+  | BinaryOp Name Expr Expr
+  | UnaryOp  Name Expr
   deriving (Eq, Ord, Show)
-{-
--- read a bunch of stuff in test.fool, it explains how we can do everything via tuples
--- and yes, we can do it via App, but lists are more convenient (maybe?) to manipulate than trees in this case
--- Name is a tag (constructor tag most often if it's applicable)
--- [Expr] is a tuple itself
--- Type is the type of the resulting tuple
-
--- Basically, Tuple without any lambdas inside is a term
--- And again, we can (probably) do it via App
-
-Some examples:
-
-Maybe a = Just a | Nothing translates to:
-Lam (TyVar "a" KStar)
-  Tuple "Maybe" [
-    Lam (Id "x" (TVar "a")) (Tuple "Just" [VarId "x"] (TApp (TCon "Maybe") (TVar "a"))),
-    Tuple "Nothing" [] (TApp (TCon "Maybe") (TVar "a"))
-  ] (KArr KStar KStar)
-
-Bool = True | False:
-  Tuple "Bool" [
-    Tuple "True" [] (TCon "Bool"),
-    Tuple "False" [] (TCon "Bool")
-  ] KStar
-
-etc.
--}
 
 
+data SizedTuple a = SzT { tuple :: [a], size :: Int}  deriving (Eq, Ord, Show)
 data Literal = LInt !Int | LFloat !Double | LChar !Char | LString String | LBool Bool deriving (Eq, Ord, Show)
 
 data Var = Id Name Type | TyVar Name Kind
@@ -58,8 +37,6 @@ varName (Id n _) = n
 varName (TyVar n _) = n
 varType (Id _ t) = t
 
--- needed for mega-abstract tuple in Expr
-data TypeOrKind = Tp Type | Kn Kind deriving (Show, Eq, Ord)
 
 -- anything that can be on the right side of ':' in expressions - so a type or a kind or type function that may depend on values etc
 data Type
@@ -122,11 +99,10 @@ data Bind b = NonRec b (Expr b) | Rec [(b, (Expr b))]
 -------------------------------------------------------------------------------
 -- AST manipulation stuff
 -------------------------------------------------------------------------------
--- calculate arity of an expression (basically, # of lambdas)
+-- calculate arity of an expression: trivial in our language approach
 arity :: Expr -> Int
-arity (Lam v e) = 1 + arity e
--- arity (App e1 e2) = arity e1 + arity e2
-arity e = 0
+arity (Lam _ v _) = size v
+
 
 
 
@@ -138,10 +114,8 @@ class PrettyPrint a where
 
 instance PrettyPrint Expr where
   prettyPrint (VarId n) = n
-  prettyPrint (Lam v e) = as [bold, dgray] "λ" ++ prettyPrint v ++ ". " ++ prettyPrint e
-  prettyPrint (Tuple nm exs) = as [magenta] nm ++ fn exs --  : " ++ prettyPrint tp - not showing types for now
-      where fn [] = ""
-            fn (e:es) = " {" ++ foldl (\acc x -> acc ++ ", " ++ prettyPrint x) (prettyPrint e) es ++ "} "
+  prettyPrint (Lam n v e) = n ++ " " ++ prettyPrint v ++ prettyPrint e
+  prettyPrint (Tuple tpl) = prettyPrint tpl
   prettyPrint (Lit l) = prettyPrint l
   prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
   prettyPrint (If e1 e2 e3) = as [bold, green] "if " ++ prettyPrint e1 ++
@@ -149,16 +123,32 @@ instance PrettyPrint Expr where
                               as [bold, green] " else " ++ prettyPrint e3
   prettyPrint (Let nm e1 e2) = as [bold, green] "let " ++ nm ++ " = " ++ prettyPrint e1 ++
                             as [bold, green] " in " ++ prettyPrint e2
-  -- prettyPrint e = show e
+
+  prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2 
+  prettyPrint e = show e
 {-
-    = Lit Literal
-    | App Expr Expr
+  | BinaryOp Name Expr Expr
+  | UnaryOp  Name Expr
+
+data SizedTuple a = SzT { tuple :: [a], size :: Int}  deriving (Eq, Ord, Show)
 -}
 
 embrace s = as [bold, blue] "(" ++ s ++ as [bold, blue] ")"
 -- additional nicer formatting for output for top level expressions
 prettyPrintTopLevel (App e1 e2) = embrace (prettyPrint e1) ++ embrace (prettyPrint e2)
 prettyPrintTopLevel e = prettyPrint e
+
+instance PrettyPrint (SizedTuple Var) where
+  prettyPrint SzT {tuple} = foldr fn "" tuple
+      where fn el acc = as [bold, dgray] "λ" ++ prettyPrint el ++ ". " ++ acc
+
+
+instance PrettyPrint (SizedTuple Expr) where
+  prettyPrint SzT {tuple} = pp tuple where
+      pp []     = ""
+      pp [x]    = "{" ++ prettyPrint x ++ "}"
+      pp (x:xs) = "{" ++ prettyPrint x ++ foldr fn "" xs ++ "}"
+          where fn el acc = ", " ++ prettyPrint el ++ acc
 
 instance PrettyPrint Literal where
   prettyPrint (LInt x) = as [magenta] $ show x
@@ -187,7 +177,3 @@ instance PrettyPrint Var where
 instance PrettyPrint Kind where
   prettyPrint KStar = "*"
   prettyPrint k = show k
-
-instance PrettyPrint TypeOrKind where
-  prettyPrint (Tp t) = prettyPrint t
-  prettyPrint (Kn k) = prettyPrint k

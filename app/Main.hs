@@ -1,8 +1,7 @@
 module Main where
 
-import Parser
+import DependentTypes.CoreParser
 import Interpreter
-import Syntax
 import Control.Monad.Trans
 import System.Console.Haskeline
 import System.Directory
@@ -12,6 +11,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 import Data.Functor.Identity
 import State
+
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
@@ -45,7 +45,6 @@ processCommand (":all":_) = do
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
   liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFile (head xs)
-processCommand (":run":_) = run
 processCommand (":set":s:_) = processSet s
 processCommand (":env":_) = do
   fl <- gets currentFlags
@@ -88,15 +87,6 @@ loadFile nm = do
      Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
      Right exprs -> mapM_ processExpr exprs >> liftIO (putStrLn "... successfully loaded.")
 
-run :: IntState ()
-run = do
-  st <- get
-  liftIO $ putStrLn "Running"
-  mn <- liftIO $ findMain $ funTable st
-  liftIO $ print mn
-  case mn of
-    Nothing -> liftIO $ putStrLn "main() does not exist!"
-    Just (Function _ _ f) -> processExpr f
 
 showHelp :: IO ()
 showHelp = do
@@ -110,7 +100,6 @@ showHelp = do
     putStrLn ":e[nv]            -- show current environment"
     putStrLn ":functions        -- list all global functions"
     putStrLn ":types            -- list all types"
-    putStrLn ":run              -- execute main() if it is present"
 
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()

@@ -23,6 +23,7 @@ library
                      , DependentTypes.Core
                      , DependentTypes.Eval
                      , DependentTypes.StrictEval
+                     , DependentTypes.CoreParser
                      , State
   build-depends:       base >= 4.7 && < 5
                      , parsec

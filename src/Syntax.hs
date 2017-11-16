@@ -40,6 +40,7 @@ data TupleType = TTVector | TTList | TTTuple deriving (Eq, Ord, Show)
 -------------------------------------------------------------------------------
 -- Converting Fl to Core
 -------------------------------------------------------------------------------
+{-
 foolToCore :: FlExpr -> Expr
 foolToCore (Constructor nm vars) = foldr Lam (Tuple nm (map (\x -> VarId "") vars) ) vars
 foolToCore (TypeDef nm vars cons) = foldr Lam (Tuple nm consList ) vars
@@ -60,7 +61,7 @@ foolToCore (PFloat x) = Lit $ LFloat x
 foolToCore e = VarId $ "NOT IMPLEMENTED: " ++ show e
 
 -- foolToCore (TypeDef nm vars cons) =
-
+-}
 -------------------------------------------------------------------------------
 -- Pretty Print typeclass
 -------------------------------------------------------------------------------

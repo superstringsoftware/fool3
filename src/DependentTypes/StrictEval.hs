@@ -49,26 +49,6 @@ So, in our AST (or close enough) it would look like:
 -------------------------------------------------------------------------------
 -- Strict Eval (kindof?)
 -------------------------------------------------------------------------------
-evalStepStrict b e@(App (App v@(VarId nm) (Lit e1)) (Lit e2)) = do
-  let pmop = findPrimOp nm
-  case pmop of Just op -> return $ Lit $ LFloat $ op (litToPrim e1) (litToPrim e2)
-               Nothing -> do
-                  let bmop = findBoolOp nm
-                  case bmop of Nothing -> evalStepStrict b v >>= \newV -> return (App (App newV (Lit e1)) (Lit e2))
-                               Just bop -> return $ Lit $ LBool $ bop (litToPrim e1) (litToPrim e2)
 
-
-evalStepStrict b e@(App (Lam var expr) val) = do
-  val' <- evalStepStrict b val -- evaluating argument first!!! (the only difference with lazy)
-  let ex =  beta (varName var) expr val'
-  if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
-    >> return ex
-  else return ex
-
--- small step semantics
-evalStepStrict b (App e1 e2) = do
-  e2' <- evalStepStrict b e2
-  e1' <- evalStepStrict b e1
-  return $ App e1' e2'
 
 evalStepStrict b e = evalStep b e
