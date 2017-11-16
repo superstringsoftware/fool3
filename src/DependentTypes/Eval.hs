@@ -17,17 +17,6 @@ import Control.Monad.IO.Class (liftIO)
 litToPrim (LInt x) = fromIntegral x
 litToPrim (LFloat x) = x
 
--- evaluate expression until it stops simplifying and show it nicely
-evalExpr :: Bool -> Bool -> Expr -> IntState Expr
-evalExpr strict b ex = fn 1 b ex
-  where evalFunc = if strict then evalStepStrict else evalStep
-        fn i b ex = do
-                      ex' <- evalFunc b ex
-                      if ex == ex' then return ex
-                      else do
-                        liftIO $ putStrLn $ "[" ++ show i ++ "]\t" ++ prettyPrintTopLevel ex'
-                        fn (i+1) b ex'
-
 -- helper in arithmetic ops for eval
 findPrimOp "(+)" = Just (+)
 findPrimOp "(-)" = Just (-)
@@ -77,8 +66,8 @@ evalStep b e@(VarId nm) = do
 
 -- small step semantics
 evalStep b (App e1 e2) = do
-  e2' <- evalStep b e2
   e1' <- evalStep b e1
+  e2' <- evalStep b e2
   return $ App e1' e2'
 
 -- If now calculates ok for arithmetic
@@ -90,19 +79,6 @@ evalStep b (If e1 e2 e3) = do
 
 
 evalStep b e = if b then liftIO (print e) >> return e else return e
-
--------------------------------------------------------------------------------
--- Strict Eval (kindof?)
--------------------------------------------------------------------------------
-
-evalStepStrict b e@(App (Lam var expr) val) = do
-  val' <- evalStepStrict b val -- evaluating argument first!!! (the only difference with lazy)
-  let ex =  beta (varName var) expr val'
-  if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
-    >> return ex
-  else return ex
-
-evalStepStrict b e = evalStep b e
 
 
 -------------------------------------------------------------------------------

@@ -22,6 +22,7 @@ import Control.Monad.IO.Class (liftIO)
 
 import State
 import DependentTypes.Eval
+import DependentTypes.StrictEval
 
 
 -- resolves a symbol by name starting with local scope and going up
@@ -77,7 +78,7 @@ initializeInterpreter = do
                 logs = [],
                 lambdas = lam,
                 currentFlags = CurrentFlags {
-                  strict = True
+                  strict = False
                 }
              }
 
@@ -115,6 +116,19 @@ processExprGeneric b e = do
     evalExpr (strict fl) b e1 -- first True - then strict, otherwise lazy
     -- liftIO $ putStrLn $ prettyPrint res
     return ()
+
+
+-- evaluate expression until it stops simplifying and show it nicely
+evalExpr :: Bool -> Bool -> Expr -> IntState Expr
+evalExpr strict b ex = fn 1 b ex
+  where evalFunc = if strict then evalStepStrict else evalStep
+        fn i b ex = do
+                      ex' <- evalFunc b ex
+                      if ex == ex' then return ex
+                      else do
+                        liftIO $ putStrLn $ "[" ++ show i ++ "]\t" ++ prettyPrintTopLevel ex'
+                        fn (i+1) b ex'
+
 
 
 -- adds function or operator definition to the table
