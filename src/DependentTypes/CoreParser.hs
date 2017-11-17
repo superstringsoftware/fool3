@@ -207,7 +207,7 @@ binarydef = do
 argument :: Parser Expr
 argument = try lambda
       <|> try (parens expr)
-      <|> try ifthen
+      <|> try (parens ifthen)
       <|> try (Lit <$> floating)
       <|> try (Lit <$> int)
       <|> try (Lit <$> stringVal)
@@ -218,12 +218,18 @@ arguments = do
   args <- many1 argument
   return $ foldr1 App args
 
+call :: Parser Expr
+call = do
+  name <- identifier
+  args <- many1 argument
+  return $ App (VarId name) (Tuple SzT { tuple = args, size = length args })
+
 
 factor :: Parser Expr
-factor = arguments -- try letins <|>
+factor = try call <|> ifthen <|> argument -- arguments -- try letins <|>
 
 defn :: Parser Expr
-defn = try typeDef
+defn =  try typeDef
     <|> try function
     <|> try unarydef
     <|> try binarydef
