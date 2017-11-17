@@ -11,7 +11,11 @@ t = 100;
 
 folded f = map f (val 7);
 
-# vec = <1,2,3,4>;
+vec = <1,2,3,4>;
+
+ls = [ "hello", "world"];
+
+tp = { x, "test", 1, y, 2.34};
 
 data Bool = True | False;
 data List a = Cell a (List a) | Nil;
@@ -24,7 +28,7 @@ data Person = Person { name:String, age : Int, dob: Maybe Date, pm : List a} | F
 
 # fact 0 = 1;
 fact n = if n == 0 then 1 else n * fact (n - 1);
-fuct n = let fn x = x ** 3, k = 4 in k + fn n;
+# fuct n = let fn x = x ** 3, k = 4 in k + fn n;
 
 fop x y = x ==-> (y + 15);
 

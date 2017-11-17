@@ -206,6 +206,7 @@ binarydef = do
 
 argument :: Parser Expr
 argument = try lambda
+      <|> try containers
       <|> try (parens expr)
       <|> try (parens ifthen)
       <|> try (Lit <$> floating)
@@ -218,6 +219,8 @@ arguments = do
   args <- many1 argument
   return $ foldr1 App args
 
+-- so the way we are parsing now is that we can only apply a symbol to a tuple of expressions,
+-- moving away from trees to lists
 call :: Parser Expr
 call = do
   name <- identifier
@@ -269,12 +272,18 @@ parseFromFile p fname st
 -- vector: <1,2,3.4>
 -- list: [1,2,3,4]
 -- tuple: {1,int, "hello"}
-{-
+
 containers :: Parser Expr
 containers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
-        try  (FlTuple TTList   <$> brackets (commaSep expr))
-        <|>        FlTuple TTTuple  <$> braces   (commaSep expr)
+        try  $ do
+          args <- brackets (commaSep expr)
+          return $ Lit $ LList SzT { tuple = args, size = length args}
+        <|> try (braces (commaSep expr) >>= \args -> return (Tuple SzT { tuple = args, size = length args}))
+        <|> (angles (commaSep factor)  >>= \args -> return (Lit $ LVec SzT { tuple = args, size = length args}))
 
+
+
+{-
 vector :: Parser Expr
 vector = FlTuple TTVector <$> angles (commaSep arguments)
 -}

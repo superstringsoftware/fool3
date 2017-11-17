@@ -18,7 +18,7 @@ data Expr
   | VarId Name -- for bound variables and functions???
   | Lam Name (SizedTuple Var) Expr -- named function. To be non-partially applied, needs all arguments. size of a tuple is arity.
   | Tuple    (SizedTuple Expr) -- polymorphic tuple
-  | App Expr Expr -- e1 can only be Lam, e2 can only be Tuple - so there should be a better way to handle this
+  | App Expr Expr -- e1 can only be Lam or VarId, e2 can only be Tuple - so there should be a better way to handle this
   | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
   | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
   | BinaryOp Name Expr Expr
@@ -27,7 +27,9 @@ data Expr
 
 
 data SizedTuple a = SzT { tuple :: [a], size :: Int}  deriving (Eq, Ord, Show)
-data Literal = LInt !Int | LFloat !Double | LChar !Char | LString String | LBool Bool deriving (Eq, Ord, Show)
+data Literal = LInt !Int | LFloat !Double | LChar !Char |
+               LString String | LBool Bool | LList (SizedTuple Expr) | LVec (SizedTuple Expr)
+               deriving (Eq, Ord, Show)
 
 data Var = Id Name Type | TyVar Name Kind
   deriving (Show, Eq, Ord)
@@ -128,6 +130,7 @@ instance PrettyPrint Expr where
   prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
   prettyPrint e = show e
 
+clrLam "" = ""
 clrLam s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
 {-
   | UnaryOp  Name Expr
@@ -146,17 +149,21 @@ instance PrettyPrint (SizedTuple Var) where
 
 
 instance PrettyPrint (SizedTuple Expr) where
-  prettyPrint SzT {tuple} = pp tuple where
-      pp []     = ""
-      pp [x]    = "{" ++ prettyPrint x ++ "}"
-      pp (x:xs) = "{" ++ prettyPrint x ++ foldr fn "" xs ++ "}"
-          where fn el acc = ", " ++ prettyPrint el ++ acc
+  prettyPrint SzT {tuple} = showBracketedList "{" "}" tuple
+
+showBracketedList l r [] = ""
+showBracketedList l r [x]    = l ++ prettyPrint x ++ r
+showBracketedList l r (x:xs) = l ++ prettyPrint x ++ foldr fn "" xs ++ r
+    where fn el acc = ", " ++ prettyPrint el ++ acc
+
 
 instance PrettyPrint Literal where
   prettyPrint (LInt x) = as [magenta] $ show x
   prettyPrint (LFloat x) = as [magenta] $ show x
   prettyPrint (LBool x) = as [magenta] $ show x
   prettyPrint (LString s) = as [green] $ show s
+  prettyPrint (LList SzT {tuple}) = showBracketedList "[" "]" tuple
+  prettyPrint (LVec  SzT {tuple})  = showBracketedList "<" ">" tuple
   prettyPrint e = show e
 
 instance PrettyPrint Type where
