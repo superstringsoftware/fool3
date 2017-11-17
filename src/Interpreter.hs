@@ -108,10 +108,9 @@ prettyPrintLS ls = do
     list <- H.toList ls
     let res = sortBy (compare `on` fst) list
     mapM_ f res where
-    f (k,v) = putStrLn $ clr k ++ " = " ++ prettyPrintTopLevel v
-              where clr s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
+    f (k,v) = putStrLn $ prettyPrintTopLevel v
+
 
 showLS :: CoreExpressionTable -> IO ()
 showLS ls = H.mapM_ f ls
-          where f (k,v) = putStrLn $ clr k ++ " = " ++ show v
-                          where clr s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
+          where f (k,v) = putStrLn $ show v

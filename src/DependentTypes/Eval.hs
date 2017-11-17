@@ -61,6 +61,7 @@ data Var = Id Name Type | TyVar Name Kind
 -- if True, printing stacktrace, if False, quiet
 evalStep :: Bool -> Expr -> IntState Expr
 
+{-
 -- applying a Lambda - beta reduction
 evalStep b e@(App (Lam nm (SzT {tuple = vars, size = arity}) expr) (Tuple SzT {tuple = vals, size = numVals}) ) = do
   -- let ex =  beta (varName var) expr val
@@ -68,7 +69,7 @@ evalStep b e@(App (Lam nm (SzT {tuple = vars, size = arity}) expr) (Tuple SzT {t
     liftIO $ putStrLn $ "Processing App for function " ++ nm ++ " of arity " ++ show arity ++ " and " ++ show numVals ++ " arguments"
     liftIO $ print e
     return e
-
+-}
 
 -- looking up global symbol by name: for now, only Functions
 -- need to make it work for types and process local contexts (letins)

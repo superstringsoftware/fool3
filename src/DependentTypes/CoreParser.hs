@@ -107,7 +107,7 @@ constructor = do
                  <?> "regular constructor failed")
   let t = map (\x -> VarId "") vars
   let sz = length vars
-  return $ Lam name SzT { tuple = vars, size = sz } (Tuple SzT { tuple = t, size = sz})
+  return $ Lam name vars (Tuple name t)
 
 recordConstructor :: Parser Expr
 recordConstructor = do
@@ -117,7 +117,7 @@ recordConstructor = do
   whitespace >> char '}' >> whitespace
   let t = map (\x -> VarId "") vars
   let sz = length vars
-  return $ Lam name SzT { tuple = vars, size = sz } (Tuple SzT { tuple = t, size = sz})
+  return $ Lam name vars (Tuple name t)
 
 
 constructors = try recordConstructor <|> constructor
@@ -131,7 +131,8 @@ typeDef = do
   let tvars = map (\(TVar n) -> TyVar n KStar) vars
   reservedOp "="
   fields <- sepBy1 constructors (char '|')
-  return $ Lam name SzT { tuple = tvars, size = length vars } (Tuple SzT { tuple = fields, size = length fields})
+  return $ Lam name tvars (Tuple name fields)
+
 
 function :: Parser Expr
 function = do
@@ -139,7 +140,7 @@ function = do
   args <- many variable   -- (parens $ many identifier) <|> (parens $ commaSep identifier)
   reservedOp "="
   body <- expr
-  return $ Lam name SzT { tuple = args, size = length args } body
+  return $ Lam name args body
 
 -- \x -> x + 1 etc
 lambda :: Parser Expr
@@ -148,7 +149,7 @@ lambda = parens $ do
   args <- many variable
   reservedOp "->"
   body <- expr
-  return $ Lam "" SzT { tuple = args, size = length args } body
+  return $ Lam "" args body
 {-
 extern :: Parser FlExpr
 extern = do
@@ -189,7 +190,7 @@ unarydef = do
   arg <- variable
   reservedOp "="
   body <- expr
-  return $ Lam ("("++o++")") SzT { tuple = [arg], size = 1 } body
+  return $ Lam ("("++o++")") [arg] body
 
 binarydef :: Parser Expr
 binarydef = do
@@ -201,7 +202,7 @@ binarydef = do
   arg2 <- variable
   reservedOp "="
   body <- expr
-  return $ Lam ("("++o++")") SzT { tuple = [arg1, arg2], size = 2 } body
+  return $ Lam ("("++o++")") [arg1, arg2] body
 
 
 argument :: Parser Expr
@@ -225,7 +226,7 @@ call :: Parser Expr
 call = do
   name <- identifier
   args <- many1 argument
-  return $ App (VarId name) (Tuple SzT { tuple = args, size = length args })
+  return $ App (VarId name) (Tuple "" args)
 
 
 factor :: Parser Expr
@@ -277,9 +278,9 @@ containers :: Parser Expr
 containers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
         try  $ do
           args <- brackets (commaSep expr)
-          return $ Lit $ LList SzT { tuple = args, size = length args}
-        <|> try (braces (commaSep expr) >>= \args -> return (Tuple SzT { tuple = args, size = length args}))
-        <|> (angles (commaSep factor)  >>= \args -> return (Lit $ LVec SzT { tuple = args, size = length args}))
+          return $ Lit $ LList args
+        <|> try (braces (commaSep expr) >>= \args -> return (Tuple "" args))
+        <|> (angles (commaSep factor)  >>= \args -> return (Lit $ LVec args))
 
 
 
