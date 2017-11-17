@@ -14,10 +14,11 @@ import Parser
 import TermColors
 import Data.Char (isUpper)
 
-import Control.Monad (zipWithM_)
+import Control.Monad (zipWithM_, void)
 
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 import Control.Monad.IO.Class (liftIO)
+
 
 import State
 import DependentTypes.Eval
@@ -59,9 +60,7 @@ processExpr e@(Lam name _ _) = do
 -- processExpr e@(FlApp _ _) = processExprGeneric False e
 -- processExpr e@(SymId _) = processExprGeneric False e
 
-processExpr _ = do return ()
-
-processExprGeneric b e = evalExpr b e
+processExpr e = void (evalExpr False e)
 
 
 -- evaluate expression until it stops simplifying and show it nicely
@@ -72,6 +71,7 @@ evalExpr b ex = do
   let printFunc = if pretty fl then prettyPrintTopLevel else show
   fn 1 b ex evalFunc printFunc where
         fn i b ex ef pf = do
+                      -- liftIO $ putStrLn $ "Iteration " ++ show i
                       ex' <- ef b ex
                       if ex == ex' then return ex
                       else do

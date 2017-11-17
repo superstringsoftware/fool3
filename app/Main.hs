@@ -64,18 +64,21 @@ processCommand _ = liftIO $ print "Unknown command. Type :h[elp] to show availab
 -- various environment settings
 processSet :: String -> IntState ()
 processSet "strict" = do
-  st <- get
-  let fl = (currentFlags st) { strict = True }
-  let newSt = st {currentFlags = fl}
-  put newSt
+  modify (\st -> st { currentFlags = (currentFlags st) { strict = True} } )
   liftIO $ putStrLn $ "Set interpretation mode to " ++ TC.as [TC.bold] "strict"
 
 processSet "lazy" = do
-  st <- get
-  let fl = (currentFlags st) { strict = False }
-  let newSt = st {currentFlags = fl}
-  put newSt
+  modify (\st -> st { currentFlags = (currentFlags st) { strict = False} } )
   liftIO $ putStrLn $ "Set interpretation mode to " ++ TC.as [TC.bold] "lazy"
+
+processSet "pretty" = do
+  modify (\st -> st { currentFlags = (currentFlags st) { pretty = True} } )
+  liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "pretty printing on"
+
+processSet "show" = do
+  modify (\st -> st { currentFlags = (currentFlags st) { pretty = False} } )
+  liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "pretty printing off"
+
 
 loadFile :: String -> IntState ()
 loadFile nm = do

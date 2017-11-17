@@ -8,6 +8,7 @@ import State
 import qualified Data.HashTable.IO as H
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad
 
 
 -------------------------------------------------------------------------------
@@ -31,9 +32,61 @@ findBoolOp "(>)" = Just (>)
 findBoolOp "(<)" = Just (<)
 findBoolOp _ = Nothing
 
+{-
+
+data Expr
+  = Lit Literal
+  | VarId Name -- for bound variables and functions???
+  | Lam Name (SizedTuple Var) Expr -- named function. To be non-partially applied, needs all arguments. size of a tuple is arity.
+  | Tuple    (SizedTuple Expr) -- polymorphic tuple
+  | App Expr Expr -- e1 can only be Lam or VarId, e2 can only be Tuple - so there should be a better way to handle this
+  | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
+  | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
+  | BinaryOp Name Expr Expr
+  | UnaryOp  Name Expr
+  deriving (Eq, Ord, Show)
+
+
+data SizedTuple a = SzT { tuple :: [a], size :: Int}  deriving (Eq, Ord, Show)
+data Literal = LInt !Int | LFloat !Double | LChar !Char |
+               LString String | LBool Bool | LList (SizedTuple Expr) | LVec (SizedTuple Expr)
+               deriving (Eq, Ord, Show)
+
+data Var = Id Name Type | TyVar Name Kind
+
+-}
+
+
 -- small evaluation step
 -- if True, printing stacktrace, if False, quiet
 evalStep :: Bool -> Expr -> IntState Expr
+
+-- applying a Lambda - beta reduction
+evalStep b e@(App (Lam nm (SzT {tuple = vars, size = arity}) expr) (Tuple SzT {tuple = vals, size = numVals}) ) = do
+  -- let ex =  beta (varName var) expr val
+  -- if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
+    liftIO $ putStrLn $ "Processing App for function " ++ nm ++ " of arity " ++ show arity ++ " and " ++ show numVals ++ " arguments"
+    liftIO $ print e
+    return e
+
+
+-- looking up global symbol by name: for now, only Functions
+-- need to make it work for types and process local contexts (letins)
+evalStep b e@(VarId nm) = do
+  excan <- lookupGlobalSymbol nm
+  case excan of
+    Nothing -> return e
+    Just ex ->
+      if b then liftIO (putStrLn $ "Substituting " ++ nm ++ " to " ++ prettyPrint ex) >> return ex
+      else return ex
+
+-- small step semantics
+evalStep b (App e1 e2) = do
+  when b $ liftIO (putStrLn "evalStep b (App e1 e2)")
+  e1' <- evalStep b e1
+  e2' <- evalStep b e2
+  return $ App e1' e2'
+
 
 {-
 -- built-in operators. There must be a better way of doing this.
@@ -49,28 +102,8 @@ evalStep b e@(App v@(VarId nm) arg@(App (Lit e1) (Lit e2))) = do
 
 
 
--- applying a Lambda - beta reduction
-evalStep b e@(App (Lam var expr) val) = do
-  let ex =  beta (varName var) expr val
-  if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
-    >> return ex
-  else return ex
 
--- looking up global symbol by name: for now, only Functions
--- need to make it work for types and process local contexts (letins)
-evalStep b e@(VarId nm) = do
-  excan <- lookupGlobalSymbol nm
-  case excan of
-    Nothing -> return e
-    Just ex ->
-      if b then liftIO (putStrLn $ "Substituting " ++ nm ++ " to " ++ prettyPrint ex) >> return ex
-      else return ex
 
--- small step semantics
-evalStep b (App e1 e2) = do
-  e1' <- evalStep b e1
-  e2' <- evalStep b e2
-  return $ App e1' e2'
 
 -- If now calculates ok for arithmetic
 evalStep b (If e1 e2 e3) = do
