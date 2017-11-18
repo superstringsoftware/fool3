@@ -128,22 +128,29 @@ traverseExpr f e = f e
 
 descendM :: (Monad m, Applicative m) => (Expr -> m Expr) -> Expr -> m Expr
 descendM f e = case e of
-    App  a b        -> App <$> descendM f a <*> descendM f b >>= f
-    VarId  a        -> VarId <$> pure a >>= f
-    Lam nm v e      -> Lam <$> pure nm <*> pure v <*> descendM f e >>= f
-    Lit  n          -> Lit <$> pure n >>= f
-    Let  n a b      -> Let <$> pure n <*> descendM f a <*> descendM f b >>= f
-    If a b c        -> If <$> descendM f a <*> descendM f b <*> descendM f c >>= f
-    BinaryOp n a b  -> BinaryOp <$> pure n <*> descendM f a <*> descendM f b >>= f
-    UnaryOp n a     -> UnaryOp <$> pure n <*> descendM f a >>= f
-    Tuple nm ex     -> Tuple <$> pure nm <*> mapM (descendM f) ex >>= f
+    App  a b        -> App <$> descendM f a <*> descendM f b
+    VarId  a        -> VarId <$> pure a
+    Lam nm v e      -> Lam <$> pure nm <*> pure v <*> descendM f e
+    Lit  n          -> Lit <$> pure n
+    Let  n a b      -> Let <$> pure n <*> descendM f a <*> descendM f b
+    If a b c        -> If <$> descendM f a <*> descendM f b <*> descendM f c
+    BinaryOp n a b  -> BinaryOp <$> pure n <*> descendM f a <*> descendM f b
+    UnaryOp n a     -> UnaryOp <$> pure n <*> descendM f a
+    Tuple nm ex     -> Tuple <$> pure nm <*> mapM (descendM f) ex
+    >>= f
 
-  
-
-{-
+-- pure traversal in the identity monad
 descend :: (Expr -> Expr) -> Expr -> Expr
 descend f ex = runIdentity (descendM (return . f) ex)
--}
+
+-- for now, this simply kills all Binary / Unary op calls and changes them to function applications
+desugar :: Expr -> Expr
+desugar = descend f
+ where
+   f (UnaryOp nm e) = App (VarId nm) (mkTuple e)
+   f (BinaryOp nm e1 e2) = App (VarId nm) (mk2Tuple e1 e2)
+   f x = x
+
 -------------------------------------------------------------------------------
 -- Pretty Print typeclass
 -------------------------------------------------------------------------------

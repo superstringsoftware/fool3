@@ -46,23 +46,13 @@ initializeInterpreter = do
                 }
              }
 
--- for now, this simply kills all Binary / Unary op calls and changes them to function applications
-desugar :: Expr -> IntState Expr
-desugar = descendM f
- where
-   f (UnaryOp nm e) = pure $ App (VarId nm) (mkTuple e)
-   f (BinaryOp nm e1 e2) = pure $ App (VarId nm) (mk2Tuple e1 e2)
-   f x = pure x
-
-
-
 -- process a single expression and alter the interpreter state correspondigly
 processExpr :: Expr -> IntState ()
 
 -- binding functions and ops
 processExpr e@(Lam name _ _) = do
     ls <- gets lambdas
-    e' <- desugar e
+    let e' = desugar e
     liftIO $ H.insert ls name e'
 
 -- executing binary op
