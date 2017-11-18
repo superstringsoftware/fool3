@@ -186,7 +186,9 @@ ifthen = do
   tr <- expr
   reserved "else"
   fl <- expr
-  return $ If cond tr fl
+  -- changing to case expressions
+  return $ Case [ (cond, tr), (Lit (LBool True), fl) ]
+  -- return $ If cond tr fl
 
 {-
 letins :: Parser Expr
