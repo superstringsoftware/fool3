@@ -59,7 +59,7 @@ processCommand (":l":xs) = processCommand (":load":xs)
 processCommand (":s":xs) = processCommand (":set":xs)
 processCommand (":e":xs) = processCommand (":env":xs)
 
-processCommand _ = liftIO $ print "Unknown command. Type :h[elp] to show available list."
+processCommand _ = liftIO $ putStrLn "Unknown command. Type :h[elp] to show available list."
 
 -- various environment settings
 processSet :: String -> IntState ()
@@ -79,6 +79,7 @@ processSet "show" = do
   modify (\st -> st { currentFlags = (currentFlags st) { pretty = False} } )
   liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "pretty printing off"
 
+processSet _ = liftIO $ putStrLn "Unknown :set command. Type :h[elp] to show available list."
 
 loadFile :: String -> IntState ()
 loadFile nm = do
