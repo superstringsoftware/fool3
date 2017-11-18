@@ -54,13 +54,22 @@ data Var = Id Name Type | TyVar Name Kind
 
 -}
 
-doubleBetaRun var val = liftIO $ print $ show var ++ ": " ++ show val
 
--- handy function that maps over 2 lists and makes sure we don't go beyond size of any of them
-doubleMap action l1 l2 =
-  unless (null l1 || null l2) $ do
-    action (head l1) (head l2)
-    doubleMap action (tail l1) (tail l2)
+
+-- function we are feeding to doubleMap when processing App (Lam...) in eval
+-- to do beta reduction over lists of vars and vals
+betaRun expr var val = do
+  liftIO $ print $ show var ++ " --> " ++ show val ++ " in: " ++ show expr
+  return $ beta (varName var) expr val
+
+-- handy function that maps over 2 lists and accumulates accumulator
+-- with an action and makes sure we don't go beyond size of any of them
+-- doubleMap :: Monad m => (c -> b -> a -> m c) -> c -> [b] -> [a] -> m (c, [b], [a])
+doubleMap action acc l1 l2 =
+  if not (null l1 || null l2) then
+    action acc (head l1) (head l2) >>= \acc' ->
+      doubleMap action acc' (tail l1) (tail l2)
+  else return (acc, l1, l2) -- returning accumulator AND remaining parts of lists over which we have mapped
 
 -- small evaluation step
 -- if True, printing stacktrace, if False, quiet
@@ -72,7 +81,14 @@ evalStep b e@(App (Lam nm vars expr) (Tuple _ vals) ) = do
   -- if b then liftIO (putStrLn $ "Instantiating " ++ prettyPrint var ++ " to " ++ prettyPrint val ++ " in " ++ prettyPrint expr)
     liftIO $ putStrLn $ "Processing App for function " ++ nm ++ " of arity " ++ show (length vars) ++ " and " ++ show (length vals) ++ " arguments"
     liftIO $ print e
-    doubleMap doubleBetaRun vars vals
+    -- now for the important part: beta reduction inside our App
+    -- we are mapping over lists of vars and vals, returning new expr (with substitutions)
+    -- and remaining vars and vals - to return either partially applied function (if vars' is not empty)
+    -- or a Value (if vars' and vals' are both empty)
+    -- remaining case - when vars' is empty and vals' is not - we are returning App (Tuple...) (Tuple...) -
+    -- which is nonsense so should be an error - need to think how to handle it
+    (e', vars', vals') <- doubleMap betaRun expr vars vals
+    liftIO $ print e'
     return e
 
 -- looking up global symbol by name: for now, only Functions
@@ -128,10 +144,10 @@ evalStep b e = if b then liftIO (print e) >> return e else return e
 -- beta reduction. substituting a var with an expr: walking the tree and applying changes
 -- this has to be abstracted and generalized
 beta :: Name -> Expr -> Expr -> Expr
-{-
+
 -- simlpy "instantiating" a variable if names are the same (hence, need unique names!)
 beta nm e@(VarId vname) val = if nm == vname then val else e
-
+{-
 -- if we have a lambda inside, going deeper
 beta nm (Lam v e) val = Lam (upd v val) ( beta nm e val)
   -- in case we are instantiating a type variable
