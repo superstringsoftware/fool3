@@ -11,10 +11,9 @@ square height width = height * width;
 # "explicit variable binding" - think about the syntax. It will simply be desugared into regular lambda anyway.
 
 # case statements
-
 fact x
   | x == 0 -> 1
-  | otherwise -> x * fact (x-1);
+  | x > 0 -> x * fact (x-1);
 
 cmd c
   | c == "list" -> list

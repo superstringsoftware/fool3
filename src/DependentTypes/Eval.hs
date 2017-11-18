@@ -82,6 +82,16 @@ evalStep b e@(App (Lam nm vars expr) (Tuple _ vals) ) = do
     -- liftIO $ print retE
     return retE
 
+-- case - check each case, the first that evaluates to True will be returned!
+evalStep b e@(Case exs) = walkCase [] exs
+{-
+evalStep b e@(Case exs) = Case <$> mapM fn exs
+  where fn (e1, e2) = do
+                          e1' <- evalStep False e1
+                          e2' <- evalStep False e2
+                          return (e1', e2')
+-}
+
 -- looking up global symbol by name: for now, only Functions
 -- need to make it work for types and process local contexts (letins)
 evalStep b e@(VarId nm) = do
@@ -110,6 +120,16 @@ evalStep b (App e1 e2) = do
 
 evalStep b e = if b then liftIO (print e) >> return e else return e
 
+
+walkCase acc [] = return $ Case acc
+walkCase acc ( (e1, e2):xs ) = do
+  e1' <- evalStep False e1
+  case e1' of
+    Lit (LBool True) -> return e2
+    _ -> do
+            e2' <- evalStep False e2
+            let acc' = (e1', e2'):acc
+            walkCase acc' xs
 
 
 lookupGlobalSymbol :: Name -> IntState (Maybe Expr)

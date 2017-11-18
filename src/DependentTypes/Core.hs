@@ -191,7 +191,8 @@ instance PrettyPrint Expr where
                             as [bold, green] " in " ++ prettyPrint e2
 
   prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
-  prettyPrint (Case exs) = show exs
+  prettyPrint (Case exs) = foldr fn "" exs
+      where fn (e1,e2) acc = "\n\t| " ++ prettyPrint e1 ++ " -> " ++ prettyPrint e2 ++ acc
   prettyPrint e = show e
 
 clrLam "" = ""
