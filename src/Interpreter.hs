@@ -52,7 +52,7 @@ processExpr :: Expr -> IntState ()
 -- binding functions and ops
 processExpr e@(Lam name _ _) = do
   ls <- gets lambdas
-  liftIO $ H.insert ls name (desugar e)
+  liftIO $ H.insert ls name e -- (desugar e)
 
 -- executing binary op
 -- processExpr e@(BinaryOp name _ _) = processExprGeneric False e

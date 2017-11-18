@@ -6,6 +6,21 @@ square height width = height * width;
 # but then when calling (if it's a complex function with a lot of params), we may want to name the arguments!
 # in haskell, we can create a record, but first - records suck in haskell, plus creating a separate type for each new function call is an overkill, so:
 
-square height = 7, width = 9
+# square height = 7, width = 9
 
 # "explicit variable binding" - think about the syntax. It will simply be desugared into regular lambda anyway.
+
+# case statements
+
+fact x
+  | x == 0 -> 1
+  | otherwise -> x * fact (x-1);
+
+cmd c
+  | c == "list" -> list
+  | c == "print" -> print
+  | otherwise -> nothing;
+
+# fmap f x
+#  | cons x == Nothing -> Nothing
+#  | cons x == Just    -> Just (f x.0)

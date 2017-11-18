@@ -133,6 +133,22 @@ typeDef = do
   fields <- sepBy1 constructors (char '|')
   return $ Lam name tvars (Tuple name fields)
 
+-- function def via cases
+caseFunction :: Parser Expr
+caseFunction = do
+  name <- lIdentifier
+  args <- many1 variable
+  reservedOp "|"
+  cases <- sepBy1 oneCase (reservedOp "|")
+  return $ Lam name args (Case cases)
+
+-- one case like | x == 0 -> 1
+oneCase :: Parser (Expr, Expr)
+oneCase = do
+  left <- expr
+  reservedOp "->"
+  right <- expr
+  return (left, right)
 
 function :: Parser Expr
 function = do
@@ -234,6 +250,7 @@ factor = try call <|> ifthen <|> argument -- arguments -- try letins <|>
 
 defn :: Parser Expr
 defn =  try typeDef
+    <|> try caseFunction
     <|> try function
     <|> try unarydef
     <|> try binarydef

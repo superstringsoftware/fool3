@@ -24,6 +24,9 @@ data Expr
   | App Expr Expr -- e1 can only be Lam or VarId, e2 can only be Tuple - so there should be a better way to handle this
   | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
   | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
+  -- Case, for instance: case x of Nothing -> Nothing; (Just x) -> Just x*2 translates to something like:
+  -- Case "x" [ (Nothing, Nothing), (cons x == Just, Just (x*2)) ]
+  | Case [(Expr, Expr)]
   -- whatever goes below is for interpreter / initial parsing
   | BinaryOp Name Expr Expr
   | UnaryOp  Name Expr
@@ -139,6 +142,11 @@ descendM f e = case e of
     BinaryOp n a b  -> BinaryOp <$> pure n <*> descendM f a <*> descendM f b
     UnaryOp n a     -> UnaryOp <$> pure n <*> descendM f a
     Tuple nm ex     -> Tuple <$> pure nm <*> mapM (descendM f) ex
+    Case exs        -> Case <$> mapM (fn f) exs
+                                  where fn f1 (e1, e2) = do
+                                                            e1' <- descendM f1 e1
+                                                            e2' <- descendM f1 e2
+                                                            return (e1', e2')
     >>= f -- to apply actual change function on the way out of the traversal
 
 -- pure traversal in the identity monad
@@ -183,6 +191,7 @@ instance PrettyPrint Expr where
                             as [bold, green] " in " ++ prettyPrint e2
 
   prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
+  prettyPrint (Case exs) = show exs
   prettyPrint e = show e
 
 clrLam "" = ""

@@ -22,7 +22,7 @@ type Parser = Parsec String ParserState
 lexer :: Tok.TokenParser ParserState
 lexer = Tok.makeTokenParser style
   where
-    ops = ["+","*","-","/",";","=",",",".","|",":", "::","<",">"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
+    ops = ["+","*","-","/",";","=",",",".",":", "::", "->","<",">", "|"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
     names = ["def","extern","if","then","else","in","for"
             ,"binary", "unary", "let", "data"]
     style = emptyDef {
