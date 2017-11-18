@@ -20,9 +20,13 @@ cmd c
   | c == "print" -> print
   | otherwise -> nothing;
 
+map f lst
+  | lst == Nil -> Nil
+  | otherwise  -> Cell lst.0 (map f lst.1);
+
 # testing record access
 st x = x.address.city.2;
 
-# fmap f x
-#  | cons x == Nothing -> Nothing
-#  | cons x == Just    -> Just (f x.0)
+fmap f x
+  | cons x == Nothing -> Nothing
+  | cons x == Just    -> Just (f x.0);
