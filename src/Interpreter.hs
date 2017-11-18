@@ -51,9 +51,8 @@ processExpr :: Expr -> IntState ()
 
 -- binding functions and ops
 processExpr e@(Lam name _ _) = do
-    ls <- gets lambdas
-    let e' = desugar e
-    liftIO $ H.insert ls name e'
+  ls <- gets lambdas
+  liftIO $ H.insert ls name (desugar e)
 
 -- executing binary op
 -- processExpr e@(BinaryOp name _ _) = processExprGeneric False e
@@ -74,9 +73,7 @@ evalExpr b ex = do
                       -- liftIO $ putStrLn $ "Iteration " ++ show i
                       ex' <- ef b ex
                       if ex == ex' then return ex
-                      else do
-                        liftIO $ putStrLn $ "[" ++ show i ++ "]\t" ++ pf ex'
-                        fn (i+1) b ex' ef pf
+                      else liftIO (putStrLn $ "[" ++ show i ++ "]\t" ++ pf ex') >> fn (i+1) b ex' ef pf
 
 
 -- getting main function from the function table
@@ -108,9 +105,9 @@ prettyPrintLS ls = do
     list <- H.toList ls
     let res = sortBy (compare `on` fst) list
     mapM_ f res where
-    f (k,v) = putStrLn $ prettyPrintTopLevel v
+    f (k,v) = putStrLn $ clrLam k ++ " = " ++ prettyPrintTopLevel v
 
 
 showLS :: CoreExpressionTable -> IO ()
 showLS ls = H.mapM_ f ls
-          where f (k,v) = putStrLn $ show v
+          where f (k,v) = putStrLn $ k ++ " = " ++ show v

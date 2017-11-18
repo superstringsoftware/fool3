@@ -24,15 +24,17 @@ data Expr
   | App Expr Expr -- e1 can only be Lam or VarId, e2 can only be Tuple - so there should be a better way to handle this
   | If  Expr Expr Expr -- will get rid of this once case patterns are in, since we can model it with a function
   | Let Name Expr Expr -- ok, need to figure out how GHC does it - here we are binding first Expr to symbol Name in 2nd Expr
+  -- whatever goes below is for interpreter / initial parsing
   | BinaryOp Name Expr Expr
   | UnaryOp  Name Expr
+  | FAIL String -- some invalid expression
   deriving (Eq, Ord, Show)
 
 mkTuple x = Tuple "" [x]
 mk2Tuple x y = Tuple "" [x, y]
 
 data Literal = LInt !Int | LFloat !Double | LChar !Char |
-               LString String | LBool Bool | LList [Expr] | LVec [Expr]
+               LString !String | LBool !Bool | LList [Expr] | LVec [Expr]
                deriving (Eq, Ord, Show)
 
 data Var = Id Name Type | TyVar Name Kind
@@ -137,7 +139,7 @@ descendM f e = case e of
     BinaryOp n a b  -> BinaryOp <$> pure n <*> descendM f a <*> descendM f b
     UnaryOp n a     -> UnaryOp <$> pure n <*> descendM f a
     Tuple nm ex     -> Tuple <$> pure nm <*> mapM (descendM f) ex
-    >>= f
+    >>= f -- to apply actual change function on the way out of the traversal
 
 -- pure traversal in the identity monad
 descend :: (Expr -> Expr) -> Expr -> Expr
@@ -147,9 +149,18 @@ descend f ex = runIdentity (descendM (return . f) ex)
 desugar :: Expr -> Expr
 desugar = descend f
  where
-   f (UnaryOp nm e) = App (VarId nm) (mkTuple e)
-   f (BinaryOp nm e1 e2) = App (VarId nm) (mk2Tuple e1 e2)
+   f (UnaryOp nm e) = App (VarId $ "("++nm++")") (mkTuple e)
+   f (BinaryOp nm e1 e2) = App (VarId $ "("++nm++")") (mk2Tuple e1 e2)
+   f (Lam nm [] expr) = expr -- flattening lambda applications with zero arguments - they should return only expression.
+   -- need this since our parser returns Lam nm [] ex for bindings like v = square x etc
    f x = x
+
+betaReduce :: Name -> Expr -> Expr -> Expr
+betaReduce name value = descend (f name value)
+  where
+    f nm val e@(VarId vname) = if nm == vname then val else e
+    f nm val x = x
+
 
 -------------------------------------------------------------------------------
 -- Pretty Print typeclass
@@ -159,10 +170,10 @@ class PrettyPrint a where
 
 instance PrettyPrint Expr where
   prettyPrint (VarId n) = n
-  prettyPrint (Lam nm [] (Tuple tnm [])) = clrLam nm
-  prettyPrint (Lam nm vars e) = clrLam nm ++ " = " ++ foldr fn "" vars ++ prettyPrint e
+  -- prettyPrint (Lam nm [] (Tuple tnm [])) = clrLam nm
+  prettyPrint (Lam nm vars e) = foldr fn "" vars ++ prettyPrint e -- clrLam nm ++ " = " ++
       where fn el acc = as [bold, dgray] "λ" ++ prettyPrint el ++ ". " ++ acc
-  prettyPrint (Tuple nm tpl) = showBracketedList "{" "}" tpl -- clrLam nm ++
+  prettyPrint (Tuple nm tpl) = clrLam nm ++ showBracketedList " {" "}" tpl -- clrLam nm ++
   prettyPrint (Lit l) = prettyPrint l
   prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
   prettyPrint (If e1 e2 e3) = as [bold, green] "if " ++ prettyPrint e1 ++
