@@ -222,6 +222,13 @@ binarydef = do
   body <- expr
   return $ Lam ("("++o++")") [arg1, arg2] body
 
+fieldAccess :: Parser Expr
+fieldAccess = do
+  fields <- sepBy1 intOrStr (reservedOp ".")
+  return $ foldl1 RecAccess fields
+
+intOrStr :: Parser Expr
+intOrStr = try (Index <$> integer) <|> (VarId <$> identifier)
 
 argument :: Parser Expr
 argument = try lambda
@@ -231,6 +238,7 @@ argument = try lambda
       <|> try (Lit <$> floating)
       <|> try (Lit <$> int)
       <|> try (Lit <$> stringVal)
+      <|> try fieldAccess
       <|> symbolId
 
 arguments :: Parser Expr

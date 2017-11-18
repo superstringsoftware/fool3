@@ -28,6 +28,10 @@ data Expr
   -- Case "x" [ (Nothing, Nothing), (cons x == Just, Just (x*2)) ]
   | Case [(Expr, Expr)]
   -- whatever goes below is for interpreter / initial parsing
+  | Index !Integer -- used for Tuple element access and maybe some other stuff?
+  | RecAccess Expr Expr -- first try, first expr is either VarId or Index - named field - second expr is to what we apply
+  -- so, f.a would be RecAccess (VarId "a") (VarId "f")
+  -- f.a.b: RecAccess (varId "b") (RecAccess (VarId "a") (VarId "f"))
   | BinaryOp Name Expr Expr
   | UnaryOp  Name Expr
   | FAIL String -- some invalid expression
@@ -142,6 +146,8 @@ descendM f e = case e of
     BinaryOp n a b  -> BinaryOp <$> pure n <*> descendM f a <*> descendM f b
     UnaryOp n a     -> UnaryOp <$> pure n <*> descendM f a
     Tuple nm ex     -> Tuple <$> pure nm <*> mapM (descendM f) ex
+    RecAccess e1 e2 -> RecAccess <$> descendM f e1 <*> descendM f e2
+    Index i         -> Index <$> pure i
     Case exs        -> Case <$> mapM (fn f) exs
                                   where fn f1 (e1, e2) = do
                                                             e1' <- descendM f1 e1
@@ -201,7 +207,7 @@ clrLam s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
 
 embrace s = as [bold, blue] "(" ++ s ++ as [bold, blue] ")"
 -- additional nicer formatting for output for top level expressions
-prettyPrintTopLevel (App e1 e2) = embrace (prettyPrint e1) ++ embrace (prettyPrint e2)
+-- prettyPrintTopLevel (App e1 e2) = embrace (prettyPrint e1) ++ embrace (prettyPrint e2)
 prettyPrintTopLevel e = prettyPrint e
 
 

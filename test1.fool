@@ -24,10 +24,10 @@ data Silly = Struct Int String Float;
 data Either a b = Left a | Right b;
 data Pair a b = Pair a b;
 
-data Person = Person { name:String, age : Int, dob: Maybe Date, pm : List a} | Fun Int String | Weird;
+data Person = Person { name:String, age : Int, dob: Maybe Date, pm : List a}; # | Fun Int String | Weird;
 
-# fact 0 = 1;
-fact n = if n == 0 then 1 else n * fact (n - 1);
+
+
 # fuct n = let fn x = x ** 3, k = 4 in k + fn n;
 
 fop x y = x ==-> (y + 15);

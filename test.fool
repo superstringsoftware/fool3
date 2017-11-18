@@ -20,6 +20,9 @@ cmd c
   | c == "print" -> print
   | otherwise -> nothing;
 
+# testing record access
+st x = x.address.city.2;
+
 # fmap f x
 #  | cons x == Nothing -> Nothing
 #  | cons x == Just    -> Just (f x.0)
