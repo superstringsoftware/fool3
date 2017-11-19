@@ -14,7 +14,7 @@ import Parser
 import TermColors
 import Data.Char (isUpper)
 
-import Control.Monad (zipWithM_, void)
+import Control.Monad (zipWithM_, void, when)
 
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 import Control.Monad.IO.Class (liftIO)
@@ -42,7 +42,8 @@ initializeInterpreter = do
                 lambdas = lam,
                 currentFlags = CurrentFlags {
                   strict = False
-                , pretty = False
+                , pretty = True
+                , tracing = False
                 }
              }
 
@@ -59,7 +60,7 @@ processExpr e@(Lam name _ _) = do
 -- processExpr e@(FlApp _ _) = processExprGeneric False e
 -- processExpr e@(SymId _) = processExprGeneric False e
 
-processExpr e = void (evalExpr False e)
+processExpr e = void (evalExpr False (desugar e))
 
 
 -- evaluate expression until it stops simplifying and show it nicely
@@ -68,12 +69,13 @@ evalExpr b ex = do
   fl <- gets currentFlags
   let evalFunc = if strict fl then evalStepStrict else evalStep
   let printFunc = if pretty fl then prettyPrintTopLevel else show
-  fn 1 b ex evalFunc printFunc where
-        fn i b ex ef pf = do
+  fn 1 b ex evalFunc printFunc (tracing fl) where
+        fn i b ex ef pf tb = do
                       -- liftIO $ putStrLn $ "Iteration " ++ show i
                       ex' <- ef b ex
-                      if ex == ex' then return ex
-                      else liftIO (putStrLn $ "[" ++ show i ++ "]\t" ++ pf ex') >> fn (i+1) b ex' ef pf
+                      if ex == ex' then liftIO (putStrLn $ pf ex') >> return ex
+                      else if tb then liftIO (putStrLn $ "[" ++ show i ++ "]\t" ++ pf ex') >> fn (i+1) b ex' ef pf tb
+                           else fn (i+1) b ex' ef pf tb
 
 
 -- getting main function from the function table

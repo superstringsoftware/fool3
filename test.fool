@@ -11,22 +11,18 @@ square height width = height * width;
 # "explicit variable binding" - think about the syntax. It will simply be desugared into regular lambda anyway.
 
 # case statements
-fact x
-  | x == 0 -> 1
-  | x > 0 -> x * fact (x-1);
-
-cmd c
+cmd c =
   | c == "list" -> list
   | c == "print" -> print
   | otherwise -> nothing;
 
-map f lst
+map f lst =
   | lst == Nil -> Nil
   | otherwise  -> Cell lst.0 (map f lst.1);
 
 # testing record access
 st x = x.address.city.2;
 
-fmap f x
+fmap f x =
   | cons x == Nothing -> Nothing
   | cons x == Just    -> Just (f x.0);

@@ -30,6 +30,7 @@ findBoolOp "(<=)" = Just (<=)
 findBoolOp "(>=)" = Just (>=)
 findBoolOp "(>)" = Just (>)
 findBoolOp "(<)" = Just (<)
+-- findBoolOp "(&&)" = Just (&&)
 findBoolOp _ = Nothing
 
 

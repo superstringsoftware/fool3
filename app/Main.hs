@@ -11,6 +11,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 import Data.Functor.Identity
 import State
+import Control.Monad (zipWithM_, void, when)
 
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
@@ -26,8 +27,10 @@ process line = do
     Left err -> liftIO $ print err
     Right ex -> do
         -- processing parsed input
-        liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
-        liftIO $ print ex -- show what was parsed first
+        fl <- gets currentFlags
+        when (tracing fl) $ do
+          liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
+          liftIO $ print ex -- show what was parsed first
         processExpr ex -- processing expressions one by one
 
 
@@ -45,7 +48,7 @@ processCommand (":all":_) = do
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
   liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFile (head xs)
-processCommand (":set":s:_) = processSet s
+processCommand (":set":s:xs) = processSet s xs
 processCommand (":env":_) = do
   fl <- gets currentFlags
   liftIO $ print fl
@@ -62,24 +65,33 @@ processCommand (":e":xs) = processCommand (":env":xs)
 processCommand _ = liftIO $ putStrLn "Unknown command. Type :h[elp] to show available list."
 
 -- various environment settings
-processSet :: String -> IntState ()
-processSet "strict" = do
+-- processSet :: String -> IntState ()
+processSet "strict" _ = do
   modify (\st -> st { currentFlags = (currentFlags st) { strict = True} } )
   liftIO $ putStrLn $ "Set interpretation mode to " ++ TC.as [TC.bold] "strict"
 
-processSet "lazy" = do
+processSet "lazy" _ = do
   modify (\st -> st { currentFlags = (currentFlags st) { strict = False} } )
   liftIO $ putStrLn $ "Set interpretation mode to " ++ TC.as [TC.bold] "lazy"
 
-processSet "pretty" = do
+processSet "pretty" _ = do
   modify (\st -> st { currentFlags = (currentFlags st) { pretty = True} } )
   liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "pretty printing on"
 
-processSet "show" = do
+processSet "show" _ = do
   modify (\st -> st { currentFlags = (currentFlags st) { pretty = False} } )
   liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "pretty printing off"
 
-processSet _ = liftIO $ putStrLn "Unknown :set command. Type :h[elp] to show available list."
+processSet "tracing" (x:_)
+  | x == "on" =   do modify (\st -> st { currentFlags = (currentFlags st) { tracing = True} } )
+                     liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "tracing on"
+  | x == "off" =  do modify (\st -> st { currentFlags = (currentFlags st) { tracing = False} } )
+                     liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "tracing off"
+
+
+
+
+processSet _ _ = liftIO $ putStrLn "Unknown :set command. Type :h[elp] to show available list."
 
 loadFile :: String -> IntState ()
 loadFile nm = do

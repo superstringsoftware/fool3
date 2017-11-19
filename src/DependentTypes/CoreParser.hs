@@ -133,15 +133,6 @@ typeDef = do
   fields <- sepBy1 constructors (char '|')
   return $ Lam name tvars (Tuple name fields)
 
--- function def via cases
-caseFunction :: Parser Expr
-caseFunction = do
-  name <- lIdentifier
-  args <- many1 variable
-  reservedOp "|"
-  cases <- sepBy1 oneCase (reservedOp "|")
-  return $ Lam name args (Case cases)
-
 -- one case like | x == 0 -> 1
 oneCase :: Parser (Expr, Expr)
 oneCase = do
@@ -149,6 +140,12 @@ oneCase = do
   reservedOp "->"
   right <- expr
   return (left, right)
+
+caseExpression :: Parser Expr
+caseExpression = do
+  reservedOp "|"
+  cases <- sepBy1 oneCase (reservedOp "|")
+  return $ Case cases
 
 function :: Parser Expr
 function = do
@@ -202,14 +199,23 @@ letins = do
 
 unarydef :: Parser Expr
 unarydef = do
-  reserved "def"
-  reserved "unary"
-  o <- op
+  o <- parens op
   arg <- variable
   reservedOp "="
   body <- expr
   return $ Lam ("("++o++")") [arg] body
 
+binarydef :: Parser Expr
+binarydef = do
+  o <- parens op
+  prec <- int <?> "integer: precedence value for the operator definition"
+  arg1 <- variable
+  arg2 <- variable
+  reservedOp "="
+  body <- expr
+  return $ Lam ("("++o++")") [arg1, arg2] body
+
+{-
 binarydef :: Parser Expr
 binarydef = do
   reserved "def"
@@ -221,6 +227,17 @@ binarydef = do
   reservedOp "="
   body <- expr
   return $ Lam ("("++o++")") [arg1, arg2] body
+
+unarydef :: Parser Expr
+unarydef = do
+  reserved "def"
+  reserved "unary"
+  o <- op
+  arg <- variable
+  reservedOp "="
+  body <- expr
+  return $ Lam ("("++o++")") [arg] body
+-}
 
 fieldAccess :: Parser Expr
 fieldAccess = do
@@ -256,11 +273,11 @@ call = do
 
 
 factor :: Parser Expr
-factor = try call <|> ifthen <|> argument -- arguments -- try letins <|>
+factor = try caseExpression <|> try call <|> try ifthen <|> argument -- arguments -- try letins <|>
 
 defn :: Parser Expr
 defn =  try typeDef
-    <|> try caseFunction
+    -- <|> try caseFunction
     <|> try function
     <|> try unarydef
     <|> try binarydef
