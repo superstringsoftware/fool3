@@ -182,6 +182,9 @@ betaReduce name value = descend (f name value)
 class PrettyPrint a where
   prettyPrint :: a -> String
 
+class PrettyPrintTyped a where
+  prettyPrintTyped :: a -> String
+
 instance PrettyPrint Expr where
   prettyPrint (VarId n) = n
   -- prettyPrint (Lam nm [] (Tuple tnm [])) = clrLam nm

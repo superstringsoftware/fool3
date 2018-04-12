@@ -205,6 +205,7 @@ unarydef = do
   body <- expr
   return $ Lam ("("++o++")") [arg] body
 
+-- precedence is not stored anywhere now and is not handled at all
 binarydef :: Parser Expr
 binarydef = do
   o <- parens op

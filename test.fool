@@ -26,3 +26,15 @@ st x = x.address.city.2;
 fmap f x =
   | cons x == Nothing -> Nothing
   | cons x == Just    -> Just (f x.0);
+
+
+# Monad chaining
+# Haskell
+safeDiv :: Double -> Double -> Maybe Double
+safeSquare :: Double -> Maybe Double
+
+safeDS x y = safeDiv x y >>= \z -> safeSquare z
+# can we rewrite in a form like:
+safeDS x y = safeSquare &(safeDiv x y)
+# - which might be more convenient with multiple argument functions?
+# isn't it just applicative style??

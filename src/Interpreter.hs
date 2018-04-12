@@ -74,7 +74,7 @@ evalExpr b ex = do
                       -- liftIO $ putStrLn $ "Iteration " ++ show i
                       ex' <- ef b ex
                       if ex == ex' then liftIO (putStrLn $ pf ex') >> return ex
-                      else if tb then liftIO (putStrLn $ "[" ++ show i ++ "]\t" ++ pf ex') >> fn (i+1) b ex' ef pf tb
+                      else if tb   then liftIO (putStrLn $ "[" ++ show i ++ "]\t" ++ pf ex') >> fn (i+1) b ex' ef pf tb
                            else fn (i+1) b ex' ef pf tb
 
 
@@ -88,12 +88,12 @@ findMain = do
 
 -- print types
 prettyPrintTT :: ExpressionTable -> IO ()
-prettyPrintTT ft = H.mapM_ f ft where
+prettyPrintTT = H.mapM_ f where
     f (k,v) = putStrLn $ prettyPrint v
 
 -- print functions
 prettyPrintFT :: ExpressionTable -> IO ()
-prettyPrintFT ft = H.mapM_ f ft where
+prettyPrintFT = H.mapM_ f where
     f (k,v) = putStrLn $ prettyPrint v
 
 -- print symbols

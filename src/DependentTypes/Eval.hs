@@ -115,9 +115,7 @@ evalStep b (If e1 e2 e3) = do
 -- small step semantics
 evalStep b (App e1 e2) = do
   when b $ liftIO (putStrLn "evalStep b (App e1 e2)")
-  e1' <- evalStep b e1
-  e2' <- evalStep b e2
-  return $ App e1' e2'
+  App <$> evalStep b e1 <*> evalStep b e2
 
 evalStep b e = if b then liftIO (print e) >> return e else return e
 
