@@ -2,34 +2,12 @@
 
 data Bool = True | False;
 data Maybe a = Just a | Nothing;
-data List a = Cell a (List a) | Nil;
-data Either a b = Left a | Right b;
-
-(&&) 4 a b =
-  | a == False -> False
-  | a == True ->
-    | b == True -> True
-    | b == False -> False;
-
-(**) 2 x n =
-  | n == 0 -> 1
-  | n >  0 -> x * (x ** (n-1));
-
-(&) x = read x;
-
-fact n = if n == 0 then 1 else n * fact (n - 1);
-
+# data Person = Person Int String;
+# data Pair a b = Pair a b;
 square x = x * x;
-quad x = square x * square x;
-safeDiv x y = if y == 0 then Nothing else Just (x / y);
-compare x y = if x < y then True else False;
+id x = x;
+compose f g x = f(g(x));
+# f x = let g y = x + y in g x;
 
-fact' x =
-  | x == 0 -> 1
-  | x > 0 -> x * fact (x-1);
-
-ackermann m n =
-  | m == 0 -> n + 1
-  | (m > 0) ->
-    | (n == 0) -> ackermann (m - 1) 1
-    | (n > 0)  -> ackermann (m - 1) (ackermann m (n-1));
+# map f (Just x1) = Just (f x1);
+# map _ Nothing = Nothing;
