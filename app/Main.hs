@@ -1,6 +1,5 @@
 module Main where
 
-import DependentTypes.CoreParser
 import Interpreter
 import Control.Monad.Trans
 import System.Console.Haskeline
@@ -13,8 +12,8 @@ import Data.Functor.Identity
 import State
 import Control.Monad (zipWithM_, void, when)
 
-import qualified DotNet.Syntax as S
-import qualified DotNet.Parser as P
+import DotNet.Syntax
+import DotNet.Parser
 
 import DotNet.Translator
 
@@ -26,7 +25,7 @@ baseLibPath = "base.fool"
 
 processNew :: String -> IntState ()
 processNew line = do
-  let res = runIdentity $ P.parseToplevel line
+  let res = runIdentity $ parseToplevel line
   case res of
     Left err -> liftIO $ print err
     Right ex -> do
@@ -36,27 +35,13 @@ processNew line = do
         processSurfaceExpr ex -- processing expressions one by one
 
 
-process :: String -> IntState ()
-process line = do
-  let res = runIdentity $ parseToplevel line
-  case res of
-    Left err -> liftIO $ print err
-    Right ex -> do
-        -- processing parsed input
-        fl <- gets currentFlags
-        when (tracing fl) $ do
-          liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
-          liftIO $ print ex -- show what was parsed first
-        processExpr ex -- processing expressions one by one
-
-
 processCommand :: [String] -> IntState ()
 processCommand (":help":_) = liftIO showHelp
 processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
 -- processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
 processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
-processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
-processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
+-- processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
+-- processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
 processCommand (":compile":_) = (liftIO $ putStrLn "Compiling...") >> compile
 processCommand (":all":_) = do
   st <- get
@@ -64,7 +49,7 @@ processCommand (":all":_) = do
   liftIO $ prettyPrintTT $ typeTable st
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
   -- liftIO $ prettyPrintFT $ funTable  st
-processCommand (":load":xs) = loadFile (head xs)
+processCommand (":load":xs) = loadFileNew (head xs)
 processCommand (":set":s:xs) = processSet s xs
 processCommand (":env":_) = do
   fl <- gets currentFlags
@@ -114,22 +99,12 @@ loadFileNew :: String -> IntState ()
 loadFileNew nm = do
    st <- get
    liftIO $ putStrLn $ "Loading file: " ++ nm
-   res <- liftIO $ P.parseToplevelFile nm
+   res <- liftIO $ parseToplevelFile nm
    -- liftIO $ print res
    case res of
      Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
      Right exprs -> mapM_ processSurfaceExpr exprs >> liftIO (putStrLn "... successfully loaded.")
 
-
-loadFile :: String -> IntState ()
-loadFile nm = do
-   st <- get
-   liftIO $ putStrLn $ "Loading file: " ++ nm
-   res <- liftIO $ parseToplevelFile nm
-   -- liftIO $ print res
-   case res of
-     Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
-     Right exprs -> mapM_ processExpr exprs >> liftIO (putStrLn "... successfully loaded.")
 
 
 showHelp :: IO ()
