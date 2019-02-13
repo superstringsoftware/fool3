@@ -62,7 +62,7 @@ data TupleField
     | ConstField 
 -}
 -- product type constructor
-data Cons = Tuple Name [Type] | Record Name [(Name, Type)] deriving (Eq, Ord, Show)
+data Cons = Anon Name [Type] | Record Name [(Name, Type)] deriving (Eq, Ord, Show)
 
 -- Surfance language AST type to handle both lazy and strict hopefully a bit more efficiently
 -- So, no currying
@@ -70,6 +70,10 @@ data Expr
     = Lit Literal
     | VarId Name
     | Type Name [Var] [Cons] -- sum type built from product constructors cons
+    | BinaryOp Name Expr Expr
+    | UnaryOp  Name Expr
+    | Tuple Name [Expr] -- polymorphic tuple
+    | App Expr Expr
     deriving (Eq, Ord, Show)
 
 {-
