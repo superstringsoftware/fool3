@@ -3,3 +3,4 @@
 type Bool = True + False;
 type Maybe a = Nothing + Just :a;
 type List a = Nil + Cons :a * :(List a);
+type Either a b = Left :a + Right :b;

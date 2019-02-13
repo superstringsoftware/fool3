@@ -16,6 +16,8 @@ import Control.Monad (zipWithM_, void, when)
 import qualified DotNet.Syntax as S
 import qualified DotNet.Parser as P
 
+import DotNet.Translator
+
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
@@ -55,10 +57,11 @@ processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
 processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
 processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
 processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
+processCommand (":compile":_) = (liftIO $ putStrLn "Compiling...") >> compile
 processCommand (":all":_) = do
   st <- get
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
-  -- liftIO $ prettyPrintTT $ typeTable st
+  liftIO $ prettyPrintTT $ typeTable st
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
   -- liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFile (head xs)
@@ -141,6 +144,7 @@ showHelp = do
     putStrLn ":e[nv]            -- show current environment"
     putStrLn ":functions        -- list all global functions"
     putStrLn ":types            -- list all types"
+    putStrLn ":compile          -- compile currently loaded program"
 
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()
