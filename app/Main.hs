@@ -31,7 +31,7 @@ processNew line = do
         -- processing parsed input
         liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
         liftIO $ print ex -- show what was parsed first
-        -- processExpr ex -- processing expressions one by one
+        processSurfaceExpr ex -- processing expressions one by one
 
 
 process :: String -> IntState ()
@@ -51,16 +51,16 @@ process line = do
 processCommand :: [String] -> IntState ()
 processCommand (":help":_) = liftIO showHelp
 processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
-processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
+-- processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
 processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
 processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
 processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
 processCommand (":all":_) = do
   st <- get
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
-  liftIO $ prettyPrintTT $ typeTable st
+  -- liftIO $ prettyPrintTT $ typeTable st
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
-  liftIO $ prettyPrintFT $ funTable  st
+  -- liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFile (head xs)
 processCommand (":set":s:xs) = processSet s xs
 processCommand (":env":_) = do
@@ -115,7 +115,7 @@ loadFileNew nm = do
    -- liftIO $ print res
    case res of
      Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
-     Right exprs -> mapM_ (liftIO . print) exprs >> liftIO (putStrLn "... successfully loaded.")
+     Right exprs -> mapM_ processSurfaceExpr exprs >> liftIO (putStrLn "... successfully loaded.")
 
 
 loadFile :: String -> IntState ()

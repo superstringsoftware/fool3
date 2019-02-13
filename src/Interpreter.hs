@@ -24,6 +24,8 @@ import State
 import DependentTypes.Eval
 import DependentTypes.StrictEval
 
+import qualified DotNet.Syntax as S
+
 
 -- initializing starting state with tables etc
 initializeInterpreter :: IO InterpreterState
@@ -46,6 +48,14 @@ initializeInterpreter = do
                 , tracing = False
                 }
              }
+
+-- processing new surface expression language             
+processSurfaceExpr :: S.Expr -> IntState ()
+
+-- inserting types into table
+processSurfaceExpr e@(S.Type name _ _) = do
+  ts <- gets typeTable
+  liftIO $ H.insert ts name e
 
 -- process a single expression and alter the interpreter state correspondigly
 processExpr :: Expr -> IntState ()
@@ -89,8 +99,9 @@ findMain = do
 -- print types
 prettyPrintTT :: ExpressionTable -> IO ()
 prettyPrintTT = H.mapM_ f where
-    f (k,v) = putStrLn $ prettyPrint v
+    f (k,v) = putStrLn $ show v
 
+{-
 -- print functions
 prettyPrintFT :: ExpressionTable -> IO ()
 prettyPrintFT = H.mapM_ f where
@@ -100,7 +111,7 @@ prettyPrintFT = H.mapM_ f where
 prettyPrintST :: ExpressionTable -> IO ()
 prettyPrintST ft = H.mapM_ f ft where
     f (k,v) = putStrLn $ (k ++ " ≡ " ++ (show v))
-
+-}
 
 prettyPrintLS :: CoreExpressionTable -> IO ()
 prettyPrintLS ls = do
