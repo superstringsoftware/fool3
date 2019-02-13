@@ -13,11 +13,25 @@ import Data.Functor.Identity
 import State
 import Control.Monad (zipWithM_, void, when)
 
+import qualified DotNet.Syntax as S
+import qualified DotNet.Parser as P
+
 -- need this 3-monad stack to make sure Haskeline works with our state monad
 type InputTState a = InputT (StateT InterpreterState IO) a
 
 -- needs to go to settings!!!
 baseLibPath = "base.fool"
+
+processNew :: String -> IntState ()
+processNew line = do
+  let res = runIdentity $ P.parseToplevel line
+  case res of
+    Left err -> liftIO $ print err
+    Right ex -> do
+        -- processing parsed input
+        liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
+        liftIO $ print ex -- show what was parsed first
+        -- processExpr ex -- processing expressions one by one
 
 
 process :: String -> IntState ()
@@ -93,6 +107,17 @@ processSet "tracing" (x:_)
 
 processSet _ _ = liftIO $ putStrLn "Unknown :set command. Type :h[elp] to show available list."
 
+loadFileNew :: String -> IntState ()
+loadFileNew nm = do
+   st <- get
+   liftIO $ putStrLn $ "Loading file: " ++ nm
+   res <- liftIO $ P.parseToplevelFile nm
+   -- liftIO $ print res
+   case res of
+     Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
+     Right exprs -> mapM_ (liftIO . print) exprs >> liftIO (putStrLn "... successfully loaded.")
+
+
 loadFile :: String -> IntState ()
 loadFile nm = do
    st <- get
@@ -128,12 +153,12 @@ loop = do
               -- if starts with ":" - then it's a command
               (':':_) -> lift (processCommand (words input)) >> loop
               -- otherwise parsing our language input
-              _ -> lift (process input) >> loop
+              _ -> lift (processNew input) >> loop
 
 runInterpreter :: InputTState ()
 runInterpreter = do
   liftIO $ putStrLn "Loading base library..."
-  lift $ loadFile baseLibPath
+  lift $ loadFileNew baseLibPath
   lift $ processCommand [":core"]
   loop
 

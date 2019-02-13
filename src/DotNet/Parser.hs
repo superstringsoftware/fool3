@@ -97,10 +97,10 @@ module DotNet.Parser where
     constructor :: Parser Cons
     constructor = do
       name <- uIdentifier
-      vars <- sepBy  (try (TCon <$> uIdentifier) <|> -- concrete type
-                     try (TVar <$> lIdentifier) <|> -- type var
-                     (parens typeAp) -- complex type, like List a
-                     <?> "regular constructor failed") (char '*')
+      vars <- sepBy  (try (TCon <$> (reservedOp ":" *> uIdentifier)) <|> -- concrete type
+                     try (TVar <$> (reservedOp ":" *> lIdentifier)) <|> -- type var
+                     (reservedOp ":" *> parens typeAp) -- complex type, like List a
+                     <?> "regular constructor failed") (symbol "*")
       return $ Anon name vars
     
     

@@ -1,15 +1,5 @@
 # Base library: v0.0.1
 
-data Bool = True | False;
-data Maybe a = Just a | Nothing;
-data Either a b = Left a | Right b;
-data Person = Person Int String;
-data Pair a b = Pair a b;
-square x = x * x;
-id x = x;
-compose f g x = f(g(x));
-# f x = let g y = x + y in g x;
-
-fmap f x =
-  | x ~ Nothing   -> Nothing
-  | x ~ Just y  -> Just (f y);
+type Bool = True + False;
+type Maybe a = Nothing + Just :a;
+type List a = Nil + Cons :a * :(List a);
