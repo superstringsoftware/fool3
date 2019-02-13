@@ -10,12 +10,17 @@ import qualified Text.Parsec.Token as Tok
 -- our parser's user state - remember that parser is ParsecT s u m a
 -- and Parsec is ParsecT s u Identity, so we are making u = ParserState
 data ParserState = ParserState {
-  count :: Int
+  count :: Int,
+  parserLog :: [String]
 } deriving Show
 
 initialParserState = ParserState {
-  count = 0
+  count = 0,
+  parserLog = []
 }
+
+addParserLog :: String -> ParserState -> ParserState
+addParserLog s ps = ps { parserLog = s : (parserLog ps) }
 
 type Parser = Parsec String ParserState
 

@@ -25,6 +25,7 @@ library
                      , DependentTypes.StrictEval
                      , DependentTypes.CoreParser
                      , DotNet.Translator
+                     , DotNet.Syntax
                      , State
   build-depends:       base >= 4.7 && < 5
                      , parsec

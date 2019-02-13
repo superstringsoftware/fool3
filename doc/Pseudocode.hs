@@ -8,6 +8,17 @@ data Post = Post {title::String, body:: Text}
 -- Object 'writes' that is an Arrow between User and Post. 'require = right' means 'writes' is mandatory for Posts
 data Arrow = User -writes{when::Date | require = right }-> Post
 
+-- or define all relations between records as function declarations,
+-- based on which the system would generate how to store
+-- 1:many, "nothing" allowed
+rel writes :: User -> Maybe [Post]
+-- 1:1, mandatory
+rel author :: Post -> User
+
+
+User 1->0.. Post
+User 1->0.. Comment
+
 -- permissions
 -- allow any action on a User if it is initiated by the Admin
 allow action User = True | action -source-> user is Admin

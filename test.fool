@@ -30,11 +30,12 @@ fmap f x =
 
 # Monad chaining
 # Haskell
-safeDiv :: Double -> Double -> Maybe Double
-safeSquare :: Double -> Maybe Double
+# safeDiv :: Double -> Double -> Maybe Double
+# safeSquare :: Double -> Maybe Double
 
-safeDS x y = safeDiv x y >>= \z -> safeSquare z
+# safeDS x y = safeDiv x y >>= \z -> safeSquare z
 # can we rewrite in a form like:
-safeDS x y = safeSquare &(safeDiv x y)
+safeDS x y = safeSquare &(safeDiv x y);
 # - which might be more convenient with multiple argument functions?
 # isn't it just applicative style??
+

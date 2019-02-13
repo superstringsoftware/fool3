@@ -15,6 +15,7 @@ import Text.Parsec
 -- import Text.Parsec.String (parseFromFile)
 import Control.Applicative ((<$>), liftA2)
 import Control.Monad (foldM)
+import Control.Monad.IO.Class (liftIO)
 
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
@@ -128,10 +129,11 @@ typeDef = do
   reserved "data"
   name <- uIdentifier
   vars <- many typeVariable
+  modifyState (addParserLog $ "Parsing typeDef for" ++ name)
   let tvars = map (\(TVar n) -> TyVar n KStar) vars
   reservedOp "="
   fields <- sepBy1 constructors (char '|')
-  return $ Lam name tvars (Tuple name fields)
+  return $ Lam name tvars (Tuple "" fields)
 
 -- one case like | x == 0 -> 1
 oneCase :: Parser (Expr, Expr)
@@ -311,7 +313,10 @@ parseToplevelFile name = parseFromFile (contents toplevel) name initialParserSta
 -- redefining parse from file to work with our state - just a quick and dirty fix
 parseFromFile p fname st
     = do input <- readFile fname
-         return (runP p st fname input)
+         let res = (runP p st fname input)
+         --st <- (lift getState)
+         --print st
+         return res
 
 -- adding new stuff
 

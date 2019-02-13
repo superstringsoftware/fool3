@@ -22,6 +22,15 @@ Ideas to ponder on
 - How about .Net compilation for easy windows integration?
 - How about low-level functional approach - abstracting llvm / CPU a little bit, so that then we can write an OS easily?
 
+Other Foundational thoughts after a lot of experiments
+________________________________________________________
+
+- For the language to be useful, it needs to have a VERY thought-out typeclass hierarchy, ideally with ONLY one type of syntax that covers both classes and families
+- Dependent types should be there for sure - "constraint" mechanism. Basically, a function from type and it's vars / types etc to Bool. Constraints shall be checked statically (where possible) and (optionally?) dynamically.
+- Strong math foundation (algebra, vectors, matrices etc).
+- Probably strict by default - easier to translate to .Net as our primary target.
+
+
 
 Initial code ideas with math-based syntax (needs unicode...)
 --------------------------------------------------------
