@@ -67,25 +67,40 @@ module DotNet.Parser where
       if null vars then return tcon -- concrete type
       else return $ foldl TApp tcon vars -- type application
     
-    
+    -- :a->b->String etc
+    tArr :: Parser Type
+    tArr = do
+      ts <- sepBy1 allTypes (reservedOp "->")
+      return $ foldr1 TArr ts
+
     -- concrete type only
     concreteType :: Parser Type
     concreteType = TCon <$> uIdentifier
     
-    
+    allTypes :: Parser Type
+    allTypes = try typeAp <|> try concreteType <|> typeVar
+
     -- variable with type
     variable :: Parser Var
     variable = do
       name <- lIdentifier
-      typ <- try (reservedOp ":" *> parens typeAp) <|>
+      typ <- try (reservedOp ":" *> parens tArr) <|>
+             try (reservedOp ":" *> tArr) <|>
+             try (reservedOp ":" *> parens typeAp) <|>
              try (reservedOp ":" *> concreteType) <|>
-             -- try (reservedOp ":" *> typeVariable) <|>
+             try (reservedOp ":" *> typeVar) <|>
              pure ToDerive
       return $ Id name typ
-    
+  
+    -- simply a name of type variable on the right of regular variable
+    typeVar :: Parser Type
+    typeVar = do
+      name <- lIdentifier
+      return $ TVar name
     
     -- type variable - Kind is either '*' or a concrete type, needs to be adjusted at later stages
     -- need to add kind parsing for complex applications!
+    -- for analyzing type definitions
     typeVariable :: Parser Var
     typeVariable = do
       name <- lIdentifier
@@ -93,7 +108,7 @@ module DotNet.Parser where
              pure KStar -- default to *
       return $ TyVar name typ
     
-    -- this, parametricType and dataDef parses haskell based data hello = Text a b | Nil type of data definitions
+    -- single constructor inside type definition
     constructor :: Parser Cons
     constructor = do
       name <- uIdentifier
@@ -117,12 +132,33 @@ module DotNet.Parser where
       fields <- sepBy1 constructors (char '+')
       return $ Type name vars fields
     
-    
-    
     symbolId :: Parser Expr
     symbolId = VarId <$> identifier
     
+    function :: Parser Expr
+    function = do
+      fn <- variable
+      let (Id name typ) = fn
+      args <- many variable   -- (parens $ many identifier) <|> (parens $ commaSep identifier)
+      reservedOp "="
+      body <- expr
+      return $ Lam name args body typ
     
+    -- one case like | x == 0 -> 1
+    oneCase :: Parser (Expr, Expr)
+    oneCase = do
+      left <- expr
+      reservedOp "->"
+      right <- expr
+      return (left, right)
+
+    caseExpression :: Parser Expr
+    caseExpression = do
+      inspect <- try (parens expr) <|> symbolId <?> "caseExpression failed in inspect"
+      reservedOp "?"
+      cases <- sepBy1 oneCase (reservedOp "|")
+      return $ Case inspect cases
+
     {-
     unarydef :: Parser Expr
     unarydef = do
@@ -144,28 +180,6 @@ module DotNet.Parser where
       return $ Lam ("("++o++")") [arg1, arg2] body
     -}
     {-
-    binarydef :: Parser Expr
-    binarydef = do
-      reserved "def"
-      reserved "binary"
-      o <- op
-      prec <- int <?> "integer: precedence value for the operator definition"
-      arg1 <- variable
-      arg2 <- variable
-      reservedOp "="
-      body <- expr
-      return $ Lam ("("++o++")") [arg1, arg2] body
-    
-    unarydef :: Parser Expr
-    unarydef = do
-      reserved "def"
-      reserved "unary"
-      o <- op
-      arg <- variable
-      reservedOp "="
-      body <- expr
-      return $ Lam ("("++o++")") [arg] body
-    
     
     fieldAccess :: Parser Expr
     fieldAccess = do
@@ -188,6 +202,13 @@ module DotNet.Parser where
           -- <|> try fieldAccess
           <|> symbolId
     
+    -- so the way we are parsing now is that we can only apply a symbol to a tuple of expressions,
+    -- moving away from trees to lists
+    call :: Parser Expr
+    call = do
+      name <- identifier
+      args <- try (parens $ many1 argument) <|> many1 argument
+      return $ App (VarId name) (Tuple "" args)
     
     arguments :: Parser Expr
     arguments = do
@@ -197,13 +218,13 @@ module DotNet.Parser where
     
     factor :: Parser Expr
     -- factor = try caseExpression <|> try call <|> try ifthen <|> argument -- arguments -- try letins <|>
-    factor = argument -- arguments -- try letins <|>
+    factor = try caseExpression <|> arguments -- arguments -- try letins <|>
     
 
     defn :: Parser Expr
     defn =  try typeDef
         -- <|> try caseFunction
-        -- <|> try function
+        <|> try function
         -- <|> try unarydef
         -- <|> try binarydef
         <|> expr

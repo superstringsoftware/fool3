@@ -72,8 +72,10 @@ data Expr
     | Type Name [Var] [Cons] -- sum type built from product constructors cons
     | BinaryOp Name Expr Expr
     | UnaryOp  Name Expr
-    | Tuple Name [Expr] -- polymorphic tuple
+    | Tuple Name [Expr] -- polymorphic tuple. Need to kill it from here.
     | App Expr Expr
+    | Case Expr [(Expr, Expr)] -- case: which expr we are inspecting, alternatives
+    | Lam Name [Var] Expr Type -- typed function
     deriving (Eq, Ord, Show)
 
 {-

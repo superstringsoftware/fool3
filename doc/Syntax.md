@@ -31,6 +31,12 @@ type <Name> [var1[:Type | Kind | Constraint]] ... = <ConsName1> [var]:<Type | va
 
 Types are following typical sum / product types. Anonymous fields are ommitted and type names are always preceeded by ":" to make distinction between types and variables / values explicit.
 
+## Functions
+
+```haskell
+
+```
+
 ### Dependent Types
 
 We are introducing types dependent on value as well as constraints mechanism (functions into Bool).

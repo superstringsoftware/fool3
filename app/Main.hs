@@ -38,7 +38,7 @@ processNew line = do
 processCommand :: [String] -> IntState ()
 processCommand (":help":_) = liftIO showHelp
 processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
--- processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
+processCommand (":functions":_) = get >>= liftIO . prettyPrintFT . funTable
 processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
 -- processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
 -- processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
@@ -48,7 +48,7 @@ processCommand (":all":_) = do
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
   liftIO $ prettyPrintTT $ typeTable st
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
-  -- liftIO $ prettyPrintFT $ funTable  st
+  liftIO $ prettyPrintFT $ funTable  st
 processCommand (":load":xs) = loadFileNew (head xs)
 processCommand (":set":s:xs) = processSet s xs
 processCommand (":env":_) = do
