@@ -129,11 +129,13 @@ class PrettyPrintTyped a where
     prettyPrintTyped :: a -> String
 
 instance PrettyPrint Expr where
+    prettyPrint (VarId "") = as [lgray,bold] "_"
     prettyPrint (VarId n) = n
     -- prettyPrint (Lam nm [] (Tuple tnm [])) = clrLam nm
-    prettyPrint (Lam nm vars e t) = clrLam nm ++ ":" ++ prettyPrint t ++ " = " ++ foldr fn "" vars ++ prettyPrint e -- clrLam nm ++ " = " ++
-        where fn el acc = as [bold, dgray] "λ " ++ prettyPrint el ++ ". " ++ acc
-    prettyPrint (Tuple nm tpl) = clrLam nm ++ showBracketedList " {" "}" tpl -- clrLam nm ++
+    prettyPrint (Lam nm vars e t) = clrLam nm ++ ":" ++ prettyPrint t ++ " = " ++ as [bold, dgray] "λ " 
+        ++ foldr fn "" vars ++ ". " ++ prettyPrint e -- clrLam nm ++ " = " ++
+        where fn el acc = prettyPrint el ++ acc
+    prettyPrint (Tuple nm tpl) = showBracketedList " {" "}" tpl -- clrLam nm ++
     prettyPrint (Lit l) = prettyPrint l
     prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
     prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
@@ -146,7 +148,7 @@ instance PrettyPrint Expr where
                 ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
                 ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" fns)
     prettyPrint (Typeinstance nm tp fns) = foldr (\x y -> x ++ y) "" (map (fn (nm ++ "." ++ prettyPrint tp)) fns)
-        where fn n (Lam n1 x y z) = prettyPrint (Lam (n ++ "." ++ n1) x y z) 
+        where fn n (Lam n1 x y z) = prettyPrint (Lam (n ++ "." ++ clrLam n1) x y z) 
     prettyPrint EMPTY = as [magenta, bold] "undefined"
     prettyPrint e = show e
     
@@ -178,7 +180,7 @@ instance PrettyPrint Literal where
 instance PrettyPrint Type where
     prettyPrint (TVar nm) = nm
     prettyPrint (TCon nm) = as [yellow, bold] nm
-    prettyPrint ToDerive  = as [dgray, bold] "?"
+    prettyPrint ToDerive  = "" --as [dgray, bold] "?"
     prettyPrint (TApp t1 t2) = "(" ++ prettyPrint t1 ++ " " ++ prettyPrint t2 ++")"
     prettyPrint (InsType ex) = prettyPrint ex
     prettyPrint (TArr t1 t2) = prettyPrint t1 ++ "->" ++ prettyPrint t2
@@ -195,5 +197,5 @@ instance PrettyPrint Var where
 
 instance PrettyPrint Kind where
     prettyPrint KStar = as [lgray, bold] "*"
-    prettyPrint KoDerive = as [dgray, bold] "?"
+    prettyPrint KoDerive = "" --as [dgray, bold] "?"
     prettyPrint k = show k
