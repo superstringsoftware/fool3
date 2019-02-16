@@ -124,7 +124,7 @@ module DotNet.Parser where
     -- returns a lambda
     constructor :: Type -> Parser Expr
     constructor tp = do
-      name <- uIdentifier
+      name <- try uIdentifier <|> spaces *> parensOp <?> "either Constructor name or operator syntax"
       vars <- sepBy  (try (TCon <$> (reservedOp ":" *> uIdentifier)) <|> -- concrete type
                      try (TVar <$> (reservedOp ":" *> lIdentifier)) <|> -- type var
                      (reservedOp ":" *> parens typeAp) -- complex type, like List a
@@ -133,7 +133,11 @@ module DotNet.Parser where
       let vars' = map (\x -> Id "" x) vars
       return $ Lam name vars' (Tuple name tupl) tp
     
-    
+    parensOp :: Parser String
+    parensOp = do 
+      n <- parens op
+      return $ "(" ++ n ++ ")"
+
     constructors = {- try recordConstructor <|> -} constructor
     
     -- simple ADT

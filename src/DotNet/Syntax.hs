@@ -132,19 +132,19 @@ instance PrettyPrint Expr where
     prettyPrint (VarId "") = as [lgray,bold] "_"
     prettyPrint (VarId n) = n
     -- prettyPrint (Lam nm [] (Tuple tnm [])) = clrLam nm
-    prettyPrint (Lam nm vars e t) = clrLam nm ++ ":" ++ prettyPrint t ++ " = " ++ as [bold, dgray] "λ " 
+    prettyPrint (Lam nm vars e t) = clrLam nm ++ ":" ++ prettyPrint t ++ " = " ++ as [bold, dgray] "λ" 
         ++ foldr fn "" vars ++ ". " ++ prettyPrint e -- clrLam nm ++ " = " ++
-        where fn el acc = prettyPrint el ++ acc
+        where fn el acc = prettyPrint el ++ " " ++ acc
     prettyPrint (Tuple nm tpl) = showBracketedList " {" "}" tpl -- clrLam nm ++
     prettyPrint (Lit l) = prettyPrint l
-    prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
+    prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ "(" ++ prettyPrint e2 ++ ")"
     prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
     prettyPrint (Case e exs) = prettyPrint e ++ " ? " ++  (foldr fn "" exs)
         where fn (e1,e2) acc = "\n\t| " ++ prettyPrint e1 ++ " -> " ++ prettyPrint e2 ++ acc
-    prettyPrint (Type nm vrs exs) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ " 
+    prettyPrint (Type nm vrs exs) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ" 
                 ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
                 ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" exs)
-    prettyPrint (Typeclass nm pred vrs fns) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ " 
+    prettyPrint (Typeclass nm pred vrs fns) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ" 
                 ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
                 ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" fns)
     prettyPrint (Typeinstance nm tp fns) = foldr (\x y -> x ++ y) "" (map (fn (nm ++ "." ++ prettyPrint tp)) fns)

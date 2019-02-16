@@ -5,7 +5,7 @@ mul = primop;
 # Types
 type Bool = True + False;
 type Maybe a = Nothing + Just :a;
-type List a = Nil + Cons :a * :(List a);
+type List a = Nil + (::) :a * :(List a);
 
 # Functions
 id x = x;
@@ -24,6 +24,6 @@ class Eq a =
 
 # typeclass implementation
 instance Functor List = 
-  fmap f ls = ls ? Nil -> Nil | Cons (x xs) -> Cons (f x)  (fmap f xs);
+  fmap f ls = ls ? Nil -> Nil | x :: xs -> (f x) :: (fmap f xs);
 
   
