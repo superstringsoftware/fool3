@@ -221,8 +221,7 @@ module DotNet.Parser where
       prec <- int <?> "integer: precedence value for the operator definition"
       arg1 <- variable
       arg2 <- variable
-      reservedOp "="
-      body <- expr
+      body <- try (reservedOp "=" *> expr) <|> pure EMPTY
       return $ Lam ("("++o++")") [arg1, arg2] body ToDerive
     
     {-
