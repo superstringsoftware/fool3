@@ -18,6 +18,7 @@ data Type
     | TArr Type Type -- Function sig - Maybe a -> String etc
     | TForall [Pred] [TVar] Type
     | ToDerive -- added it to handle initial parsing
+    | TClass Name -- for initial typeclass parsing, might change this
     | InsType Expr -- this is probably a workaround - when we are beta-reducing Type lambdas for variables like \a. x:a
     -- "a" needs to be able to become any kind of expression (since we are applying lambdas to expressions).
     -- Type checking etc will fix this.
@@ -43,7 +44,7 @@ data TyCon
     deriving (Show, Eq, Ord)
 
 data Pred
-    = IsIn Name Type
+    = IsIn [Name] Type -- class Eq a => Ord a, Eq a goes to IsIn ['a'] TClass 'Eq'
     deriving (Show, Eq, Ord)
 
 data Var = Id Name Type | TyVar Name Kind
@@ -63,38 +64,27 @@ data TupleField
     | ConstField 
 -}
 -- product type constructor
-data Cons = Anon Name [Type] | Record Name [(Name, Type)] deriving (Eq, Ord, Show)
+data Cons = Anon Name [Type] | CRecord Name [(Name, Type)] deriving (Eq, Ord, Show)
 
 -- Surfance language AST type to handle both lazy and strict hopefully a bit more efficiently
 -- So, no currying
 data Expr 
     = Lit Literal
     | VarId Name
-    | Type Name [Var] [Cons] -- sum type built from product constructors cons
+    | Type Name [Var] [Expr] -- sum type built from product constructors, which are Lambdas themselves!
     | BinaryOp Name Expr Expr
     | UnaryOp  Name Expr
     | Tuple Name [Expr] -- polymorphic tuple. 
+    | Record Name [(Name, Expr)] -- polymorphic record
     | App Expr Expr
     | Case Expr [(Expr, Expr)] -- case: which expr we are inspecting, alternatives
-    | Lam Name [Var] Expr Type -- typed function
+    | Lam Name [Var] Expr Type -- typed function (or any typed expression for that matter)
     -- class 
     | Typeclass Name [Pred] [Var] [Expr] -- Expr here can only be Lam as it's a list of functions basically, where interface is just an empty expression
+    | Typeinstance Name Type [Expr] -- for parsing typelcass instances - Name is typeclass name, Type is the type and [Expr] are all Lambdas
     | EMPTY
     deriving (Eq, Ord, Show)
 
-{-
-Examples for Type:
-type Maybe a:* = Nothing + Just :a -->
-Type "Maybe" [TyVar "a" KStar] [
-    Tuple "Nothing" [],
-    Tuple "Just" [TVar "a"]
-]
-type Tagged a:* tag:String = Tagged :a tag -->
-Type "Tagged" [TyVar "a" KStar, Id "tag" (TCon "String")] [
-    Tuple "Tagged" [TVar "a", TVar "tag"] -- this is somewhat misleading, no?
-]    
-type Vector a:* n:Int = Vector (primvector a n) -->
--}
 
 {-
 data Expr

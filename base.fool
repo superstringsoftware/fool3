@@ -22,4 +22,8 @@ class Eq a =
     (==) 4 x:a y:a = not (x /= y) # default implementation
     (/=) 4 x:a y:a = not (x == y);    
 
+# typeclass implementation
+instance Functor List = 
+  fmap f ls = ls ? Nil -> Nil | Cons (x xs) -> Cons (f x)  (fmap f xs);
+
   

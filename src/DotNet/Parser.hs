@@ -121,14 +121,17 @@ module DotNet.Parser where
       return $ TyVar name typ
     
     -- single constructor inside type definition
-    constructor :: Parser Cons
-    constructor = do
+    -- returns a lambda
+    constructor :: Type -> Parser Expr
+    constructor tp = do
       name <- uIdentifier
       vars <- sepBy  (try (TCon <$> (reservedOp ":" *> uIdentifier)) <|> -- concrete type
                      try (TVar <$> (reservedOp ":" *> lIdentifier)) <|> -- type var
                      (reservedOp ":" *> parens typeAp) -- complex type, like List a
-                     <?> "regular constructor failed") (symbol "*")
-      return $ Anon name vars
+                     <?> "simple constructor expected") (symbol "*")
+      let tupl = map (\_ -> VarId "") vars
+      let vars' = map (\x -> Id "" x) vars
+      return $ Lam name vars' (Tuple name tupl) tp
     
     
     constructors = {- try recordConstructor <|> -} constructor
@@ -141,7 +144,7 @@ module DotNet.Parser where
       vars <- many typeVariable
       modifyState (addParserLog $ "Parsing typeDef for" ++ name)
       reservedOp "="
-      fields <- sepBy1 constructors (char '+')
+      fields <- sepBy1 (constructors ToDerive) (char '+')
       return $ Type name vars fields
     
     symbolId :: Parser Expr
@@ -156,8 +159,7 @@ module DotNet.Parser where
       body <- try (reservedOp "=" *> expr) <|> pure EMPTY
       return $ Lam name args body typ
 
-    -- typeclass header
-    
+    -- typeclass. Kind signatures aren't working for some reason yet.
     typeClass :: Parser Expr
     typeClass = do
       reserved "class"
@@ -166,6 +168,21 @@ module DotNet.Parser where
       reservedOp "="
       fs <- try $ many1 function <|> many1 binarydef
       return $ Typeclass name [] vars fs
+
+    -- class instance is somewhat tricky - we parse it simply as a function
+    -- with a compound name <ClassName>.<TypeName>.<functionName>
+    -- however, when compiling - this function needs to be stored more efficiently
+    -- so that we can retrieve it as needed based on the type parameter
+    -- returns array of Lam's
+    classInstance :: Parser Expr
+    classInstance = do
+      reserved "instance"
+      name <- uIdentifier
+      tp <- try (parens typeAp) <|> concreteType <?> ("correct type in instance " ++ name ++ " definition")
+      reservedOp "="
+      fs <- try $ many1 function <|> many1 binarydef
+      return $ Typeinstance name tp fs
+
     
     -- one case like | x == 0 -> 1
     oneCase :: Parser (Expr, Expr)
@@ -247,6 +264,7 @@ module DotNet.Parser where
     defn :: Parser Expr
     defn =  try typeDef
         <|> try typeClass
+        <|> try classInstance
         <|> try function
         <|> try unarydef
         <|> try binarydef

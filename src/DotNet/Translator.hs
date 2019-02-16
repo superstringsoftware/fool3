@@ -36,8 +36,8 @@ compileExpr :: Expr -> String
 compileExpr e@(Type tname vars cons) = verboseExpr e 
     ++ "public class " 
     ++ tname
-    ++ tVars
-    ++ "{}\n"
+    -- ++ tVars
+    ++ "{}\n" {-
     ++ concat (map processCons cons)
     where processVars [] = "" -- processing type variables 
           processVars (x:xs) = "<" ++ (cap $ varName x) ++ processVarsTail xs
@@ -46,7 +46,7 @@ compileExpr e@(Type tname vars cons) = verboseExpr e
           -- setting baseName for the type
           tVars = processVars vars
           -- processing 1 constructor as child classes
-          processCons (Anon nm fields) = "public class " 
+          processCons (Tuple nm fields) = "public class " 
             ++ nm
             ++ tVars
             ++ " : " ++ tname ++ tVars
@@ -56,7 +56,7 @@ compileExpr e@(Type tname vars cons) = verboseExpr e
           -- processing fields
           processFields _ [] = ""
           processFields i (f:fs) = typeToClassField ("__F" ++ show i ++ "__") f ++ "\n" ++ processFields (i+1) fs
-
+-}
 {-
 data Type
     = TVar Name -- TVar -- a:* - careful, we CANNOT use 'Id' constructor from Var here
