@@ -61,9 +61,8 @@ module DotNet.Parser where
     -- concrete type or type application
     typeAp :: Parser Type
     typeAp = do
-      name <- uIdentifier
+      tcon <- try (TCon <$> uIdentifier) <|> (TVar <$> lIdentifier)
       vars <- many $ try (TCon <$> uIdentifier) <|> try ( TVar <$> lIdentifier ) <|> parens typeAp
-      let tcon = TCon name
       if null vars then return tcon -- concrete type
       else return $ foldl TApp tcon vars -- type application
     
@@ -72,6 +71,16 @@ module DotNet.Parser where
     tArr = do
       ts <- sepBy1 allTypes (reservedOp "->")
       return $ foldr1 TArr ts
+
+    -- :*->*  etc
+    kArr :: Parser Kind
+    kArr = do
+      ks <- sepBy1 allKinds (reservedOp "->")
+      -- let ks' = map (\x -> KStar) ks
+      return $ foldr1 KArr ks
+
+    allKinds :: Parser Kind
+    allKinds = (symbol "*") *> pure KStar
 
     -- concrete type only
     concreteType :: Parser Type
@@ -85,7 +94,7 @@ module DotNet.Parser where
     variable = do
       name <- lIdentifier
       typ <- try (reservedOp ":" *> parens tArr) <|>
-             try (reservedOp ":" *> tArr) <|>
+             -- try (reservedOp ":" *> tArr) <|>
              try (reservedOp ":" *> parens typeAp) <|>
              try (reservedOp ":" *> concreteType) <|>
              try (reservedOp ":" *> typeVar) <|>
@@ -104,8 +113,11 @@ module DotNet.Parser where
     typeVariable :: Parser Var
     typeVariable = do
       name <- lIdentifier
-      typ <- try (KTerm <$> (reservedOp ":" *> concreteType)) <|>
-             pure KStar -- default to *
+      typ <- try (KTerm <$> (reservedOp ":" *> concreteType)) 
+             <|> try (reservedOp ":" *> parens kArr) 
+             <|> try (reservedOp ":" *> kArr) 
+             <|> pure KoDerive
+             <?> "correct kind signature for " ++ name
       return $ TyVar name typ
     
     -- single constructor inside type definition
@@ -135,14 +147,25 @@ module DotNet.Parser where
     symbolId :: Parser Expr
     symbolId = VarId <$> identifier
     
+    -- parses both empty and non-empty functions (for typeclasses empty are needed)
     function :: Parser Expr
     function = do
       fn <- variable
       let (Id name typ) = fn
       args <- many variable   -- (parens $ many identifier) <|> (parens $ commaSep identifier)
-      reservedOp "="
-      body <- expr
+      body <- try (reservedOp "=" *> expr) <|> pure EMPTY
       return $ Lam name args body typ
+
+    -- typeclass header
+    
+    typeClass :: Parser Expr
+    typeClass = do
+      reserved "class"
+      name <- uIdentifier
+      vars <- many typeVariable
+      reservedOp "="
+      fs <- many1 function
+      return $ Typeclass name [] vars fs
     
     -- one case like | x == 0 -> 1
     oneCase :: Parser (Expr, Expr)
@@ -159,14 +182,14 @@ module DotNet.Parser where
       cases <- sepBy1 oneCase (reservedOp "|")
       return $ Case inspect cases
 
-    {-
+    
     unarydef :: Parser Expr
     unarydef = do
       o <- parens op
       arg <- variable
       reservedOp "="
       body <- expr
-      return $ Lam ("("++o++")") [arg] body
+      return $ Lam ("("++o++")") [arg] body ToDerive
     
     -- precedence is not stored anywhere now and is not handled at all
     binarydef :: Parser Expr
@@ -177,8 +200,8 @@ module DotNet.Parser where
       arg2 <- variable
       reservedOp "="
       body <- expr
-      return $ Lam ("("++o++")") [arg1, arg2] body
-    -}
+      return $ Lam ("("++o++")") [arg1, arg2] body ToDerive
+    
     {-
     
     fieldAccess :: Parser Expr
@@ -223,10 +246,10 @@ module DotNet.Parser where
 
     defn :: Parser Expr
     defn =  try typeDef
-        -- <|> try caseFunction
+        <|> try typeClass
         <|> try function
-        -- <|> try unarydef
-        -- <|> try binarydef
+        <|> try unarydef
+        <|> try binarydef
         <|> expr
     
     

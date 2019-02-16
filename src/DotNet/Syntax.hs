@@ -34,6 +34,7 @@ data Kind
     | KPrim
     | KVar Name
     | KTerm Type
+    | KoDerive
     deriving (Show, Eq, Ord)
   
 data TyCon
@@ -72,10 +73,13 @@ data Expr
     | Type Name [Var] [Cons] -- sum type built from product constructors cons
     | BinaryOp Name Expr Expr
     | UnaryOp  Name Expr
-    | Tuple Name [Expr] -- polymorphic tuple. Need to kill it from here.
+    | Tuple Name [Expr] -- polymorphic tuple. 
     | App Expr Expr
     | Case Expr [(Expr, Expr)] -- case: which expr we are inspecting, alternatives
     | Lam Name [Var] Expr Type -- typed function
+    -- class 
+    | Typeclass Name [Pred] [Var] [Expr] -- Expr here can only be Lam as it's a list of functions basically, where interface is just an empty expression
+    | EMPTY
     deriving (Eq, Ord, Show)
 
 {-
