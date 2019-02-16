@@ -52,6 +52,10 @@ processSurfaceExpr e@(Lam name _ _ _) = do
   fs <- gets funTable
   liftIO $ H.insert fs name e
 
+processSurfaceExpr e@(Typeclass name _ _ _) = do
+  fs <- gets funTable
+  liftIO $ H.insert fs name e
+  
 processSurfaceExpr e = do
   fs <- gets funTable
   liftIO $ H.insert fs "test" e

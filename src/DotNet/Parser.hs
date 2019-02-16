@@ -162,9 +162,9 @@ module DotNet.Parser where
     typeClass = do
       reserved "class"
       name <- uIdentifier
-      vars <- many typeVariable
+      vars <- many typeVariable <?> "correct type variable signature"
       reservedOp "="
-      fs <- many1 function
+      fs <- try $ many1 function <|> many1 binarydef
       return $ Typeclass name [] vars fs
     
     -- one case like | x == 0 -> 1
