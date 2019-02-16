@@ -144,7 +144,9 @@ module DotNet.Parser where
       vars <- many typeVariable
       modifyState (addParserLog $ "Parsing typeDef for" ++ name)
       reservedOp "="
-      fields <- sepBy1 (constructors ToDerive) (char '+')
+      -- converting type name to actual type to put it as a type to functions
+      let tp = foldl TApp (TCon name) (map (\(TyVar n _)-> TVar n) vars)
+      fields <- sepBy1 (constructors tp) (char '+')
       return $ Type name vars fields
     
     symbolId :: Parser Expr

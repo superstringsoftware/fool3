@@ -2,7 +2,7 @@
 
 module DotNet.Syntax where
 
--- import TermColors
+import TermColors
 import Data.Char (isUpper)
 
 import Data.Functor.Identity
@@ -64,7 +64,7 @@ data TupleField
     | ConstField 
 -}
 -- product type constructor
-data Cons = Anon Name [Type] | CRecord Name [(Name, Type)] deriving (Eq, Ord, Show)
+-- data Cons = Anon Name [Type] | CRecord Name [(Name, Type)] deriving (Eq, Ord, Show)
 
 -- Surfance language AST type to handle both lazy and strict hopefully a bit more efficiently
 -- So, no currying
@@ -121,3 +121,79 @@ varType (Id _ t) = t
 
 
 
+
+class PrettyPrint a where
+    prettyPrint :: a -> String
+  
+class PrettyPrintTyped a where
+    prettyPrintTyped :: a -> String
+
+instance PrettyPrint Expr where
+    prettyPrint (VarId n) = n
+    -- prettyPrint (Lam nm [] (Tuple tnm [])) = clrLam nm
+    prettyPrint (Lam nm vars e t) = clrLam nm ++ ":" ++ prettyPrint t ++ " = " ++ foldr fn "" vars ++ prettyPrint e -- clrLam nm ++ " = " ++
+        where fn el acc = as [bold, dgray] "λ " ++ prettyPrint el ++ ". " ++ acc
+    prettyPrint (Tuple nm tpl) = clrLam nm ++ showBracketedList " {" "}" tpl -- clrLam nm ++
+    prettyPrint (Lit l) = prettyPrint l
+    prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
+    prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
+    prettyPrint (Case e exs) = prettyPrint e ++ " ? " ++  (foldr fn "" exs)
+        where fn (e1,e2) acc = "\n\t| " ++ prettyPrint e1 ++ " -> " ++ prettyPrint e2 ++ acc
+    prettyPrint (Type nm vrs exs) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ " 
+                ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
+                ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" exs)
+    prettyPrint (Typeclass nm pred vrs fns) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ " 
+                ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
+                ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" fns)
+    prettyPrint (Typeinstance nm tp fns) = foldr (\x y -> x ++ y) "" (map (fn (nm ++ "." ++ prettyPrint tp)) fns)
+        where fn n (Lam n1 x y z) = prettyPrint (Lam (n ++ "." ++ n1) x y z) 
+    prettyPrint EMPTY = as [magenta, bold] "undefined"
+    prettyPrint e = show e
+    
+clrLam "" = ""
+clrLam s = if isUpper (head s) then as [bold, red] s else as [bold, green] s
+
+
+embrace s = as [bold, blue] "(" ++ s ++ as [bold, blue] ")"
+-- additional nicer formatting for output for top level expressions
+-- prettyPrintTopLevel (App e1 e2) = embrace (prettyPrint e1) ++ embrace (prettyPrint e2)
+prettyPrintTopLevel e = prettyPrint e
+
+
+showBracketedList l r [] = l ++ r
+showBracketedList l r [x]    = l ++ prettyPrint x ++ r
+showBracketedList l r (x:xs) = l ++ prettyPrint x ++ foldr fn "" xs ++ r
+    where fn el acc = ", " ++ prettyPrint el ++ acc
+
+
+instance PrettyPrint Literal where
+    prettyPrint (LInt x) = as [magenta] $ show x
+    prettyPrint (LFloat x) = as [magenta] $ show x
+    prettyPrint (LBool x) = as [magenta] $ show x
+    prettyPrint (LString s) = as [green] $ show s
+    prettyPrint (LList tuple) = showBracketedList "[" "]" tuple
+    prettyPrint (LVec  tuple)  = showBracketedList "<" ">" tuple
+    prettyPrint e = show e
+
+instance PrettyPrint Type where
+    prettyPrint (TVar nm) = nm
+    prettyPrint (TCon nm) = as [yellow, bold] nm
+    prettyPrint ToDerive  = as [dgray, bold] "?"
+    prettyPrint (TApp t1 t2) = "(" ++ prettyPrint t1 ++ " " ++ prettyPrint t2 ++")"
+    prettyPrint (InsType ex) = prettyPrint ex
+    prettyPrint (TArr t1 t2) = prettyPrint t1 ++ "->" ++ prettyPrint t2
+    prettyPrint e = show e
+  
+  {-
+    | TArr Type Type
+    | TForall [Pred] [TVar] Type
+  -}
+-- Λ
+instance PrettyPrint Var where
+    prettyPrint (Id nm tp)   = nm ++ ":" ++ prettyPrint tp
+    prettyPrint (TyVar nm k) = nm ++ ":" ++ prettyPrint k
+
+instance PrettyPrint Kind where
+    prettyPrint KStar = as [lgray, bold] "*"
+    prettyPrint KoDerive = as [dgray, bold] "?"
+    prettyPrint k = show k

@@ -43,12 +43,18 @@ processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
 -- processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
 -- processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
 processCommand (":compile":_) = (liftIO $ putStrLn "Compiling...") >> compile
-processCommand (":all":_) = do
+processCommand (":all":"-d":_) = do
   st <- get
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
   liftIO $ prettyPrintTT $ typeTable st
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
   liftIO $ prettyPrintFT $ funTable  st
+processCommand (":all":_) = do
+  st <- get
+  liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
+  liftIO $ prettyPrintTT' $ typeTable st
+  liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
+  liftIO $ prettyPrintFT' $ funTable  st  
 processCommand (":load":xs) = loadFileNew (head xs)
 processCommand (":set":s:xs) = processSet s xs
 processCommand (":env":_) = do
@@ -138,7 +144,7 @@ runInterpreter :: InputTState ()
 runInterpreter = do
   liftIO $ putStrLn "Loading base library..."
   lift $ loadFileNew baseLibPath
-  lift $ processCommand [":core"]
+  lift $ processCommand [":all"]
   loop
 
 main :: IO ()
@@ -151,5 +157,5 @@ main = do
 greetings = do
   putStrLn "Welcome to Functional Object Oriented Low-Level Language (FOOL3)"
   putStrLn "Version 0.0.1"
-  putStrLn "(c) Copyright 2016-2017 by J X-Ray Ho\n"
+  putStrLn "(c) Copyright 2016-2018 by Anton Antich (a@s3.ag)\n"
   putStrLn "Type :help for help on commands or :load a file.\n"

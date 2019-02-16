@@ -53,7 +53,7 @@ processSurfaceExpr e@(Lam name _ _ _) = do
   liftIO $ H.insert fs name e
 
 processSurfaceExpr e@(Typeclass name _ _ _) = do
-  fs <- gets funTable
+  fs <- gets typeTable
   liftIO $ H.insert fs name e
 
 processSurfaceExpr e@(Typeinstance name tp _) = do
@@ -70,11 +70,18 @@ prettyPrintTT :: ExpressionTable -> IO ()
 prettyPrintTT = H.mapM_ f where
     f (k,v) = putStrLn $ show v
 
+prettyPrintTT' :: ExpressionTable -> IO ()
+prettyPrintTT' = H.mapM_ f where
+  f (k,v) = putStrLn $ prettyPrint v
+  
 -- print functions
 prettyPrintFT :: ExpressionTable -> IO ()
 prettyPrintFT = H.mapM_ f where
     f (k,v) = putStrLn $ show v
 
+prettyPrintFT' :: ExpressionTable -> IO ()
+prettyPrintFT' = H.mapM_ f where
+    f (k,v) = putStrLn $ prettyPrint v
 {-
 -- print symbols
 prettyPrintST :: ExpressionTable -> IO ()

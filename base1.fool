@@ -43,5 +43,5 @@ m a b = a ? True -> (b ? True -> True) | otherwise -> False; # works with bracke
 
 # trying typeclasses
 class Functor f = 
-  fmap:(f b) g:(a->b) x:(f a)
+  fmap:(f b) g:(a->b) x:(f a);
   
