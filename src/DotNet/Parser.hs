@@ -25,6 +25,7 @@ module DotNet.Parser where
     
     import Lexer
     import DotNet.Syntax
+    import State
     
     int :: Parser Literal
     int = LInt . fromInteger <$> integer
@@ -310,16 +311,14 @@ module DotNet.Parser where
     parseToplevel s = runParserT (contents defn) initialParserState "<stdin>" s
     
     -- parse a given file
+    parseToplevelFile :: String -> IntState (Either ParseError [Expr])
     parseToplevelFile name = parseFromFile (contents toplevel) name initialParserState
     
-    -- parseFromFile :: Parser a -> String -> IO (Either ParseError a)
+    parseFromFile :: Parser a -> String -> ParserState -> IntState (Either ParseError a)
     -- redefining parse from file to work with our state - just a quick and dirty fix
     parseFromFile p fname st
-        = do input <- readFile fname
-             let res = (runP p st fname input)
-             --st <- (lift getState)
-             --print st
-             return res
+        = liftIO (readFile fname) >>= runPT p st fname
+             
     
     -- adding new stuff
     

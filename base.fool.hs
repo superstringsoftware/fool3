@@ -46,6 +46,14 @@ class Field a <: Ring a =
     (/):a x:a y:a;
     -- forall x:a => (Z1 / x * x == Z1)
 
+-- Functor
+class Functor f = 
+  fmap:(f b) g:(a->b) x:(f a);
+
+instance Functor Maybe = 
+  fmap f x = x ? Nothing -> Nothing | Just y -> Just (f y);
+    
+
 instance Eq Int = (==) x y = primop_equals x y;
 instance Semigroup Int = (+) x y = primop_plus x y;
 instance Monoid Int = z0 = 0;

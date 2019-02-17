@@ -1,4 +1,8 @@
 {-# LANGUAGE RankNTypes, TypeSynonymInstances, FlexibleInstances #-}
+
+-- State / IO monad where we are doing all our transformations etc
+-- So, our parser needs to work in this monad as well
+
 module State where
 
 import qualified Data.HashTable.IO as H
@@ -7,7 +11,7 @@ import DotNet.Syntax
 
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 
-type IntState a = StateT InterpreterState IO a
+type IntState = StateT InterpreterState IO
 
 type HashTable k v = H.BasicHashTable k v
 type ExpressionTable = HashTable Name Expr

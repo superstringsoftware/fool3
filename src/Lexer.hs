@@ -1,30 +1,50 @@
 module Lexer where
 
 -- import Text.Parsec.String (Parser)
-import Text.Parsec.Language (emptyDef)
+-- import Text.Parsec.Language (emptyDef)
 import Text.Parsec.Prim (many)
-import Text.Parsec ((<?>), Parsec, ParsecT)
+import Text.Parsec
 
-import qualified Text.Parsec.Token as Tok
+import Text.Parsec.Token as Tok
+
+import State
 
 -- our parser's user state - remember that parser is ParsecT s u m a
 -- and Parsec is ParsecT s u Identity, so we are making u = ParserState
 data ParserState = ParserState {
-  count :: Int,
+  -- count :: Int,
   parserLog :: [String]
 } deriving Show
 
 initialParserState = ParserState {
-  count = 0,
+  -- count = 0,
   parserLog = []
 }
 
 addParserLog :: String -> ParserState -> ParserState
 addParserLog s ps = ps { parserLog = s : (parserLog ps) }
 
-type Parser = Parsec String ParserState
+type Parser = ParsecT String ParserState IntState
+type LanguageDefIS st = Tok.GenLanguageDef String st IntState
+type TokenParserIS st = Tok.GenTokenParser String st IntState
 
-lexer :: Tok.TokenParser ParserState
+emptyDef   :: LanguageDefIS st
+emptyDef    = Tok.LanguageDef
+            { commentStart   = "{-"
+            , commentEnd     = "-}"
+            , commentLine    = "--"
+            , nestedComments = False
+            , identStart     = letter <|> char '_'
+            , identLetter    = alphaNum <|> oneOf "_'"
+            , opStart        = opLetter emptyDef
+            , opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
+            , reservedOpNames= []
+            , reservedNames  = []
+            , caseSensitive  = True
+            }
+
+
+lexer :: TokenParserIS ParserState
 lexer = Tok.makeTokenParser style
   where
     ops = [";","=",",",".",":", "->","<",">", "|", "?", "<:"] -- ["+","*","-","/",";","=",",","<",">","|",":"]

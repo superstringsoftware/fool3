@@ -25,7 +25,7 @@ baseLibPath = "base.fool.hs"
 
 processNew :: String -> IntState ()
 processNew line = do
-  let res = runIdentity $ parseToplevel line
+  res <- parseToplevel line
   case res of
     Left err -> liftIO $ print err
     Right ex -> do
@@ -105,7 +105,7 @@ loadFileNew :: String -> IntState ()
 loadFileNew nm = do
    st <- get
    liftIO $ putStrLn $ "Loading file: " ++ nm
-   res <- liftIO $ parseToplevelFile nm
+   res <- parseToplevelFile nm
    -- liftIO $ print res
    case res of
      Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
