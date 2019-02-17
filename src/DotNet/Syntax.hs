@@ -112,13 +112,68 @@ data Expr
 -- mkTuple x = Tuple "" [x]
 -- mk2Tuple x y = Tuple "" [x, y]
 
-
+arity :: Expr -> Int
+arity (Type _ v _) = length v
+arity (Lam _ v _ _) = length v
 
 
 varName (Id n _) = n
 varName (TyVar n _) = n
 varType (Id _ t) = t
 
+
+-- Expr traversals with modifying function f::Expr->Expr
+traverseExpr :: (Expr -> Expr) -> Expr -> Expr
+traverseExpr f (Lam nm v e t) = Lam nm v (f e) t
+traverseExpr f (Tuple nm ex) = Tuple nm (map f ex)
+traverseExpr f (App e1 e2) = App (f e1) (f e2)
+traverseExpr f (BinaryOp nm e1 e2) = BinaryOp nm (f e1) (f e2)
+traverseExpr f (UnaryOp nm e) = UnaryOp nm (f e)
+traverseExpr f (Type nm v ex) = Type nm v (map f ex)
+traverseExpr f (Record nm nex) = Record nm (map (\(n, e) -> (n, f e)) nex)  -- nex = [(Name, Expr)]
+traverseExpr f (Case e nex) = Case (f e) (map (\(e1, e2) -> (f e1, f e2)) nex) -- nex = [(Expr, Expr)]
+traverseExpr f (Typeclass nm p v ex) = Typeclass nm p v (map f ex)
+traverseExpr f (Typeinstance nm t ex) = Typeinstance nm t (map f ex)
+traverseExpr f e = f e
+
+-- Monadic traversals - in case we need to lookup/ modify state along the way etc
+descendM :: (Monad m, Applicative m) => (Expr -> m Expr) -> Expr -> m Expr
+descendM f e = case e of
+    App  a b        -> App <$> descendM f a <*> descendM f b
+    VarId  a        -> VarId <$> pure a
+    Lam nm v e t    -> Lam <$> pure nm <*> pure v <*> descendM f e <*> pure t
+    Lit  n          -> Lit <$> pure n
+    BinaryOp n a b  -> BinaryOp <$> pure n <*> descendM f a <*> descendM f b
+    UnaryOp n a     -> UnaryOp <$> pure n <*> descendM f a
+    Tuple nm ex     -> Tuple <$> pure nm <*> mapM (descendM f) ex
+    Case e exs      -> Case <$> descendM f e <*> mapM (fn f) exs
+                                  where fn f1 (e1, e2) = do
+                                                            e1' <- descendM f1 e1
+                                                            e2' <- descendM f1 e2
+                                                            return (e1', e2')
+    Record n nex    -> Record <$> pure n <*> mapM (fn f) nex 
+                                    where fn f1 (n, e) = do
+                                                            e' <- descendM f1 e
+                                                            return (n, e')
+    Typeclass n p v ex -> Typeclass <$> pure n <*> pure p <*> pure v <*> mapM (descendM f) ex
+    Typeinstance n t ex -> Typeinstance <$> pure n <*> pure t <*> mapM (descendM f) ex
+    Type n v ex     -> Type <$> pure n <*> pure v <*> mapM (descendM f) ex
+    EMPTY           -> pure EMPTY                                                            
+    >>= f -- to apply actual change function on the way out of the traversal
+
+-- pure traversal in the identity monad
+descend :: (Expr -> Expr) -> Expr -> Expr
+descend f ex = runIdentity (descendM (return . f) ex)
+
+-- function that performs some initial optimizations - e.g., getting rid of 
+-- BinaryOps by turning them into App Tuple, turning function App's from the Tree into App Tuple etc
+desugar :: Expr -> Expr
+desugar = descend f where
+    f (BinaryOp name e1 e2) = App (VarId $ "(" ++ name ++")") (Tuple "" [e1,e2])
+    f (UnaryOp nm e) = App (VarId $ "("++nm++")") (Tuple "" [e])
+    f e = e
+
+-- ------------------------------------------------------------------------------------------------
 
 
 
@@ -137,8 +192,8 @@ instance PrettyPrint Expr where
         where fn el acc = prettyPrint el ++ " " ++ acc
     prettyPrint (Tuple nm tpl) = showBracketedList " {" "}" tpl -- clrLam nm ++
     prettyPrint (Lit l) = prettyPrint l
-    prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ "(" ++ prettyPrint e2 ++ ")"
-    prettyPrint (BinaryOp n e1 e2) = "("++n++") " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
+    prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
+    prettyPrint (BinaryOp n e1 e2) = prettyPrint e1 ++ " " ++ n ++ " " ++ prettyPrint e2 -- "("++n++") " ++ 
     prettyPrint (Case e exs) = prettyPrint e ++ " ? " ++  (foldr fn "" exs)
         where fn (e1,e2) acc = "\n\t| " ++ prettyPrint e1 ++ " -> " ++ prettyPrint e2 ++ acc
     prettyPrint (Type nm vrs exs) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ" 

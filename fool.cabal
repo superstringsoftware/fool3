@@ -22,6 +22,7 @@ library
                      , DotNet.Syntax
                      , DotNet.Parser
                      , State
+                     , DotNet.Typechecker
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , vector

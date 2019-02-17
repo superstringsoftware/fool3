@@ -9,12 +9,12 @@ type List a = Nil + (::) :a * :(List a);
 id x = x;
 
 class Eq a =
-    (==) 4 x:a y:a = not (x /= y) -- default implementation
-    (/=) 4 x:a y:a = not (x == y);   
+    (==):Bool x:a y:a = not (x /= y) -- default implementation
+    (/=):Bool x:a y:a = not (x == y);   
     
 -- Basic algebra stuff
 class Semigroup a =
-    (+) 4 x:a y:a;
+    (+):a x:a y:a;
   -- forall x:a, y:a, z:a => x + (y + z) == (x + y) + z -- constraint (law), associativity
 
 -- monoid is a semigroup plus zero
@@ -24,12 +24,12 @@ class Monoid a <: Semigroup a =
 
 -- group is a monoid plus negation
 class Group a <: Monoid a = 
-    (-) 4 x:a y:a;
+    (-):a x:a y:a;
     -- forall x:a => (Z0 - x + x == Z0)
 
 -- ring is a group plus another binary operation that is a monoid itself and a bunch of laws
 class Ring a <: Group a =
-    (*) 3 x:a y:a
+    (*):a x:a y:a
     z1:a;
 {-
   forall x:a, y:a => (x + y == y + x) -- require Monoid in (+) to be commutative!
@@ -43,14 +43,32 @@ class Ring a <: Group a =
 
 -- field is a ring plus reverse to multiplication
 class Field a <: Ring a =
-    (/) 3 x:a y:a;
+    (/):a x:a y:a;
     -- forall x:a => (Z1 / x * x == Z1)
 
+instance Eq Int = (==) x y = primop_equals x y;
 instance Semigroup Int = (+) x y = primop_plus x y;
 instance Monoid Int = z0 = 0;
 instance Group Int = (-) x y = primop_minus x y;
-instance Ring Int = (*) x y = primop_mul x y;
 
+-- need to separate functions somehow explicitly, otherwise wrong parsing
+instance Ring Int = 
+    (*) x y = primop_mul x y
+    z1 = 1;
+
+
+    -- TEST PROGRAM
+
+f x y = x*x + y;
+
+g = f 1;
+h = (f 1) 3;
+
+fact n = n ?
+    z0 -> z1
+  | otherwise -> n * fact(n-1);
+
+main = print (fact (f (g 1) 1)); -- should be 120
 
 {-
 # trying typeclasses
@@ -61,7 +79,4 @@ class Functor f =
 instance Functor List = 
   fmap f ls = ls ? Nil -> Nil | x :: xs -> (f x) :: (fmap f xs);
 
-fact n = n ?
-    0 -> 1
-  | otherwise -> n * fact(n-1);
  -} 

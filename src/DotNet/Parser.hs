@@ -93,13 +93,18 @@ module DotNet.Parser where
     variable :: Parser Var
     variable = do
       name <- lIdentifier
-      typ <- try (reservedOp ":" *> parens tArr) <|>
-             -- try (reservedOp ":" *> tArr) <|>
-             try (reservedOp ":" *> parens typeAp) <|>
-             try (reservedOp ":" *> concreteType) <|>
-             try (reservedOp ":" *> typeVar) <|>
-             pure ToDerive
+      typ <- typeSignature
       return $ Id name typ
+
+    typeSignature :: Parser Type
+    typeSignature =
+            try (reservedOp ":" *> parens tArr) <|>
+            -- try (reservedOp ":" *> tArr) <|>
+            try (reservedOp ":" *> parens typeAp) <|>
+            try (reservedOp ":" *> concreteType) <|>
+            try (reservedOp ":" *> typeVar) <|>
+            pure ToDerive
+      
   
     -- simply a name of type variable on the right of regular variable
     typeVar :: Parser Type
@@ -194,7 +199,7 @@ module DotNet.Parser where
       name <- uIdentifier
       tp <- try (parens typeAp) <|> concreteType <?> ("correct type in instance " ++ name ++ " definition")
       reservedOp "="
-      fs <- try $ many1 function <|> many1 binarydef
+      fs <- many1 (try function <|> binarydef)
       return $ Typeinstance name tp fs
 
     
@@ -227,10 +232,11 @@ module DotNet.Parser where
     binarydef = do
       o <- parens op
       prec <- try int <|> pure (LInt 0) -- <?> "integer: precedence value for the operator definition"
+      typ <- typeSignature
       arg1 <- variable
       arg2 <- variable
       body <- try (reservedOp "=" *> expr) <|> pure EMPTY
-      return $ Lam ("("++o++")") [arg1, arg2] body ToDerive
+      return $ Lam ("("++o++")") [arg1, arg2] body typ
     
     {-
     
@@ -259,9 +265,9 @@ module DotNet.Parser where
     -- moving away from trees to lists
     call :: Parser Expr
     call = do
-      name <- identifier
+      name <- argument
       args <- try (parens $ many1 argument) <|> many1 argument
-      return $ App (VarId name) (Tuple "" args)
+      return $ App name (Tuple "" args)
     
     arguments :: Parser Expr
     arguments = do

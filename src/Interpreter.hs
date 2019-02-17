@@ -1,5 +1,14 @@
-{-# LANGUAGE RankNTypes, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Interpreter where
+
+{-
+Initial "compilation" pipeline:
+
+- Parsing (more or less works, but some errors and surface language needs revising)
+- Expression reorg:
+  - 
+
+-}
 
 import Data.Word
 import qualified Data.Vector.Unboxed as U
@@ -40,7 +49,8 @@ initializeInterpreter = do
                 }
              }
 
--- processing new surface expression language             
+-- processing new surface expression language - just initial putting to the hashtable and some 
+-- preliminary checks            
 processSurfaceExpr :: Expr -> IntState ()
 
 -- inserting types into table
@@ -63,6 +73,7 @@ processSurfaceExpr e@(Typeinstance name tp _) = do
 processSurfaceExpr e = do
   fs <- gets funTable
   liftIO $ H.insert fs "test" e
+
   
 
 -- print types

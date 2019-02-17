@@ -109,7 +109,8 @@ loadFileNew nm = do
    -- liftIO $ print res
    case res of
      Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
-     Right exprs -> mapM_ processSurfaceExpr exprs >> liftIO (putStrLn "... successfully loaded.")
+     -- desugaring on the first pass
+     Right exprs -> mapM_ (processSurfaceExpr . desugar) exprs >> liftIO (putStrLn "... successfully loaded.")
 
 
 
