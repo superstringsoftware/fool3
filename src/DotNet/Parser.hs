@@ -171,9 +171,17 @@ module DotNet.Parser where
       reserved "class"
       name <- uIdentifier
       vars <- many typeVariable <?> "correct type variable signature"
+      subtypes <- try (reservedOp "<:" *> (parens $ sepBy1 predicate (symbol ","))) 
+                  <|> try (reservedOp "<:" *> (predicate >>= \x-> return [x])) <|> pure []
       reservedOp "="
       fs <- try $ many1 function <|> many1 binarydef
-      return $ Typeclass name [] vars fs
+      return $ Typeclass name subtypes vars fs
+
+    -- subtyping predicates for typeclasses
+    predicate = do
+      name <- uIdentifier
+      vnames <- many lIdentifier
+      return $ IsIn vnames (TClass name)
 
     -- class instance is somewhat tricky - we parse it simply as a function
     -- with a compound name <ClassName>.<TypeName>.<functionName>

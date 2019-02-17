@@ -19,6 +19,10 @@ class Semigroup a =
     (+) 4 x:a y:a;
   -- forall x:a, y:a, z:a => x + (y + z) == (x + y) + z -- constraint (law), associativity
 
+-- monoid is a semigroup plus zero
+class Monoid a <: Semigroup a =
+    z0:a; -- zero element for the (+) operation
+  -- forall x:a => (Z0 + x == x, x + Z0 == x) -- constraint (law)
 
 
 {-

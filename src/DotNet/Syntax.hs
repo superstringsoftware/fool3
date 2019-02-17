@@ -144,7 +144,7 @@ instance PrettyPrint Expr where
     prettyPrint (Type nm vrs exs) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ" 
                 ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
                 ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" exs)
-    prettyPrint (Typeclass nm pred vrs fns) = clrLam nm ++ " = " ++ as [bold, dgray] "Λ" 
+    prettyPrint (Typeclass nm pred vrs fns) = clrLam nm ++ prettyPrint pred ++ " = " ++ as [bold, dgray] "Λ" 
                 ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
                 ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" fns)
     prettyPrint (Typeinstance nm tp fns) = foldr (\x y -> x ++ y) "" (map (fn (nm ++ "." ++ prettyPrint tp)) fns)
@@ -167,6 +167,14 @@ showBracketedList l r [x]    = l ++ prettyPrint x ++ r
 showBracketedList l r (x:xs) = l ++ prettyPrint x ++ foldr fn "" xs ++ r
     where fn el acc = ", " ++ prettyPrint el ++ acc
 
+instance PrettyPrint Pred where
+    prettyPrint (IsIn names tp) = prettyPrint tp ++ " " ++ foldr fn "" names 
+        where fn el acc = el ++ " " ++ acc
+
+instance PrettyPrint [Pred] where
+    prettyPrint [] = " "
+    prettyPrint (x:[]) = " <: " ++ prettyPrint x
+    prettyPrint xs = " <: " ++ showBracketedList "(" ")" xs
 
 instance PrettyPrint Literal where
     prettyPrint (LInt x) = as [magenta] $ show x
@@ -184,6 +192,7 @@ instance PrettyPrint Type where
     prettyPrint (TApp t1 t2) = "(" ++ prettyPrint t1 ++ " " ++ prettyPrint t2 ++")"
     prettyPrint (InsType ex) = prettyPrint ex
     prettyPrint (TArr t1 t2) = prettyPrint t1 ++ "->" ++ prettyPrint t2
+    prettyPrint (TClass n) = clrLam n
     prettyPrint e = show e
   
   {-
