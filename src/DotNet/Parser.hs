@@ -174,7 +174,7 @@ module DotNet.Parser where
       subtypes <- try (reservedOp "<:" *> (parens $ sepBy1 predicate (symbol ","))) 
                   <|> try (reservedOp "<:" *> (predicate >>= \x-> return [x])) <|> pure []
       reservedOp "="
-      fs <- try $ many1 function <|> many1 binarydef
+      fs <- many1 (try function <|> binarydef)
       return $ Typeclass name subtypes vars fs
 
     -- subtyping predicates for typeclasses
@@ -226,7 +226,7 @@ module DotNet.Parser where
     binarydef :: Parser Expr
     binarydef = do
       o <- parens op
-      prec <- int <?> "integer: precedence value for the operator definition"
+      prec <- try int <|> pure (LInt 0) -- <?> "integer: precedence value for the operator definition"
       arg1 <- variable
       arg2 <- variable
       body <- try (reservedOp "=" *> expr) <|> pure EMPTY
