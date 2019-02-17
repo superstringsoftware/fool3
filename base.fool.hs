@@ -9,7 +9,7 @@ type List a = Nil + (::) :a * :(List a);
 id x = x;
 
 class Eq a =
-    (==):Bool x:a y:a = not (x /= y) -- default implementation
+    (==):Bool x:a y:a = not (x /= y), -- default implementation
     (/=):Bool x:a y:a = not (x == y);   
     
 -- Basic algebra stuff
@@ -29,7 +29,7 @@ class Group a <: Monoid a =
 
 -- ring is a group plus another binary operation that is a monoid itself and a bunch of laws
 class Ring a <: Group a =
-    (*):a x:a y:a
+    (*):a x:a y:a,
     z1:a;
 {-
   forall x:a, y:a => (x + y == y + x) -- require Monoid in (+) to be commutative!
@@ -53,7 +53,7 @@ instance Group Int = (-) x y = primop_minus x y;
 
 -- need to separate functions somehow explicitly, otherwise wrong parsing
 instance Ring Int = 
-    (*) x y = primop_mul x y
+    (*) x y = primop_mul x y,
     z1 = 1;
 
 
@@ -63,12 +63,15 @@ f x y = x*x + y;
 
 g = f 1;
 h = (f 1) 3;
+h' = f 1 3;
+
+k = f x y z;
 
 fact n = n ?
     z0 -> z1
   | otherwise -> n * fact(n-1);
 
-main = print (fact (f (g 1) 1)); -- should be 120
+main = print (fact (f (g 2) 1)); -- should be 120
 
 {-
 # trying typeclasses

@@ -192,7 +192,7 @@ instance PrettyPrint Expr where
         where fn el acc = prettyPrint el ++ " " ++ acc
     prettyPrint (Tuple nm tpl) = showBracketedList " {" "}" tpl -- clrLam nm ++
     prettyPrint (Lit l) = prettyPrint l
-    prettyPrint (App e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
+    prettyPrint (App e1 e2) = embrace $ prettyPrint e1 ++ " " ++ prettyPrint e2
     prettyPrint (BinaryOp n e1 e2) = prettyPrint e1 ++ " " ++ n ++ " " ++ prettyPrint e2 -- "("++n++") " ++ 
     prettyPrint (Case e exs) = prettyPrint e ++ " ? " ++  (foldr fn "" exs)
         where fn (e1,e2) acc = "\n\t| " ++ prettyPrint e1 ++ " -> " ++ prettyPrint e2 ++ acc
@@ -203,7 +203,7 @@ instance PrettyPrint Expr where
                 ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
                 ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" fns)
     prettyPrint (Typeinstance nm tp fns) = foldr (\x y -> x ++ y) "" (map (fn (nm ++ "." ++ prettyPrint tp)) fns)
-        where fn n (Lam n1 x y z) = prettyPrint (Lam (n ++ "." ++ clrLam n1) x y z) 
+        where fn n (Lam n1 x y z) = prettyPrint (Lam (n ++ "." ++ clrLam n1) x y z) ++ "\n" 
     prettyPrint EMPTY = as [magenta, bold] "undefined"
     prettyPrint e = show e
     

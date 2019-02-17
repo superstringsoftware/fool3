@@ -179,7 +179,7 @@ module DotNet.Parser where
       subtypes <- try (reservedOp "<:" *> (parens $ sepBy1 predicate (symbol ","))) 
                   <|> try (reservedOp "<:" *> (predicate >>= \x-> return [x])) <|> pure []
       reservedOp "="
-      fs <- many1 (try function <|> binarydef)
+      fs <- sepEndBy1 (try function <|> binarydef) (reservedOp ",")
       return $ Typeclass name subtypes vars fs
 
     -- subtyping predicates for typeclasses
@@ -199,7 +199,7 @@ module DotNet.Parser where
       name <- uIdentifier
       tp <- try (parens typeAp) <|> concreteType <?> ("correct type in instance " ++ name ++ " definition")
       reservedOp "="
-      fs <- many1 (try function <|> binarydef)
+      fs <- sepEndBy1 (try function <|> binarydef) (reservedOp ",")
       return $ Typeinstance name tp fs
 
     
@@ -272,7 +272,7 @@ module DotNet.Parser where
     arguments :: Parser Expr
     arguments = do
       args <- many1 argument
-      return $ foldr1 App args
+      return $ foldl1 App args -- need to use left fold here because application is highest precedence
     
     
     factor :: Parser Expr
