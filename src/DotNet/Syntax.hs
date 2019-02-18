@@ -44,7 +44,7 @@ data TyCon
     deriving (Show, Eq, Ord)
 
 data Pred
-    = IsIn [Name] Type -- class Eq a => Ord a, Eq a goes to IsIn ['a'] TClass 'Eq'
+    = IsIn [Name] Type | Exists Type [Name] -- class Eq a => Ord a, Eq a goes to IsIn ['a'] TClass 'Eq'
     deriving (Show, Eq, Ord)
 
 data Var = Id Name Type | TyVar Name Kind
@@ -80,11 +80,27 @@ data Expr
     | Case Expr [(Expr, Expr)] -- case: which expr we are inspecting, alternatives
     | Lam Name [Var] Expr Type -- typed function (or any typed expression for that matter)
     -- class 
-    | Typeclass Name [Pred] [Var] [Expr] -- Expr here can only be Lam as it's a list of functions basically, where interface is just an empty expression
-    | Typeinstance Name Type [Expr] -- for parsing typelcass instances - Name is typeclass name, Type is the type and [Expr] are all Lambdas
+    | Typeclass     Name [Pred] [Var] [Expr] -- Expr here can only be Lam as it's a list of functions basically, where interface is just an empty expression
+    | Typeinstance  Name [Pred] Type  [Expr] -- for parsing typelcass instances - Name is typeclass name, Type is the type and [Expr] are all Lambdas
     | EMPTY
     deriving (Eq, Ord, Show)
 
+-- function that is a memeber of typeclass:
+-- maps concrete types for which a typeclass is implemented to Lambda that implements it
+-- using a list of types to support multiparameter typeclasses
+-- E.g., fmap for List would be ([TCon "List"], Lam 'fmap' ...)
+type ClassFunPair = ([Type], Expr) 
+
+-- Holder for all interfaces and implementations for one typeclass    
+data Typeclass = MkTypeclass {
+    className       :: String -- name of the typeclass
+  , vars            :: [TVar] -- type variables
+  , superclasses    :: [Pred] -- immediate superclasses (Exists Type [Name] - e.g., Ord a where ∃ Eq a)
+  , funDictionary   :: [(Name, [ClassFunPair])] -- mapping from the function name to it's implementations for different
+  -- instances. So, when we do instance Class Type - we add functions here to the dictionnary.
+  -- Need to implement a good lookup function.
+  -- interface for the function is in [(Name, ([], Lam ...))]
+} deriving (Eq, Ord, Show)
 
 {-
 data Expr
@@ -132,8 +148,8 @@ traverseExpr f (UnaryOp nm e) = UnaryOp nm (f e)
 traverseExpr f (Type nm v ex) = Type nm v (map f ex)
 traverseExpr f (Record nm nex) = Record nm (map (\(n, e) -> (n, f e)) nex)  -- nex = [(Name, Expr)]
 traverseExpr f (Case e nex) = Case (f e) (map (\(e1, e2) -> (f e1, f e2)) nex) -- nex = [(Expr, Expr)]
-traverseExpr f (Typeclass nm p v ex) = Typeclass nm p v (map f ex)
-traverseExpr f (Typeinstance nm t ex) = Typeinstance nm t (map f ex)
+traverseExpr f (Typeclass    nm p v ex) = Typeclass     nm p v (map f ex)
+traverseExpr f (Typeinstance nm p t ex) = Typeinstance  nm p t (map f ex)
 traverseExpr f e = f e
 
 -- Monadic traversals - in case we need to lookup/ modify state along the way etc
@@ -155,8 +171,8 @@ descendM f e = case e of
                                     where fn f1 (n, e) = do
                                                             e' <- descendM f1 e
                                                             return (n, e')
-    Typeclass n p v ex -> Typeclass <$> pure n <*> pure p <*> pure v <*> mapM (descendM f) ex
-    Typeinstance n t ex -> Typeinstance <$> pure n <*> pure t <*> mapM (descendM f) ex
+    Typeclass    n p v ex -> Typeclass      <$> pure n <*> pure p <*> pure v <*> mapM (descendM f) ex
+    Typeinstance n p t ex -> Typeinstance   <$> pure n <*> pure p <*> pure t <*> mapM (descendM f) ex
     Type n v ex     -> Type <$> pure n <*> pure v <*> mapM (descendM f) ex
     EMPTY           -> pure EMPTY                                                            
     >>= f -- to apply actual change function on the way out of the traversal
@@ -202,8 +218,9 @@ instance PrettyPrint Expr where
     prettyPrint (Typeclass nm pred vrs fns) = clrLam nm ++ prettyPrint pred ++ " = " ++ as [bold, dgray] "Λ" 
                 ++ (foldr (\x y -> prettyPrint x ++ y) "" vrs) 
                 ++ (foldr (\x y -> "\n\t" ++ prettyPrint x ++ y) "" fns)
-    prettyPrint (Typeinstance nm tp fns) = foldr (\x y -> x ++ y) "" (map (fn (nm ++ "." ++ prettyPrint tp)) fns)
-        where fn n (Lam n1 x y z) = prettyPrint (Lam (n ++ "." ++ clrLam n1) x y z) ++ "\n" 
+    prettyPrint (Typeinstance nm pred tp fns) = foldr (\x y -> x ++ y) "" (map (fn (nm ++ "." ++ prettyPrint tp)) fns)
+        where fn n (Lam n1 x y z) = prettyPrint (Lam (n ++ "." ++ clrLam n1) x y z)
+                                        ++ prettyPrint pred ++ "\n" 
     prettyPrint EMPTY = as [magenta, bold] "undefined"
     prettyPrint e = show e
     
@@ -224,6 +241,8 @@ showBracketedList l r (x:xs) = l ++ prettyPrint x ++ foldr fn "" xs ++ r
 
 instance PrettyPrint Pred where
     prettyPrint (IsIn names tp) = prettyPrint tp ++ " " ++ foldr fn "" names 
+        where fn el acc = el ++ " " ++ acc
+    prettyPrint (Exists tp names) = prettyPrint tp ++ " " ++ foldr fn "" names 
         where fn el acc = el ++ " " ++ acc
 
 instance PrettyPrint [Pred] where

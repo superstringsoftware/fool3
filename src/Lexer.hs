@@ -49,7 +49,7 @@ lexer = Tok.makeTokenParser style
   where
     ops = [";","=",",",".",":", "->","<",">", "|", "?", "<:"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
     names = ["instance","extern","if","then","else","in","for"
-            ,"binary", "unary", "let", "class", "case", "of", "type"]
+            ,"binary", "unary", "let", "class", "case", "of", "type", "where", "∃", "∀", "exists"]
     style = emptyDef {
                Tok.commentStart   = "{-"
              , Tok.commentEnd     = "-}"

@@ -35,6 +35,8 @@ ________________________________________________________
 Initial code ideas with math-based syntax (needs unicode...)
 --------------------------------------------------------
 
+∃, ∀
+
 -- vector:
 map (f, X::Vector) ≡ <f (x) | ∀x ∊ X>
 

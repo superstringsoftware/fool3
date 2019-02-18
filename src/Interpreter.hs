@@ -66,7 +66,7 @@ processSurfaceExpr e@(Typeclass name _ _ _) = do
   fs <- gets typeTable
   liftIO $ H.insert fs name e
 
-processSurfaceExpr e@(Typeinstance name tp _) = do
+processSurfaceExpr e@(Typeinstance name _ tp _) = do
   fs <- gets funTable
   liftIO $ H.insert fs (name ++ "." ++ show tp) e
   

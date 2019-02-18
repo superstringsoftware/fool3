@@ -16,7 +16,7 @@ class Eq a =
 class Semigroup a =
     (+):a x:a y:a;
   -- forall x:a, y:a, z:a => x + (y + z) == (x + y) + z -- constraint (law), associativity
-
+ 
 -- monoid is a semigroup plus zero
 class Monoid a <: Semigroup a =
     z0:a; -- zero element for the (+) operation
@@ -46,6 +46,11 @@ class Field a <: Ring a =
     (/):a x:a y:a;
     -- forall x:a => (Z1 / x * x == Z1)
 
+-- multiparameter typeclass test
+class Mult a b = 
+    result,
+    (*):result x:a y:b;
+
 -- Functor
 class Functor f = 
   fmap:(f b) g:(a->b) x:(f a);
@@ -64,6 +69,12 @@ instance Ring Int =
     (*) x y = primop_mul x y,
     z1 = 1;
 
+-- instance for the type constructor:
+instance Semigroup (List a) = 
+  (+) ls1 ls2 = concat ls1 ls2;
+
+instance Semigroup (Vector a n) where exists Semigroup a = 
+  (+) v1 v2 = primop_plus;
 
     -- TEST PROGRAM
 

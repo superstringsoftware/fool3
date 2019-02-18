@@ -187,7 +187,7 @@ module DotNet.Parser where
     predicate = do
       name <- uIdentifier
       vnames <- many lIdentifier
-      return $ IsIn vnames (TClass name)
+      return $ Exists (TClass name) vnames -- IsIn vnames (TClass name)
 
     -- class instance is somewhat tricky - we parse it simply as a function
     -- with a compound name <ClassName>.<TypeName>.<functionName>
@@ -199,9 +199,13 @@ module DotNet.Parser where
       reserved "instance"
       name <- uIdentifier
       tp <- try (parens typeAp) <|> concreteType <?> ("correct type in instance " ++ name ++ " definition")
+      pr <- optionMaybe (reserved "where" *> reserved "exists" *> many1 predicate)
+      let pr' = case pr of
+                  Nothing -> []
+                  Just p  -> p
       reservedOp "="
       fs <- sepEndBy1 (try function <|> binarydef) (reservedOp ",")
-      return $ Typeinstance name tp fs
+      return $ Typeinstance name pr' tp fs
 
     
     -- one case like | x == 0 -> 1
