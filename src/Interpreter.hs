@@ -36,11 +36,13 @@ initializeInterpreter = do
     st <- H.new
     lt <- H.new
     tt <- H.new
+    ct <- H.new
     return InterpreterState {
                 funTable = ft,
                 typeTable = tt,
                 symTable = st,
                 localSymTable = lt,
+                typeClassTable = ct,
                 logs = [],
                 currentFlags = CurrentFlags {
                   strict = False
@@ -76,6 +78,11 @@ processSurfaceExpr e = do
 
   
 
+
+prettyPrintTCT :: HashTable Name Typeclass -> IO ()
+prettyPrintTCT = H.mapM_ f where
+    f (k,v) = putStrLn $ show v
+  
 -- print types
 prettyPrintTT :: ExpressionTable -> IO ()
 prettyPrintTT = H.mapM_ f where

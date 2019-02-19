@@ -7,6 +7,8 @@ module State where
 
 import qualified Data.HashTable.IO as H
 
+import Control.Monad.IO.Class (liftIO)
+
 import DotNet.Syntax
 
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
@@ -21,6 +23,7 @@ data InterpreterState = InterpreterState {
     symTable :: ExpressionTable, -- global symbol table for variable bidnings
     localSymTable :: ExpressionTable, -- local table in the current scope (e.g., when processing a function call)
     typeTable :: ExpressionTable,
+    typeClassTable :: HashTable Name Typeclass,
     logs     :: [String],
     currentFlags :: CurrentFlags
 } deriving Show
@@ -30,3 +33,8 @@ data CurrentFlags = CurrentFlags {
   , pretty    :: Bool -- pretty print or raw output
   , tracing   :: Bool -- whether to trace execution steps
 } deriving Show
+
+putTypeclass :: Typeclass -> IntState ()
+putTypeclass tc = do
+  ts <- gets typeClassTable
+  liftIO $ H.insert ts (className tc) tc

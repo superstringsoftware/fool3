@@ -16,6 +16,8 @@ module DotNet.Parser where
     import Control.Applicative ((<$>), liftA2)
     import Control.Monad (foldM)
     import Control.Monad.IO.Class (liftIO)
+    import Control.Monad.Trans.Class (lift)
+    import Control.Monad.Trans.State
     
     import qualified Text.Parsec.Expr as Ex
     import qualified Text.Parsec.Token as Tok
@@ -181,6 +183,11 @@ module DotNet.Parser where
                   <|> try (reservedOp "<:" *> (predicate >>= \x-> return [x])) <|> pure []
       reservedOp "="
       fs <- sepEndBy1 (try function <|> binarydef) (reservedOp ",")
+       
+      -- initializing the typeclass and putting it into status in our monad
+      let fs' = map (\f@(Lam n _ _ _) -> (n, [([], f)])) fs
+      lift $ putTypeclass $ MkTypeclass name vars subtypes fs'
+      
       return $ Typeclass name subtypes vars fs
 
     -- subtyping predicates for typeclasses

@@ -92,13 +92,4 @@ fact n = n ?
 
 main = print (fact (f (g 2) 1)); -- should be 120
 
-{-
-# trying typeclasses
-class Functor f = 
-  fmap:(f b) g:(a->b) x:(f a);
 
-# typeclass implementation
-instance Functor List = 
-  fmap f ls = ls ? Nil -> Nil | x :: xs -> (f x) :: (fmap f xs);
-
- -} 

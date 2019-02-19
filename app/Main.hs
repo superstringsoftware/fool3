@@ -45,6 +45,8 @@ processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
 processCommand (":compile":_) = (liftIO $ putStrLn "Compiling...") >> compile
 processCommand (":all":"-d":_) = do
   st <- get
+  liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Type classes:"
+  liftIO $ prettyPrintTCT $ typeClassTable st
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Types:"
   liftIO $ prettyPrintTT $ typeTable st
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Functions:"
