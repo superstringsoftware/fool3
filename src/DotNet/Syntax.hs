@@ -26,7 +26,7 @@ data Type
 
 extractTypeVars :: Type -> [Name] -> [Name]
 extractTypeVars (TVar nm) acc = (nm:acc)
-extractTypeVars (TApp t1 t2) acc = concat [ (extractTypeVars t1 acc), (extractTypeVars t2 acc) ]
+extractTypeVars (TApp t1 t2) acc = extractTypeVars t2 acc
 extractTypeVars _ acc = acc
 
 -- traversing Type AST with a function and gather results in a list

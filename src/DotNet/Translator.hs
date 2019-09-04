@@ -18,6 +18,66 @@ import Data.List.Unique
 -- data Cons = Anon Name [Type] | Record Name [(Name, Type)] deriving (Eq, Ord, Show)
 --    | Type Name [Var] [Cons] -- sum type built from product constructors cons
 
+-- intermediate .Net expression AST -- idea is:
+-- optimize Expr AST a bit with some passes, then translate it into
+-- this intermediate .Net expression AST, then spit out
+-- C#, CLR etc code from this directly
+
+-- only signature for the class
+data DotNetClassSignature = DotNetClassSignature {
+  className :: Name, -- name of the class
+  typeParams :: [Name] -- if it's a generic, list of type variables
+} deriving (Show, Eq)
+
+-- field inside the class
+data DotNetField = DotNetField {
+    fieldName :: Name
+  , fieldType :: DotNetClassSignature
+} deriving (Show, Eq)
+
+-- method signature
+data DotNetMethodSignature = DotNetMethodSignature {
+    methodName :: Name
+  , methodType :: DotNetClassSignature
+  , methodArgs :: [DotNetField]
+} deriving (Show, Eq)
+
+-- full class definition
+data DotNetClass = DotNetClass {
+    classSignature :: DotNetClassSignature
+  , fields :: [DotNetField]
+  , methods :: [DotNetMethodSignature]
+  , inherits :: [DotNetClassSignature]
+  , comments :: String
+} deriving (Show, Eq)
+
+-- Translation methods Expr -> dot net stuff
+
+translateExprToClass :: Expr -> [DotNetClass]
+translateExprToClass e@(Type tname vars cons) = parent : (map (translateConsToClass (classSignature parent)) cons)
+    where 
+      parent = DotNetClass {
+          comments = verboseExpr e
+        , classSignature = DotNetClassSignature tname []
+        , fields = []
+        , methods = []
+        , inherits = []
+      } 
+      translateConsToClass pr (Lam nm vars _ _) = DotNetClass {
+          comments = ""
+        , classSignature = DotNetClassSignature nm (extractAllTypeVars vars)
+        , fields = []
+        , methods = []
+        , inherits = [pr]
+      }
+
+  
+-- finding all type variables in a lambda, keeping only unique values
+extractAllTypeVars vars = map cap (sortUniq $ foldl fn [] vars)
+  where fn acc (Id _ tp) = concat [acc, (extractTypeVars tp [])]
+
+
+
 class ToDotNet a where
   compileNet :: a -> String
 
@@ -27,8 +87,20 @@ cap [] = []
 
 verboseExpr e = "// Compiled expr: \n// " ++ show e ++ "\n"
 
-compileExpr :: Expr -> String
+-- Some very basic optimization passes for our naive translation
 
+-- adding default field names to our unnamed datatypes - since we need the names in .Net
+renameUnnamed :: Expr -> Expr
+renameUnnamed = descend f where
+    f (Lam nm vars tup tp) = (Lam nm (fnmap 0 vars) tup tp)
+    f e = e
+    fnmap _ [] = []
+    fnmap acc (v:vs) = (fn acc v):(fnmap (acc+1) vs)
+    fn i (Id "" vtype) = Id ("__FIELD__" ++ (show i)) vtype
+    fn _ vr = vr
+
+
+compileExpr :: Expr -> String
 -- compiling specifc Type
 -- there has to be a better way to do the vars processing...
 -- now we are translating sumtype type A a b = C a + B b to 
@@ -40,33 +112,30 @@ compileExpr e@(Type tname vars cons) = verboseExpr e
     ++ tname
     -- ++ tVars
     ++ "{}\n" 
-    ++ concat (map (processCons tname vars) cons)
+    ++ concat (map (processCons tname) cons)
     
-processCons tname tvars (Lam nm vars (Tuple nm1 fields) tp)= "public class " 
+-- converting specific constructor function to a child class    
+processCons tname (Lam nm vars (Tuple nm1 fields) tp)= "public class " 
   ++ nm ++ (buildTypeVars $ extractAllTypeVars vars)
   ++ " : " ++ tname
   ++ " {\n"
-  -- ++ (processFields 0 fields)
+  ++ (processVarsToFields vars)
   ++ "}\n"
 
--- build a generic from TVars - we only take those bound variables in Lambda that have TVar as type!!!
--- filterTypeVars 
+-- converting record fields to field names
+processVarsToFields [] = ""
+processVarsToFields xs = foldr fn "" xs
+  where fn (Id nm tp) acc = typeToClassField nm tp ++ "\n" ++ acc
 
--- finding all type variables in a lambda, keeping only unique values
-extractAllTypeVars vars = sortUniq $ foldl fn [] vars
-  where fn acc (Id _ tp) = concat [acc, (extractTypeVars tp [])]
 
 -- build generic class string from the list of type variables
 buildTypeVars [] = ""
 buildTypeVars (x:xs) = "<" ++ (cap x) ++ (foldr fn "" xs) ++ ">"
   where fn nm acc = acc ++ ", " ++ (cap nm)
 
-{-
-buildTypeVars vars = foldr fn "" vars 
-  where fn (Id _ tp) acc = acc ++ ", " ++ (show $ extractTypeVars tp [])
--}
 
--- converting list of type vars to c# template string 
+-- converting list of type vars to c# template string -- NOT USED NOW
+{-
 buildTypeVarsForType [] = ""
 buildTypeVarsForType ( (TyVar nm _) : []) = "<" ++ (cap nm) ++ ">"
 buildTypeVarsForType ( (TyVar nm _) : xs) = "<" ++ (cap nm) ++ (foldr fn "" xs) ++ ">"
@@ -75,6 +144,7 @@ buildTypeVarsForType ( (TyVar nm _) : xs) = "<" ++ (cap nm) ++ (foldr fn "" xs) 
   -- processing fields
 processFields _ [] = ""
 processFields i (f:fs) = typeToClassField ("__F" ++ show i ++ "__") f ++ "\n" ++ processFields (i+1) fs
+-}
 {-
     data Expr 
     = Lit Literal
@@ -108,7 +178,8 @@ data Type
 typeToClassField :: String -> Type -> String
 typeToClassField nm (TVar tn) = "public " ++ cap tn ++ " " ++ nm ++ " {get;}"
 typeToClassField nm (TCon tn) = "public " ++ tn     ++ " " ++ nm ++ " {get;}"
-typeToClassField nm (TApp (TCon tn) (TVar vn)) = "public " ++ tn ++ "<" ++ cap vn ++ ">" ++ " " ++ nm ++ " {get;}"
+-- typeToClassField nm (TApp (TCon tn) (TVar vn)) = "public " ++ tn ++ "<" ++ cap vn ++ ">" ++ " " ++ nm ++ " {get;}"
+typeToClassField nm (TApp (TCon tn) (TVar vn)) = "public " ++ tn ++ " " ++ nm ++ " {get;}"
 typeToClassField nm e = "NOT IMPLEMENTED CONVERSION FOR " ++ show e
 
 -- compiling everything we have in the state table now
@@ -116,6 +187,8 @@ compile :: IntState ()
 compile = do
   ts <- gets typeTable
   liftIO $ H.mapM_ f ts where
-    f (k,v) = putStrLn $ compileExpr v
+    f (k,v) = do 
+      putStrLn $ compileExpr $ renameUnnamed v
+      putStrLn $ show $ translateExprToClass v
 
 
