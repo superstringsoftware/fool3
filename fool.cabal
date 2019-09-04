@@ -30,7 +30,8 @@ library
                      , hashtables
                      , text
                      , directory
-                     , transformers                  
+                     , transformers     
+                     , Unique             
   default-language:    Haskell2010
 
 executable fool-exe

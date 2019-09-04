@@ -9,6 +9,7 @@ type List a = Nil + (::) :a * :(List a);
 -- type Test = Test :(Maybe Int); - WORKS
 -- type Test = Maybe Int; - FAILS!
 type Record b = Record test:Int * typed:b;
+type NList a = Nil + (::) head:a * tail:(NList a);
 
 
 -- Functions
@@ -63,6 +64,10 @@ class Functor f =
 
 instance Functor Maybe = 
   fmap f x = x ? Nothing -> Nothing | Just y -> Just (f y);
+
+instance Functor List = 
+  fmap f l = l ? Nil -> Nil | (x::xs) -> (f x) :: (map f xs);
+    
     
 
 instance Eq Int = (==) x y = primop_equals x y;

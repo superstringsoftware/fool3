@@ -24,6 +24,25 @@ data Type
     -- Type checking etc will fix this.
     deriving (Show, Eq, Ord)
 
+extractTypeVars :: Type -> [Name] -> [Name]
+extractTypeVars (TVar nm) acc = (nm:acc)
+extractTypeVars (TApp t1 t2) acc = concat [ (extractTypeVars t1 acc), (extractTypeVars t2 acc) ]
+extractTypeVars _ acc = acc
+
+-- traversing Type AST with a function and gather results in a list
+flattenType :: (Type -> a) -> Type -> [a] -> [a]
+flattenType f (TApp t1 t2) acc = concat [acc, (flattenType f t1 acc), (flattenType f t2 acc)]
+flattenType f (TArr t1 t2) acc = concat [acc, (flattenType f t1 acc), (flattenType f t2 acc)]
+flattenType f t acc = concat [acc, [f t]]
+
+-- traversing Type AST with a modifying function
+traverseType :: (Type -> Type) -> Type -> Type
+traverseType f (TApp t1 t2) = f (TApp (traverseType f t1) (traverseType f t2))
+traverseType f (TArr t1 t2) = f (TArr (traverseType f t1) (traverseType f t2))
+-- traverseType 
+traverseType f t = f t
+
+
 -- Since we are doing dependent types, we need to be able to do both the standard:
 -- Maybe :: * -> * as well as something for Vector a:* n:Int which would look like:
 -- Vector :: * -> Int -> *
@@ -140,6 +159,7 @@ varType (Id _ t) = t
 
 
 -- Expr traversals with modifying function f::Expr->Expr
+-- I think THIS IS WRONG!!! -- we are not traversing or not modifying...    
 traverseExpr :: (Expr -> Expr) -> Expr -> Expr
 traverseExpr f (Lam nm v e t) = Lam nm v (f e) t
 traverseExpr f (Tuple nm ex) = Tuple nm (map f ex)
