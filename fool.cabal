@@ -23,6 +23,7 @@ library
                      , DotNet.Parser
                      , State
                      , DotNet.Typechecker
+                     , DotNet.Tuples
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , vector

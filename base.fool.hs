@@ -1,9 +1,15 @@
 -- Base library: v0.0.1
 
 -- Types
+type NamedRecord = NamedRecord age:Int * name:String; 
 type Bool = True + False;
 type Maybe a = Nothing + Just :a;
 type List a = Nil + (::) :a * :(List a);
+-- type NList a = Nil + (::) head:a * tail:(NList a);
+-- type Test = Test :(Maybe Int); - WORKS
+-- type Test = Maybe Int; - FAILS!
+type Record b = Record test:Int * typed:b;
+
 
 -- Functions
 id x = x;
@@ -91,5 +97,10 @@ fact n = n ?
   | otherwise -> n * fact(n-1);
 
 main = print (fact (f (g 2) 1)); -- should be 120
+
+test = 1::2::3::[];
+
+l1 = [1,2,3,4];
+v1 = <1,3,2,3.3>;
 
 

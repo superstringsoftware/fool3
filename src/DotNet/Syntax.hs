@@ -76,6 +76,7 @@ data Expr
     | UnaryOp  Name Expr
     | Tuple Name [Expr] -- polymorphic tuple. 
     | Record Name [(Name, Expr)] -- polymorphic record
+    | NewRecord Name [Var] -- polymorphic record
     | App Expr Expr
     | Case Expr [(Expr, Expr)] -- case: which expr we are inspecting, alternatives
     | Lam Name [Var] Expr Type -- typed function (or any typed expression for that matter)
@@ -150,6 +151,7 @@ traverseExpr f (Record nm nex) = Record nm (map (\(n, e) -> (n, f e)) nex)  -- n
 traverseExpr f (Case e nex) = Case (f e) (map (\(e1, e2) -> (f e1, f e2)) nex) -- nex = [(Expr, Expr)]
 traverseExpr f (Typeclass    nm p v ex) = Typeclass     nm p v (map f ex)
 traverseExpr f (Typeinstance nm p t ex) = Typeinstance  nm p t (map f ex)
+traverseExpr f (NewRecord nm vrs) = NewRecord nm vrs
 traverseExpr f e = f e
 
 -- Monadic traversals - in case we need to lookup/ modify state along the way etc
@@ -174,6 +176,7 @@ descendM f e = case e of
     Typeclass    n p v ex -> Typeclass      <$> pure n <*> pure p <*> pure v <*> mapM (descendM f) ex
     Typeinstance n p t ex -> Typeinstance   <$> pure n <*> pure p <*> pure t <*> mapM (descendM f) ex
     Type n v ex     -> Type <$> pure n <*> pure v <*> mapM (descendM f) ex
+    r@(NewRecord nm vrs) -> pure r
     EMPTY           -> pure EMPTY                                                            
     >>= f -- to apply actual change function on the way out of the traversal
 
@@ -207,6 +210,7 @@ instance PrettyPrint Expr where
         ++ foldr fn "" vars ++ ". " ++ prettyPrint e -- clrLam nm ++ " = " ++
         where fn el acc = prettyPrint el ++ " " ++ acc
     prettyPrint (Tuple nm tpl) = showBracketedList " {" "}" tpl -- clrLam nm ++
+    prettyPrint (NewRecord nm vrs) = showBracketedList " {" "}" vrs
     prettyPrint (Lit l) = prettyPrint l
     prettyPrint (App e1 e2) = embrace $ prettyPrint e1 ++ " " ++ prettyPrint e2
     prettyPrint (BinaryOp n e1 e2) = prettyPrint e1 ++ " " ++ n ++ " " ++ prettyPrint e2 -- "("++n++") " ++ 

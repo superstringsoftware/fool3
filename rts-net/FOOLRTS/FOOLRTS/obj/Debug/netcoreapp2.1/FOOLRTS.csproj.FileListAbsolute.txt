@@ -1,0 +1,11 @@
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/bin/Debug/netcoreapp2.1/FOOLRTS.deps.json
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/bin/Debug/netcoreapp2.1/FOOLRTS.runtimeconfig.json
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/bin/Debug/netcoreapp2.1/FOOLRTS.runtimeconfig.dev.json
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/bin/Debug/netcoreapp2.1/FOOLRTS.dll
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/bin/Debug/netcoreapp2.1/FOOLRTS.pdb
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/obj/Debug/netcoreapp2.1/FOOLRTS.csprojAssemblyReference.cache
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/obj/Debug/netcoreapp2.1/FOOLRTS.csproj.CoreCompileInputs.cache
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/obj/Debug/netcoreapp2.1/FOOLRTS.AssemblyInfoInputs.cache
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/obj/Debug/netcoreapp2.1/FOOLRTS.AssemblyInfo.cs
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/obj/Debug/netcoreapp2.1/FOOLRTS.dll
+/Users/aantich/Dropbox/Dev/Haskell/fool/rts-net/FOOLRTS/FOOLRTS/obj/Debug/netcoreapp2.1/FOOLRTS.pdb

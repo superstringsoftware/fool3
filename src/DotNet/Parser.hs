@@ -56,6 +56,9 @@ module DotNet.Parser where
     -- helper parsers: lower case and upper case
     lIdentifier = skipMany space >> lookAhead lower >> identifier
     uIdentifier = skipMany space >> lookAhead upper >> identifier
+
+    emptyStringParser :: Parser String
+    emptyStringParser = pure "anonymous"
     
     expr :: Parser Expr
     expr = Ex.buildExpressionParser (binops ++ [[unop],[binop]]) factor
@@ -95,18 +98,19 @@ module DotNet.Parser where
     -- variable with type
     variable :: Parser Var
     variable = do
-      name <- lIdentifier
+      name <- lIdentifier --emptyStringParser -- added unnamed variables for easier record parsing
       typ <- typeSignature
       return $ Id name typ
 
-    typeSignature :: Parser Type
-    typeSignature =
+    strictTypeSignature :: Parser Type
+    strictTypeSignature =
             try (reservedOp ":" *> parens tArr) <|>
             -- try (reservedOp ":" *> tArr) <|>
             try (reservedOp ":" *> parens typeAp) <|>
             try (reservedOp ":" *> concreteType) <|>
-            try (reservedOp ":" *> typeVar) <|>
-            pure ToDerive
+            try (reservedOp ":" *> typeVar)
+           
+    typeSignature = try strictTypeSignature <|> pure ToDerive
       
   
     -- simply a name of type variable on the right of regular variable
@@ -133,20 +137,27 @@ module DotNet.Parser where
     constructor :: Type -> Parser Expr
     constructor tp = do
       name <- try uIdentifier <|> spaces *> parensOp <?> "either Constructor name or operator syntax"
-      vars <- sepBy  (try (TCon <$> (reservedOp ":" *> uIdentifier)) <|> -- concrete type
-                     try (TVar <$> (reservedOp ":" *> lIdentifier)) <|> -- type var
-                     (reservedOp ":" *> parens typeAp) -- complex type, like List a
-                     <?> "simple constructor expected") (symbol "*")
-      let tupl = map (\_ -> VarId "") vars
-      let vars' = map (\x -> Id "" x) vars
-      return $ Lam name vars' (Tuple name tupl) tp
+      vars <- sepBy  (try variable <|> ( (Id "") <$> strictTypeSignature)
+                     <?> "simple constructor inside unnamed constructor parser") (symbol "*")
+      let tupl = map (\(Id nm _) -> VarId nm) vars
+      -- let vars' = map (\x -> Id "" x) vars
+      return $ Lam name vars (Tuple name tupl) tp
+
+    
+
+    recordConstructor :: Type -> Parser Expr
+    recordConstructor tp = do
+      name <- try uIdentifier <|> spaces *> parensOp <?> "either Constructor name or operator syntax"
+      vars <- sepBy (variable
+                      <?> "simple constructor inside recordConstructor parser") (symbol "*")
+      return $ NewRecord name vars
     
     parensOp :: Parser String
     parensOp = do 
       n <- parens op
       return $ "(" ++ n ++ ")"
 
-    constructors = {- try recordConstructor <|> -} constructor
+    constructors tp = try (recordConstructor tp) <|> try (constructor tp)
     
     -- simple ADT
     typeDef :: Parser Expr
@@ -158,7 +169,7 @@ module DotNet.Parser where
       reservedOp "="
       -- converting type name to actual type to put it as a type to functions
       let tp = foldl TApp (TCon name) (map (\(TyVar n _)-> TVar n) vars)
-      fields <- sepBy1 (constructors tp) (char '+')
+      fields <- sepBy1 (constructor tp) (char '+')
       return $ Type name vars fields
     
     symbolId :: Parser Expr

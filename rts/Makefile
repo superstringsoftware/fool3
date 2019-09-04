@@ -1,5 +1,6 @@
 # the compiler to use
-export CC := /usr/local/opt/llvm/bin/clang
+# export CC := /usr/local/opt/llvm/bin/clang
+export CC := clang
 
 # compiler flags:
 #  -g    adds debugging information to the executable file
