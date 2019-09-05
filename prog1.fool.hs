@@ -2,10 +2,13 @@
 
 type List a = Nil + Cons head:a * tail:(List a);
 type Maybe a = Nothing + Just :a;
+
+{-
 type Person = Person name:String * age:Int;
 type Either a b = Left :a + Right :b;
 type Pair a b = P :a * :b;
 type Test a = Test :(List a); 
+-}
 
 map:(List b) f:(a->b) l:(List a) = l ? 
     Nil -> Nil 

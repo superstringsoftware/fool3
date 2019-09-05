@@ -28,7 +28,8 @@ import Data.List.Index
 data DotNetClassSignature = DotNetClassSignature {
   className :: Name, -- name of the class
   typeParams :: [Name] -- if it's a generic, list of type variables
-} deriving (Show, Eq)
+} | NoClassSignature -- needed for constructor functions
+  deriving (Show, Eq)
 
 -- field inside the class
 data DotNetField = DotNetField {
@@ -37,17 +38,18 @@ data DotNetField = DotNetField {
 } deriving (Show, Eq)
 
 -- method signature
-data DotNetMethodSignature = DotNetMethodSignature {
+data DotNetMethod = DotNetMethod {
     methodName :: Name
   , methodType :: DotNetClassSignature
   , methodArgs :: [DotNetField]
+  , methodBody :: String
 } deriving (Show, Eq)
 
 -- full class definition
 data DotNetClass = DotNetClass {
     classSignature :: DotNetClassSignature
   , fields :: [DotNetField]
-  , methods :: [DotNetMethodSignature]
+  , methods :: [DotNetMethod]
   , inherits :: [DotNetClassSignature]
   , comments :: String
 } deriving (Show, Eq)
@@ -75,29 +77,39 @@ typeParamsToDotNet (x:xs) = "<" ++ x ++ (foldl fn "" xs) ++ ">"
 
 instance ToDotNet DotNetClassSignature where
   compileNet DotNetClassSignature{className = cn, typeParams = tp} = cn ++ (typeParamsToDotNet tp)
+  compileNet NoClassSignature = ""
 
 instance ToDotNet DotNetField where 
   compileNet DotNetField{fieldName = fn, fieldType = ft } = 
-    "public " ++ (compileNet ft) ++ " " ++ fn
+    (compileNet ft) ++ " " ++ fn
 
-instance ToDotNet DotNetMethodSignature where
-  compileNet = show
+instance ToDotNet DotNetMethod where
+  compileNet DotNetMethod{methodName = nm, methodType = mt, methodArgs = ma, methodBody = b} = 
+    "public " ++ (compileNet mt) ++ " " ++ nm ++ "("
+    ++ specialFold "" "" ", " compileNet ma
+    ++ ") {\n" 
+    ++ b ++ "}"
+    
 
 instance ToDotNet DotNetClass where
   compileNet DotNetClass{classSignature = cs, fields = fs, methods = ms, inherits = inh, comments = comments} = 
     "public class " ++ (compileNet cs) ++ (specialFold ":" "" ", " compileNet inh)
     ++ "{"
-    ++ specialFold "\n" ";\n" ";\n" compileNet fs
+    ++ specialFold "\n" ";\n" ";\n" ( ((++) "public ") . compileNet) fs
+    ++ specialFold "\n" "\n" "\n" compileNet ms
     ++ "}"
   
 
 ----------------------------------------------------------
--- Translation methods Expr -> dot net stuff
+-- Translation methods Expr -> dot net stuff and .net compiler passes
 ----------------------------------------------------------
 
+-- converts Type expression to .Net classes (internal representation)
 translateExprToClass :: Expr -> [DotNetClass]
-translateExprToClass e@(Type tname vars cons) = parent : (map (translateConsToClass (classSignature parent)) cons)
+translateExprToClass e@(Type tname vars cons) = parent : (map createConstructor classes)
     where 
+      createConstructor cls = cls{methods = [generateDefaultConstructor cls]}
+      classes = map (translateConsToClass (classSignature parent)) cons
       parent = DotNetClass {
           comments = "Compiled " ++ tname -- verboseExpr e
         , classSignature = DotNetClassSignature tname []
@@ -113,7 +125,17 @@ translateExprToClass e@(Type tname vars cons) = parent : (map (translateConsToCl
         , inherits = [pr]
       }
       
-
+-- after we converted Expr to .Net classes need to generate constructor function
+generateDefaultConstructor :: DotNetClass -> DotNetMethod
+generateDefaultConstructor DotNetClass{fields = fs, classSignature = cs} = 
+  DotNetMethod {
+      methodName = className (cs :: DotNetClassSignature) -- it's a constructor
+    , methodType = NoClassSignature
+    , methodArgs = fs
+    , methodBody = specialFold "" ";\n" ";\n" fn fs
+  } where fn f = "this." ++ fieldName f ++ " = " ++ fieldName f
+  -- the above is not very good as we are compiling the body; what if we want to do it to MSIL directly???
+  
   
 -- finding all type variables in a lambda, keeping only unique values
 extractAllTypeVars vars = map cap (sortUniq $ foldl fn [] vars)
