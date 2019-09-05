@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, NamedFieldPuns, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns, FlexibleInstances, DuplicateRecordFields #-}
 
 module DotNet.Translator where
 
@@ -14,6 +14,7 @@ import qualified Data.HashTable.IO as H
 import State
 
 import Data.List.Unique
+import Data.List.Index
 
 -- data Cons = Anon Name [Type] | Record Name [(Name, Type)] deriving (Eq, Ord, Show)
 --    | Type Name [Var] [Cons] -- sum type built from product constructors cons
@@ -51,13 +52,54 @@ data DotNetClass = DotNetClass {
   , comments :: String
 } deriving (Show, Eq)
 
+----------------------------------------------------------
+-- type class for converting stuff into dotnet code - eventually can create directly to CLR etc
+----------------------------------------------------------
+class ToDotNet a where
+  compileNet :: a -> String
+
+-- helper folding function treating zero and many items in the list differently
+-- brackets in starting and ending, separates by separator, applies f to each element
+specialFold _ _ _ _ [] = ""
+specialFold starting ending sep f (x:xs) = starting ++ (f x) ++ (foldl (fn sep f) "" xs) ++ ending
+  where fn s g acc el = acc ++ s ++ (g el)
+
+-- helper function converting array of type var names to proper generic <> syntax
+typeParamsToDotNet = specialFold "<" ">" ", " id 
+
+{-
+typeParamsToDotNet [] = ""
+typeParamsToDotNet (x:xs) = "<" ++ x ++ (foldl fn "" xs) ++ ">"
+  where fn acc xx = acc ++ ", " ++ xx
+-}
+
+instance ToDotNet DotNetClassSignature where
+  compileNet DotNetClassSignature{className = cn, typeParams = tp} = cn ++ (typeParamsToDotNet tp)
+
+instance ToDotNet DotNetField where 
+  compileNet DotNetField{fieldName = fn, fieldType = ft } = 
+    "public " ++ (compileNet ft) ++ " " ++ fn
+
+instance ToDotNet DotNetMethodSignature where
+  compileNet = show
+
+instance ToDotNet DotNetClass where
+  compileNet DotNetClass{classSignature = cs, fields = fs, methods = ms, inherits = inh, comments = comments} = 
+    "public class " ++ (compileNet cs) ++ (specialFold ":" "" ", " compileNet inh)
+    ++ "{"
+    ++ specialFold "\n" ";\n" ";\n" compileNet fs
+    ++ "}"
+  
+
+----------------------------------------------------------
 -- Translation methods Expr -> dot net stuff
+----------------------------------------------------------
 
 translateExprToClass :: Expr -> [DotNetClass]
 translateExprToClass e@(Type tname vars cons) = parent : (map (translateConsToClass (classSignature parent)) cons)
     where 
       parent = DotNetClass {
-          comments = verboseExpr e
+          comments = "Compiled " ++ tname -- verboseExpr e
         , classSignature = DotNetClassSignature tname []
         , fields = []
         , methods = []
@@ -66,28 +108,36 @@ translateExprToClass e@(Type tname vars cons) = parent : (map (translateConsToCl
       translateConsToClass pr (Lam nm vars _ _) = DotNetClass {
           comments = ""
         , classSignature = DotNetClassSignature nm (extractAllTypeVars vars)
-        , fields = []
+        , fields = map (\(Id nm tp) -> DotNetField nm (typeToClassSignature tp)) vars
         , methods = []
         , inherits = [pr]
       }
+      
 
   
 -- finding all type variables in a lambda, keeping only unique values
 extractAllTypeVars vars = map cap (sortUniq $ foldl fn [] vars)
   where fn acc (Id _ tp) = concat [acc, (extractTypeVars tp [])]
 
+-- convert type of the expression to class signature
+typeToClassSignature :: Type -> DotNetClassSignature
+typeToClassSignature (TVar tn) = DotNetClassSignature (cap tn) []
+typeToClassSignature (TCon tn) = DotNetClassSignature tn []
+typeToClassSignature (TApp (TCon tn) (TVar vn)) = DotNetClassSignature tn []
+typeToClassSignature e = DotNetClassSignature ("NOT IMPLEMENTED CONVERSION FOR " ++ show e) []
+  
 
-
-class ToDotNet a where
-  compileNet :: a -> String
-
+-- stupid utility function for uppercasing strings
 cap :: String -> String
 cap (head:tail) = Data.Char.toUpper head : tail
 cap [] = []
 
 verboseExpr e = "// Compiled expr: \n// " ++ show e ++ "\n"
 
+
+----------------------------------------------------------
 -- Some very basic optimization passes for our naive translation
+----------------------------------------------------------
 
 -- adding default field names to our unnamed datatypes - since we need the names in .Net
 renameUnnamed :: Expr -> Expr
@@ -100,51 +150,7 @@ renameUnnamed = descend f where
     fn _ vr = vr
 
 
-compileExpr :: Expr -> String
--- compiling specifc Type
--- there has to be a better way to do the vars processing...
--- now we are translating sumtype type A a b = C a + B b to 
--- public class A<A,B> {}
--- public class C<A,B> : A<A,B> {...} etc
--- very straightforward just to get a taste 
-compileExpr e@(Type tname vars cons) = verboseExpr e 
-    ++ "public class " 
-    ++ tname
-    -- ++ tVars
-    ++ "{}\n" 
-    ++ concat (map (processCons tname) cons)
-    
--- converting specific constructor function to a child class    
-processCons tname (Lam nm vars (Tuple nm1 fields) tp)= "public class " 
-  ++ nm ++ (buildTypeVars $ extractAllTypeVars vars)
-  ++ " : " ++ tname
-  ++ " {\n"
-  ++ (processVarsToFields vars)
-  ++ "}\n"
 
--- converting record fields to field names
-processVarsToFields [] = ""
-processVarsToFields xs = foldr fn "" xs
-  where fn (Id nm tp) acc = typeToClassField nm tp ++ "\n" ++ acc
-
-
--- build generic class string from the list of type variables
-buildTypeVars [] = ""
-buildTypeVars (x:xs) = "<" ++ (cap x) ++ (foldr fn "" xs) ++ ">"
-  where fn nm acc = acc ++ ", " ++ (cap nm)
-
-
--- converting list of type vars to c# template string -- NOT USED NOW
-{-
-buildTypeVarsForType [] = ""
-buildTypeVarsForType ( (TyVar nm _) : []) = "<" ++ (cap nm) ++ ">"
-buildTypeVarsForType ( (TyVar nm _) : xs) = "<" ++ (cap nm) ++ (foldr fn "" xs) ++ ">"
-  where fn (TyVar nm1 _) acc = acc ++ ", " ++ (cap nm1)
-
-  -- processing fields
-processFields _ [] = ""
-processFields i (f:fs) = typeToClassField ("__F" ++ show i ++ "__") f ++ "\n" ++ processFields (i+1) fs
--}
 {-
     data Expr 
     = Lit Literal
@@ -174,13 +180,6 @@ data Type
     | InsType Expr 
 -}
 
--- takes a field name and type and converts it to .Net field
-typeToClassField :: String -> Type -> String
-typeToClassField nm (TVar tn) = "public " ++ cap tn ++ " " ++ nm ++ " {get;}"
-typeToClassField nm (TCon tn) = "public " ++ tn     ++ " " ++ nm ++ " {get;}"
--- typeToClassField nm (TApp (TCon tn) (TVar vn)) = "public " ++ tn ++ "<" ++ cap vn ++ ">" ++ " " ++ nm ++ " {get;}"
-typeToClassField nm (TApp (TCon tn) (TVar vn)) = "public " ++ tn ++ " " ++ nm ++ " {get;}"
-typeToClassField nm e = "NOT IMPLEMENTED CONVERSION FOR " ++ show e
 
 -- compiling everything we have in the state table now
 compile :: IntState ()
@@ -188,7 +187,10 @@ compile = do
   ts <- gets typeTable
   liftIO $ H.mapM_ f ts where
     f (k,v) = do 
-      putStrLn $ compileExpr $ renameUnnamed v
-      putStrLn $ show $ translateExprToClass v
+      let v' = renameUnnamed v
+      -- putStrLn $ compileExpr $ renameUnnamed v
+      -- putStrLn $ show $ translateExprToClass v'
+      mapM_ (putStrLn . compileNet) (translateExprToClass v')
+      
 
 
