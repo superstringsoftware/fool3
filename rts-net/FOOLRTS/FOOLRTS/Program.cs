@@ -1,7 +1,25 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace FOOLRTS
 {
+
+    public class Maybe<A>
+    {
+
+    }
+
+    public class Functor 
+    {
+        static List<B> fmap<A,B>(Func<A,B> f, List<A> val)
+        {
+            return null;
+        }
+        static Maybe<B> fmap<A, B>(Func<A, B> f, Maybe<A> val)
+        {
+            return null;
+        }
+    }
 
     public class List {
         public virtual string show()

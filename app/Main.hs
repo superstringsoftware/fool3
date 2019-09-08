@@ -27,13 +27,36 @@ processNew :: String -> IntState ()
 processNew line = do
   res <- parseToplevel line
   case res of
-    Left err -> liftIO $ print err
     Right ex -> do
         -- processing parsed input
         liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
         liftIO $ print ex -- show what was parsed first
         processSurfaceExpr ex -- processing expressions one by one
+    Left err -> do
+      -- it's not a top level expression, trying interactive expression
+      res1 <- parseExpr line
+      case res1 of
+        Left err1 -> liftIO (print err) >> liftIO (print err1)
+        Right ex1 -> do
+          liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received interactive expression: " -- ++ (show $ length ex)
+          liftIO $ print ex1 -- show what was parsed first
+          -- now processing it in interpreter immediately
 
+
+showHelp :: IO ()
+showHelp = do
+    putStrLn $ TC.as [TC.bold, TC.underlined] "Available commands:"
+    putStrLn ":h[elp]           -- this message"
+    putStrLn ":q[uit]           -- quit"
+    putStrLn ":a[ll]            -- list everything, -d - in core format"
+    putStrLn ":l[oad] <name>    -- load and interpret file <name>"
+    putStrLn ":s[et] <command>  -- set environment flags (:s strict or :s lazy)"
+    putStrLn ":e[nv]            -- show current environment"
+    putStrLn ":functions        -- list all global functions"
+    putStrLn ":types            -- list all types"
+    putStrLn ":compile          -- compile currently loaded program"
+    putStrLn ":r[un] <f name>   -- execute expression with a given name that's already loaded. 'main' by detault."
+        
 
 processCommand :: [String] -> IntState ()
 processCommand (":help":_) = liftIO showHelp
@@ -43,6 +66,11 @@ processCommand (":types":_) = get >>= liftIO . prettyPrintTT . typeTable
 -- processCommand (":core":"-d":_) = get >>= liftIO . showLS . lambdas
 -- processCommand (":core":_) = get >>= liftIO . prettyPrintLS . lambdas
 processCommand (":compile":_) = (liftIO $ putStrLn "Compiling...") >> compile
+processCommand (":run":fn:_) = do
+  st <- get
+  liftIO $ putStrLn $ "executing " ++ fn
+processCommand (":run":[]) = processCommand [":run","main"]
+processCommand (":r":xs) = processCommand (":run":xs)
 processCommand (":all":"-d":_) = do
   st <- get
   liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Type classes:"
@@ -65,8 +93,7 @@ processCommand (":env":_) = do
 
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
-processCommand (":c":"-d":_) = processCommand [":core","-d"]
-processCommand (":c":_) = processCommand [":core"]
+processCommand (":a":"-d":_) = processCommand [":all","-d"]
 processCommand (":a":_) = processCommand [":all"]
 processCommand (":l":xs) = processCommand (":load":xs)
 processCommand (":s":xs) = processCommand (":set":xs)
@@ -114,21 +141,6 @@ loadFileNew nm = do
      -- desugaring on the first pass
      Right exprs -> mapM_ (processSurfaceExpr . desugar) exprs >> liftIO (putStrLn "... successfully loaded.")
 
-
-
-showHelp :: IO ()
-showHelp = do
-    putStrLn $ TC.as [TC.bold, TC.underlined] "Available commands:"
-    putStrLn ":h[elp]           -- this message"
-    putStrLn ":q[uit]           -- quit"
-    putStrLn ":a[ll]            -- list everything"
-    putStrLn ":c[ore]           -- list everything in core format"
-    putStrLn ":l[oad] <name>    -- load and interpret file <name>"
-    putStrLn ":s[et] <command>  -- set environment flags (:s strict or :s lazy)"
-    putStrLn ":e[nv]            -- show current environment"
-    putStrLn ":functions        -- list all global functions"
-    putStrLn ":types            -- list all types"
-    putStrLn ":compile          -- compile currently loaded program"
 
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()

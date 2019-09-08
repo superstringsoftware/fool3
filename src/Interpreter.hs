@@ -29,6 +29,8 @@ import State
 import DotNet.Syntax
 
 
+-- IntState is our StateT InterpreterState IO monad stack
+
 -- initializing starting state with tables etc
 initializeInterpreter :: IO InterpreterState
 initializeInterpreter = do
@@ -76,9 +78,14 @@ processSurfaceExpr e = do
   fs <- gets funTable
   liftIO $ H.insert fs "test" e
 
-  
+-------------------------------------------------------------
+-- Some very basic interpreting
+-------------------------------------------------------------
 
 
+-------------------------------------------------------------
+-- Pretty printing
+-------------------------------------------------------------
 prettyPrintTCT :: HashTable Name Typeclass -> IO ()
 prettyPrintTCT = H.mapM_ f where
     f (k,v) = putStrLn $ show v

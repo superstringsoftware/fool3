@@ -87,7 +87,27 @@ instance Semigroup (List a) =
 instance Semigroup (Vector a n) where exists Semigroup a = 
   (+) v1 v2 = primop_plus;
 
-    -- TEST PROGRAM
+
+
+-- now this has appeared as I was thinking about generalizing fibonacchi sequence, canonically defined as
+-- fib 0 = 0
+-- fib 1 = 1
+-- fib n = fib (n - 1) + fib (n - 2)
+-- naive attempt was to require a Ring, b/c there's 0 and 1, but there's no 2nd binary op in fibonacci, 
+-- so it's only a Group, but it needs to be *ordered* as there's no other way to get 1 from z0 in a monoid / group.
+-- once we do that, we can define generalized fibonacci (see below)
+class Ordered a =
+  succ:a element:a;
+
+-- generalized fibonacci, the only requirement is that n is an Ordered Group and we define it for n >= z0
+fib n = n ?
+    z0 -> z0
+  | succ z0 -> succ z0
+  | otherwise -> fib (n - 1) + fib (n - 2);
+
+-- as a note, of course it's possible to define (+) and (-) via succ and it's an interesting exercize, but not very practical
+
+-- TEST PROGRAM
 
 f x y = x*x + y;
 
@@ -100,6 +120,7 @@ k = f x y z;
 fact n = n ?
     z0 -> z1
   | otherwise -> n * fact(n-1);
+
 
 main = print (fact (f (g 2) 1)); -- should be 120
 
