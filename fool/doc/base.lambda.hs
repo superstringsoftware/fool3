@@ -80,6 +80,13 @@ Vect : Type = \n:Nat a:*. {
   , (::) : Vect (S k) a = \head:a tail:(Vect k a). {head tail}
 }
 
+-- same but with Ints
+VectI : Type = \n:Int a:*. {
+    Nil  : VectI     0 a
+  , (::) : VectI (k+1) a = \head:a tail:(Vect k a). {head tail}
+}
+
+
 -- https://www.wikiwand.com/en/Module_(mathematics)
 -- Module (Left-R)
 -- m has to be Abelian Group! (so commutative in + for module elements)
@@ -105,6 +112,17 @@ RealVectorSpace : Class = ∃(Module Double m) => \m:*. {
     (./.):m = \v:m s:Double . (1/s) • v
 }
 
+InnerProductVectorSpace : Class = ∃ VectorSpace r m => \r:* m:*. {
+  -- inner product, dot product in case of regular coordinate stuff
+    (·):r = \v1:m v2:m. dot v1 v2
+  , dot:r = \v1:m v2:m. v1 · v2
+}
+
+NormedVectorSpace : Class = ∃ InnerProductVectorSpace r m => \r:* m:*. {
+    norm:r = \v:m. sqrt (v · v)
+}
+
+
 -- Algebra
 -- https://www.wikiwand.com/en/Algebra_over_a_field
 F_Algebra : Class = ∃(VectorSpace f a) => \f:* a:*. {
@@ -115,6 +133,14 @@ F_Algebra : Class = ∃(VectorSpace f a) => \f:* a:*. {
       , (s·x)•(r·y) === (s*r)·(x•y) -- compatibility with scalars
     }
 }
+
+-- Dependent types for efficient vectors
+PVector : Type = \a:* n:Int. {
+    PVector = \a:* n:Int . {primarray# a n} : PVector a n
+    -- now, this is tricky. Constructor simply allocates memory for the given *primitive* type
+}
+
+generate : PVector a n = \n:Int g:(Int->a).
 
 -- some instances
 -- Can define all operations in the subclass! (how to implement?)
@@ -160,8 +186,17 @@ instance RingOverRing (Vector Double) Double where type Res (Vector Double) Doub
   | otherwise -> n * fact (n - 1);
 
 
-{-
+VarId : Expr = \n:Name . {_}
+Lam   : Expr = \v:Var e:Expr t:Type . {_ _ _}  
 
+{-
+data Expr = 
+    VarId Name
+  | Lam    Var Expr Type -- currying based machinery
+  | TLam [Var] Expr Type -- tuple based machinery
+  | App Expr Expr
+  | Tuple ConsTag [Expr] Type -- polymorphic tuple. 
+  | Let Var Expr -- binding a var / symbol to an expression
 
 -- Functor
 class Functor f = 

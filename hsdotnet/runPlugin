@@ -1,0 +1,2 @@
+stack ghc -- -fplugin Plugin Example.hs 
+

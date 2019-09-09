@@ -21,7 +21,8 @@ import DotNet.Translator
 type InputTState a = InputT (StateT InterpreterState IO) a
 
 -- needs to go to settings!!!
-baseLibPath = "prog1.fool.hs" -- "base.fool.hs"
+-- baseLibPath = "prog1.fool.hs" -- "base.fool.hs"
+baseLibPath = "base.fool.hs"
 
 processNew :: String -> IntState ()
 processNew line = do

@@ -55,8 +55,8 @@ class Field a <: Ring a =
 
 -- multiparameter typeclass test
 class Mult a b = 
-    result,
-    (*):result x:a y:b;
+    result:Type a b,
+    (*):(result a b) x:a y:b;
 
 -- Functor
 class Functor f = 
