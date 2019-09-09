@@ -21,6 +21,8 @@ import Kind
 import IdInfo
 
 import GHC
+
+import Compiler
     
 plugin :: Plugin
 plugin = defaultPlugin {
@@ -67,6 +69,9 @@ pass guts = do
 
     liftIO $ banner "STG"
     liftIO $ mapM_ putStrLn (map showGhc stg_binds2)
+
+    liftIO $ banner "OUR STG COMPILATION"
+    liftIO $ mapM_ (putStrLn . stgProcessBind) stg_binds2
     
     return guts
     

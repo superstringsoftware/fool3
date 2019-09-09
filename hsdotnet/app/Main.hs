@@ -41,8 +41,7 @@ import IdInfo
 
 import Control.Monad.Trans
 
-showGhc :: (Outputable a) => a -> String
-showGhc = showPpr unsafeGlobalDynFlags
+import Compiler
 
 banner :: MonadIO m => String -> m ()
 banner msg = liftIO $ putStrLn (
@@ -130,65 +129,7 @@ main = runGhc (Just libdir) $ do
 
   
   
--- Mapping TyThings
-processTyThing e@(ATyCon tc) = "TyCon: " ++ showGhc e ++
-    "\nVars: " ++ showGhc (tyConTyVars tc) ++
-    "\nConstructors: " ++ showGhc (tyConDataCons tc)
-    ++ "\n"
-processTyThing e@(AnId var) = "Var: " ++ showVar var
-processTyThing e = showGhc e
 
--- Mapping STG
-
-{-
-StgTopLifted (GenStgBinding bndr occ)	 
-StgTopStringLit bndr ByteString
--}
--- stgProcessBind :: GenStgTopBinding b o -> String
-stgProcessBind (StgTopStringLit _ bs) = "STG Top String Literal: " ++ show bs
-stgProcessBind (StgTopLifted bn) = "STG Top Lifted:\n" ++ stgProcessGenBinding bn
-
-{-
-StgNonRec bndr (GenStgRhs bndr occ)	 
-StgRec [(bndr, GenStgRhs bndr occ)]
-bndr are Id here which is an alias for Var
--}
-stgProcessGenBinding (StgNonRec bndr rhs) = "[Binder:]" ++ (showGhc $ varName bndr)
-     ++ ":" ++ (showGhc $ varType bndr)
-     ++ "\n[Expr:]\n" ++ stgProcessRHS rhs
--- stgProcessGenBinding (StgRec bndr rhs) = stgProcessRHS rhs
-
-{-
-StgRhsClosure CostCentreStack StgBinderInfo [occ] !UpdateFlag [bndr] (GenStgExpr bndr occ)	 
-StgRhsCon CostCentreStack DataCon [GenStgArg occ]
-DataCon: https://downloads.haskell.org/~ghc/8.6.3/docs/html/libraries/ghc-8.6.3/DataCon.html#t:DataCon
-data GenStgArg occ
-  = StgVarArg  occ
-  | StgLitArg  Literal
-
-  occ is now Id which is Var
--}
-stgProcessRHS e@(StgRhsClosure ccs bi occs flag bndrs expr) = "[StgRhsClosure:]\n" ++ showGhc e -- stgProcessExpr expr
-stgProcessRHS (StgRhsCon ccs dcon args) = "StgRhsCon: " ++ showGhc dcon ++ showGhc args
-    -- ++ "\n[CostCenter for above:]" ++ showGhc ccs
-
-stgProcessExpr e@(StgApp oc args) = "App " ++ showGhc e
-stgProcessExpr (StgLit l) = showGhc l
-stgProcessExpr e@(StgConApp dcon args types) = "ConApp " ++ showGhc e
-stgProcessExpr e@(StgOpApp op args tp) = "OpApp " ++ showGhc e
-stgProcessExpr e@(StgLam bndrs ex) = "Lam " ++ showGhc e -- bndrs ++ " = " ++ stgProcessExpr ex
-stgProcessExpr e = "NOT IMPLEMENTED: " ++ showGhc e
-{-
-StgApp occ [GenStgArg occ]	 
-StgLit Literal	 
-StgConApp DataCon [GenStgArg occ] [Type]	 
-StgOpApp StgOp [GenStgArg occ] Type	 
-StgLam (NonEmpty bndr) StgExpr	 
-StgCase (GenStgExpr bndr occ) bndr AltType [GenStgAlt bndr occ]	 
-StgLet (GenStgBinding bndr occ) (GenStgExpr bndr occ)	 
-StgLetNoEscape (GenStgBinding bndr occ) (GenStgExpr bndr occ)	 
-StgTick (Tickish bndr) (GenStgExpr bndr occ)
--}
 
 
   -- Mapping Core
@@ -214,10 +155,6 @@ showExpr (Type t) = "Type: " ++ showGhc t
 showExpr (Tick tick ex) = "Tick: " ++ showExpr ex
 showExpr e@(Coercion coerc) = "Coercion: " ++ showGhc e
 -- showExpr e = "NOT IMPLEMENTED: " ++ showGhc e
-
--- showing vars
-showVar v = showGhc v ++ showVarDetails v -- showGhc (varName v) ++ " : " ++ showGhc (varType v)
-showVarDetails v = showGhc $ idDetails v
 
 -- showing Alts
 showAlt (con, vars, ex) = showGhc con ++ " vars: " ++ showGhc vars ++ "-->" ++ showExpr ex ++ "\n"
