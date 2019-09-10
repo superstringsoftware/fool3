@@ -1,9 +1,57 @@
-{-# LANGUAGE MagicHash, UnliftedFFITypes, NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim, UnboxedTuples #-} -- , NoImplicitPrelude
 
 module Example where
 
+-- import GHC.Prim
+-- import GHC.Float
+-- import Foreign.C.String
+
+-- data Nat = Z | S Nat
+
+-- data Crazy a = Nuts a | Insane
+
+-- fact 0 = 1
+fact :: Int -> Int
+fact n = if n==0 then 1 else n*fact(n-1)
+
+data Crazy a = Great a | Stupid
+
+true = Stupid
+x5 = Great 5
+
+main = print $ fact 10
+
+{-
+infixl 6 :+
+type family   (n :: Nat) :+ (m :: Nat) :: Nat
+type instance Z     :+ m = m
+type instance (S n) :+ m = S (n :+ m)
+-}
+
+--foreign import ccall writeLn :: CString -> IO ()    
+
+{-
+-- foreign declaration for prim functions defined elsewhere
+-- foreign import prim "int2Integerzh" int2Integer# :: Int# -> (# Int#, ByteArray# #)
+
+-- Apparently we can trick GHC into accepting new dummy "primops" via simply using this trick:
+expDoubleStrange# :: Double# -> Double#
+expDoubleStrange# = expDoubleStrange#
+
+expD (D# d) = expDoubleStrange# d
+
+-- Actually, this works even without hashes:
+expDoubleStrange :: Double -> Double
+expDoubleStrange = expDoubleStrange
+
+-- This means we can define .Net classes interface this way and use GHC typechecker to make sure everything works
+-}
+
+
+
 -- BEGIN TEST PROGRAM FOR .NET COMPILATION
-import GHC.Prim
+
+{-
 
 data Int = I# !Int#
 (I# x) + (I# y) = I# (x +# y)
@@ -18,6 +66,7 @@ generate (I# 0#) = Nil
 generate n  = Cons n (generate (n- (I# 1#)))
 
 main = map (+(I# 10#)) (generate (I# 1000000#))
+-}
 
 -- END TEST PROGRAM FOR .NET COMPILATION
 

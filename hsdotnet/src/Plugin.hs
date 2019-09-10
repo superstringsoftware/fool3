@@ -14,6 +14,7 @@ import SimplStg
 import CoreSyn
 import StgSyn
 import TyCon
+-- import StgFVs - doesnt import???
 
 import Var
 import Name (nameStableString)
@@ -72,6 +73,12 @@ pass guts = do
 
     liftIO $ banner "OUR STG COMPILATION"
     liftIO $ mapM_ (putStrLn . stgProcessBind) stg_binds2
+
+    {-
+    let cgStg = annTopBindingsFreeVars stg_binds2
+    liftIO $ banner "Annotated STG"
+    liftIO $ mapM_ (putStrLn . showGhc) cgStg
+    -}
     
     return guts
     
