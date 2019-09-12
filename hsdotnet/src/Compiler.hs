@@ -171,7 +171,13 @@ stgProcessRHS e@(StgRhsClosure ccs binfo freeVars ReEntrant args expr) = "\n/* f
     ++ showVarList freeVars ++ " */\n"
     ++ showVarList args
     ++ " => {\n" ++ stgProcessExpr expr ++ "} "
--- keeping other closures as is for now
+-- this would be a THUNK
+stgProcessRHS e@(StgRhsClosure ccs binfo freeVars Updatable args expr) = 
+    "new THUNK (" 
+    ++ showVarList freeVars ++ ", "
+    ++ showVarList args
+    ++ " => {\n" ++ stgProcessExpr expr ++ "} );"
+    -- keeping other closures as is for now
 stgProcessRHS e@(StgRhsClosure ccs binfo freeVars flag args expr) = "[CLOSURE]" ++ 
     showVarList freeVars ++ show flag ++ showVarList args ++ " . " ++ stgProcessExpr expr
 stgProcessRHS e@(StgRhsCon ccs dcon args) = "new " ++ stgShowDCon dcon ++ processGenStgArgs args
