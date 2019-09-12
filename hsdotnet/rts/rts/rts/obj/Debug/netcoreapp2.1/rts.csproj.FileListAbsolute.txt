@@ -1,0 +1,11 @@
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/bin/Debug/netcoreapp2.1/rts.deps.json
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/bin/Debug/netcoreapp2.1/rts.runtimeconfig.json
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/bin/Debug/netcoreapp2.1/rts.runtimeconfig.dev.json
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/bin/Debug/netcoreapp2.1/rts.dll
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/bin/Debug/netcoreapp2.1/rts.pdb
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.csprojAssemblyReference.cache
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.csproj.CoreCompileInputs.cache
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.AssemblyInfoInputs.cache
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.AssemblyInfo.cs
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.dll
+/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.pdb

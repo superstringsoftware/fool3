@@ -43,12 +43,11 @@ pass guts = do
 
     let core = mg_binds guts
 
+    {-
     liftIO $ banner "Core Module"
     liftIO $ putStrLn $ showGhc core
+    -}
 
-    liftIO $ banner "Class Instances"
-    liftIO $ putStrLn $ showGhc ( mg_inst_env guts )
-    
     -- http://hackage.haskell.org/package/ghc-8.6.5/docs/CorePrep.html
     -- (prep, _) <- liftIO $ corePrepPgm env mod loc binds tcs
     --stg <- liftIO $ coreToStg dflags (mg_module core) (mg_binds core)
@@ -60,20 +59,61 @@ pass guts = do
     let tcs = filter isDataTyCon (mg_tcs guts)
     let loc   = ms_location modSum
     -- prepping core
-    (prep, _) <- liftIO $ corePrepPgm env mod loc core tcs
+    let dflags1 = foldl (\acc flag -> gopt_set acc flag) dflags [Opt_StgCSE, 
+            Opt_DoEtaReduction,
+            Opt_CallArity,
+            Opt_FunToThunk,
+            Opt_StgStats
+            ]
+    let dflags' = dflags1 -- dopt_set dflags1 Opt_D_dump_stg
+    let env' = env {hsc_dflags = dflags'}
+    (prep, _) <- liftIO $ corePrepPgm env' mod loc core tcs
     -- compiling to stg
-    let (stg,_) = coreToStg dflags mod prep
-    stg_binds2 <- liftIO $ stg2stg dflags stg
+    -- gopt_set :: DynFlags -> GeneralFlag -> DynFlags
+    -- dopt_set :: DynFlags -> DumpFlag -> DynFlags
+    let (stg,_) = coreToStg dflags' mod prep
+    -- let dflags1 = dopt_set dflags Opt_D_dump_stg
+    -- setting stg optimization passes
+     -- , Opt_StgStats
+    -- setDynFlags dflags'
+    stg_binds2 <- liftIO $ stg2stg dflags' stg
 
-    liftIO $ banner "Core Module - PREPPED!"
-    liftIO $ putStrLn $ showGhc prep
+    
+    liftIO $ banner "Core Module"
+    liftIO $ putStrLn $ showGhc core
+    
 
+    {-
     liftIO $ banner "STG"
     liftIO $ mapM_ putStrLn (map showGhc stg_binds2)
+    -}
+
+    liftIO $ banner "Class Instances"
+    liftIO $ putStrLn $ showGhc ( mg_inst_env guts )
+
+    -- TODO: http://hackage.haskell.org/package/ghc-8.6.5/docs/TyCon.html#
+    -- Inspect type definitions properly, using at the very least:
+    -- tyConName :: TyCon -> Name
+    -- tyConKind :: TyCon -> Kind
+    -- tyConTyVars :: TyCon -> [TyVar]
+    -- tyConDataCons :: TyCon -> [DataCon]
+    -- We'll probably need it for .Net code generation if we decide to use the type system somewhat.
+
+    liftIO $ banner "OUR STG WITH SHOW GHC"
+    liftIO $ putStrLn $ showGhc stg_binds2
+
+    liftIO $ banner "Typed Toplevel Definitions"
+    liftIO $ mapM_ (putStrLn . showTyCon) (mg_tcs guts)
+    
+    {-
+    liftIO $ banner "OUR STG BEFORE STG2STG"
+    liftIO $ mapM_ (putStrLn . stgProcessBind) stg
+    -}
 
     liftIO $ banner "OUR STG COMPILATION"
     liftIO $ mapM_ (putStrLn . stgProcessBind) stg_binds2
 
+    
     {-
     let cgStg = annTopBindingsFreeVars stg_binds2
     liftIO $ banner "Annotated STG"

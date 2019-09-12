@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "restore": {
+    "/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/rts.csproj": {}
+  },
+  "projects": {
+    "/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/rts.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/rts.csproj",
+        "projectName": "rts",
+        "projectPath": "/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/rts.csproj",
+        "packagesPath": "/Users/aantich/.nuget/packages/",
+        "outputPath": "/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "/usr/local/share/dotnet/sdk/NuGetFallbackFolder"
+        ],
+        "configFilePaths": [
+          "/Users/aantich/.config/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netcoreapp2.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netcoreapp2.1": {
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "netcoreapp2.1": {
+          "dependencies": {
+            "Microsoft.NETCore.App": {
+              "target": "Package",
+              "version": "[2.1.0, )",
+              "autoReferenced": true
+            }
+          },
+          "imports": [
+            "net461"
+          ],
+          "assetTargetFallback": true,
+          "warn": true
+        }
+      }
+    }
+  }
+}

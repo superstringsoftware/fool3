@@ -1,0 +1,25 @@
+﻿<Properties StartupConfiguration="{88EEDC94-EF2F-4C81-AF6A-1D245773FD69}|Default">
+  <MonoDevelop.Ide.ItemProperties.test-apps PreferredExecutionTarget="MonoDevelop.Default" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="test-apps/MApp.cs">
+    <Files>
+      <File FileName="test-apps/MApp.cs" Line="2" Column="22" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="test-apps" expanded="True">
+            <Node name="test-apps" expanded="True">
+              <Node name="MApp.cs" selected="True" />
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug|x86" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MultiItemStartupConfigurations />
+</Properties>

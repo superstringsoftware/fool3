@@ -41,6 +41,9 @@ import IdInfo
 --import UniqDSet
 import DataCon
 
+import PrimOp
+import ForeignCall
+
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
 
@@ -53,9 +56,9 @@ instance Show UpdateFlag where
 showVar v = showGhc v ++ showVarDetails v -- showGhc (varName v) ++ " : " ++ showGhc (varType v)
 showVarDetails v = showGhc $ idDetails v
 
-showVarList [] = "[]"
+showVarList [] = "()"
 --showVarList (v:[]) = "[" ++ showVar v ++ "]"
-showVarList (v:vs) = "[" ++ showVar v ++ (foldl (\acc v1 -> acc ++ ", " ++ showVar v1) "" vs) ++ "]"
+showVarList (v:vs) = "(" ++ showVar v ++ (foldl (\acc v1 -> acc ++ ", " ++ showVar v1) "" vs) ++ ")"
 
 -- Mapping TyThings
 processTyThing e@(ATyCon tc) = "TyCon: " ++ showGhc e ++
@@ -90,7 +93,9 @@ data GenStgBinding pass
 -}
 -- stgProcessBind :: GenStgTopBinding b o -> String
 stgProcessBind (StgTopStringLit _ bs) = "STG Top String Literal: " ++ show bs
-stgProcessBind (StgTopLifted bn) = "EXPR STG Top Lifted:\n" ++ stgProcessGenBinding bn ++ "\nEND EXPR"
+-- stgProcessBind (StgTopLifted bn) = stgProcessGenBinding bn ++ "\n"
+stgProcessBind (StgTopLifted bn) = stgProcessGenBinding bn ++ "\n"
+-- stgProcessBind (StgTopLifted bn) = stgProcessGenBindingFiltered filterOutCons bn ++ "\n"
 
 {-
 StgNonRec bndr (GenStgRhs bndr occ)	 
@@ -98,14 +103,24 @@ StgRec [(bndr, GenStgRhs bndr occ)]
 bndr are Id here which is an alias for Var, occ is as well???
 -}
 stgProcessGenBinding (StgNonRec bndr rhs) = stgProcessGenericBinding bndr rhs
-stgProcessGenBinding (StgRec ls) = foldl fn "" ls
+stgProcessGenBinding (StgRec ls) = foldl fn "[REC]\n" ls ++ "[ENDREC]"
     where fn acc (b,rhs) = acc ++ stgProcessGenericBinding b rhs ++ "\n"
-stgProcessGenericBinding bndr rhs = "[Binder:] " ++ (showGhc $ varName bndr)
-    ++ ":" ++ (showGhc $ varType bndr)
-    ++ "\n[Expr:]" ++ stgProcessRHS rhs
+stgProcessGenericBinding bndr rhs = "// " ++ (showGhc $ varName bndr) ++ " :: " 
+    ++ (showGhc $ varType bndr) ++ "\n"
+    ++ "var " ++ (showGhc $ varName bndr) ++ " = " ++ stgProcessRHS rhs
+
+-- filtering out some rhs we don't want
+{-
+stgProcessGenBindingFiltered filt (StgNonRec bndr rhs) = stgProcessGenericBindingFiltered filt bndr rhs
+stgProcessGenBindingFiltered filt (StgRec ls) = foldl fn "[REC]\n" ls ++ "[ENDREC]"
+    where fn acc (b,rhs) = acc ++ stgProcessGenericBindingFiltered filt b rhs ++ "\n"
+stgProcessGenericBindingFiltered filt bndr rhs = if (filt rhs) then stgProcessGenericBinding bndr rhs else ""
+-}
 
 {-
 DataCon: https://downloads.haskell.org/~ghc/8.6.3/docs/html/libraries/ghc-8.6.3/DataCon.html#t:DataCon
+ -- opaque time, follow the link to get deconstruction functions
+
 data GenStgArg occ
   = StgVarArg  occ
   | StgLitArg  Literal
@@ -151,21 +166,65 @@ closure will only be entered once, and so need not be updated but may
 safely be blackholed.
 data UpdateFlag = ReEntrant | Updatable | SingleEntry
 -}
-stgProcessRHS e@(StgRhsClosure ccs binfo freeVars flag args expr) = "[StgRhsClosure:]\n" 
-    ++ "[SHOW GHC]" ++ showGhc e -- stgProcessExpr expr
-    ++ "\n[OURS]" ++ showVarList freeVars ++ show flag ++ showVarList args ++ " . " ++ stgProcessExpr expr
-stgProcessRHS e@(StgRhsCon ccs dcon args) = "[StgRhsCon:]\n" 
-    ++ "[SHOW GHC]"++ showGhc e
-    ++ "\n[OURS]" ++ (showGhc $ getName dcon) ++ "(" ++ ") " ++ showGhc args
+-- ReEntrant closure is most likely a function
+stgProcessRHS e@(StgRhsClosure ccs binfo freeVars ReEntrant args expr) = "\n/* free Vars: " 
+    ++ showVarList freeVars ++ " */\n"
+    ++ showVarList args
+    ++ " => {\n" ++ stgProcessExpr expr ++ "} "
+-- keeping other closures as is for now
+stgProcessRHS e@(StgRhsClosure ccs binfo freeVars flag args expr) = "[CLOSURE]" ++ 
+    showVarList freeVars ++ show flag ++ showVarList args ++ " . " ++ stgProcessExpr expr
+stgProcessRHS e@(StgRhsCon ccs dcon args) = "new " ++ stgShowDCon dcon ++ processGenStgArgs args
     -- ++ "\n[CostCenter for above:]" ++ showGhc ccs
 
+filterOutCons (StgRhsClosure ccs binfo freeVars flag args expr) = True
+filterOutCons (StgRhsCon ccs dcon args) = False
 
-stgProcessExpr e@(StgApp oc args) = "App " ++ showGhc e
+instance Show PrimOp where show = showGhc
+instance Show PrimCall where show = showGhc
+instance Show ForeignCall where show = showGhc
+deriving instance Show StgOp
+
+-- function application
+stgProcessExpr (StgApp oc args) = showVar oc ++ " " ++ processGenStgArgs args
 stgProcessExpr (StgLit l) = showGhc l
-stgProcessExpr e@(StgConApp dcon args types) = "ConApp " ++ showGhc e
-stgProcessExpr e@(StgOpApp op args tp) = "OpApp " ++ showGhc e
-stgProcessExpr e@(StgLam bndrs ex) = "Lam " ++ showGhc e -- bndrs ++ " = " ++ stgProcessExpr ex
-stgProcessExpr e = "NOT IMPLEMENTED: " ++ showGhc e
+-- constructor application
+stgProcessExpr (StgConApp dcon args types) = "new " ++ stgShowDCon dcon ++ processGenStgArgs args -- ++ " [TYPES]" ++ showGhc types
+-- operator application
+stgProcessExpr (StgOpApp op args tp) = show op ++ processGenStgArgs args
+-- apparently this is only used during transformation, so safely to ignore?
+stgProcessExpr e@(StgLam bndrs ex) = "[Lam]" ++ showGhc e -- bndrs ++ " = " ++ stgProcessExpr ex
+-- case forces evaluation!!!
+stgProcessExpr (StgCase ex bndr altType alts) = "var " ++ showGhc bndr ++ " = " 
+    ++ "EVAL (" ++ stgProcessExpr ex ++ ");\n"
+    ++ "switch (" ++ showGhc bndr ++ ")"
+    ++ processCaseAlts alts
+stgProcessExpr e@(StgLet binding expr) = "[Let]" ++ stgProcessGenBinding binding
+    ++ " [IN] " ++ stgProcessExpr expr
+stgProcessExpr e = "NOT IMPLEMENTED" -- ++ showGhc e
+
+processCaseAlts alts = foldl processCaseAlt "{\n" alts ++ "}"
+processCaseAlt acc (altCon, bndrs, ex) = acc
+    ++ processAltCon altCon bndrs ++ ":\n"
+    ++ stgProcessExpr ex ++ "\n"
+
+
+{-
+data GenStgArg occ
+  = StgVarArg  occ
+  | StgLitArg  Literal
+-}
+processGenStgArgs [] = "()"
+processGenStgArgs (x:[]) = "(" ++ processGenStgArg x ++ ")"
+processGenStgArgs (x:xs) = "(" ++ processGenStgArg x ++
+    foldl (\acc v -> acc ++ ", " ++ processGenStgArg v) "" xs ++ ")"
+
+processGenStgArg (StgLitArg  lit) = showGhc lit
+processGenStgArg (StgVarArg  occ) = showVar occ
+
+processAltCon DEFAULT _ = "default"
+processAltCon (LitAlt lit) _ = "case " ++ showGhc lit
+processAltCon (DataAlt dc) bndrs = "case " ++ showGhc dc ++ " " ++ showVarList bndrs
 {-
 
 https://downloads.haskell.org/~ghc/8.6.5/docs/html/libraries/ghc-8.6.5/StgSyn.html
@@ -178,6 +237,14 @@ StgCase (GenStgExpr bndr occ) bndr AltType [GenStgAlt bndr occ]
 StgLet (GenStgBinding bndr occ) (GenStgExpr bndr occ)	 
 StgLetNoEscape (GenStgBinding bndr occ) (GenStgExpr bndr occ)	 
 StgTick (Tickish bndr) (GenStgExpr bndr occ)
+
+type GenStgAlt bndr occ = (AltCon, [bndr], GenStgExpr bndr occ) Source#
+
+data AltCon Source# =
+    DataAlt DataCon	 
+    LitAlt Literal	-- A literal: case e of { 1 -> ... } Invariant: always an *unlifted* literal See Note [Literal alternatives]
+    DEFAULT	-- Trivial alternative: case e of { _ -> ... }
+
 
 Important types
 http://hackage.haskell.org/package/ghc-prim-0.5.3/docs/src/GHC.Types.html
@@ -213,3 +280,20 @@ data Module = Module
                 TrName   -- Package name
                 TrName   -- Module name                 
 -}
+
+    -- tyConName :: TyCon -> Name
+    -- tyConKind :: TyCon -> Kind
+    -- tyConTyVars :: TyCon -> [TyVar]
+    -- tyConDataCons :: TyCon -> [DataCon]
+-- TODO: http://hackage.haskell.org/package/ghc-8.6.5/docs/TyCon.html#
+showTyCon tc = showGhc (tyConName tc) ++ "(" ++ showGhc (tyConTyVars tc) ++ ") : " 
+    ++ showGhc (tyConKind tc) ++
+    " = { " ++ showDataConList (tyConDataCons tc) ++ " }"
+
+-- http://hackage.haskell.org/package/ghc-8.6.5/docs/DataCon.html#t:DataCon
+-- read deconstruction for better data con representation
+showDataCon dcon = (showGhc $ getName dcon) -- ++ "`" ++ (showGhc $ dataConTag dcon)   
+showDataConList [] = "{}"
+showDataConList (dc:dcs) = "{" ++ showDataCon dc ++ 
+    (foldl (\acc d -> acc ++ ", " ++ showDataCon d) "" dcs) ++ "}"
+stgShowDCon = showDataCon -- legacy

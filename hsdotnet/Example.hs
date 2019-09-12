@@ -1,16 +1,21 @@
-{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim, UnboxedTuples #-} -- , NoImplicitPrelude
+{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim, UnboxedTuples, NoImplicitPrelude #-} -- , NoImplicitPrelude
 
 module Example where
 
--- import GHC.Prim
+import GHC.Prim
 -- import GHC.Float
 -- import Foreign.C.String
-
+{-
+len :: [a] -> Int#
+len [] = 0#
+len (_:xs) = 1# +# len xs
+-}
 -- data Nat = Z | S Nat
 
 -- data Crazy a = Nuts a | Insane
 
 -- fact 0 = 1
+{-
 fact :: Int -> Int
 fact n = if n==0 then 1 else n*fact(n-1)
 
@@ -20,7 +25,7 @@ true = Stupid
 x5 = Great 5
 
 main = print $ fact 10
-
+-}
 {-
 infixl 6 :+
 type family   (n :: Nat) :+ (m :: Nat) :: Nat
@@ -51,7 +56,10 @@ expDoubleStrange = expDoubleStrange
 
 -- BEGIN TEST PROGRAM FOR .NET COMPILATION
 
-{-
+primNumTest 0# = 0#
+primNumTest 10# = 100#
+primNumTest x = x
+
 
 data Int = I# !Int#
 (I# x) + (I# y) = I# (x +# y)
@@ -62,11 +70,26 @@ data List a = Cons a (List a) | Nil
 map _ Nil = Nil
 map f (Cons x xs) = Cons (f x) (map f xs)
 
+papTest = map (+ (I# 2#))
+
+constructorCheck = Cons 1 Nil
+
+replicate :: a -> List a
+replicate x = Cons x (replicate x)
+
+head (Cons x _) = x
+
+foldr f z Nil     = z
+foldr f z (Cons x xs) = x `f` foldr f z xs
+
+length Nil = 0#
+length (Cons _ xs) = 1# +# length xs
+
 generate (I# 0#) = Nil
 generate n  = Cons n (generate (n- (I# 1#)))
 
 main = map (+(I# 10#)) (generate (I# 1000000#))
--}
+
 
 -- END TEST PROGRAM FOR .NET COMPILATION
 
@@ -162,4 +185,20 @@ data List a = Cons a (List a) | Nil
 
 -- add :: Int -> Int -> Int
 -- add x y = x + y 
+-}
+
+{-
+\r [ds_sU5 ds_sU6]
+         case ds_sU5 of {
+           I# x [Occ=Once] ->
+               case ds_sU6 of {
+                 I# y [Occ=Once] ->
+                     case +# [x y] of sat_sUb [Occ=Once] { __DEFAULT -> I# [sat_sUb]; };
+               };
+         };,
+
+[CLOSURE][]\r[ds_sU5, ds_sU6] . [Case][App]ds_sU5 [] [bound to] wild_sU7 of: 
+I#[binders][x] -> [Case][App]ds_sU6 [] [bound to] wild_sU9 of: 
+I#[binders][y] -> [Case][OpApp]+# [x y] [bound to] sat_sUb of: 
+__DEFAULT[binders][] -> [ConApp]I#`1[sat_sUb] [TYPES][Int#]
 -}
