@@ -81,6 +81,267 @@ stab s = do
     let t = replicate (stringAlign st) ' '
     return (t ++ s)
 
+------------------------------------------------------------------------------------------------
+-- Now for the interesting part, conversion from STG into internal codegen rep
+------------------------------------------------------------------------------------------------
+-- Filtering out some bindings / rhs we don't want:
+-- Top level literals - don't loook like we need them in the compilation now
+isTopLevelLiteral :: GenStgTopBinding Var Var -> Bool
+isTopLevelLiteral (StgTopStringLit _ _) = True
+isTopLevelLiteral _ = False
+-- top level constructor applications to what looks like some helpful type / kind manipulation stuff which 
+-- we also probably don't need, at least initially
+isHelperConApp :: GenStgTopBinding Var Var -> Bool
+isHelperConApp (StgTopLifted (StgNonRec bndr _)) = elem (showVarType bndr) helperCons
+    where helperCons = ["KindRep", "TrName", "TyCon"]
+isHelperConApp _ = False
+-- all filters combined
+allStgTopBindingFilters b = (isTopLevelLiteral b) || (isHelperConApp b)
+
+-- We are stripping going down the GenStgTopBinding --> GenStgBinding hierarchy,
+-- then killing the difference between REC and NONREC (may need it in the future, but not now???)
+-- and simply representing the program as the list of bindings from Var to GenStgRhs
+type BareStgProgram = [(Var, GenStgRhs Var Var)]
+-- function that does this simplification, then we can simply call stgProcessGenericBinding to create the program
+simplifyStgToBare :: [GenStgTopBinding Var Var] -> BareStgProgram
+simplifyStgToBare [] = []
+simplifyStgToBare (x:xs) = if (allStgTopBindingFilters x)
+        then simplifyStgToBare xs else (convertTopBinding x) ++ (simplifyStgToBare xs)
+        where convertTopBinding (StgTopLifted (StgNonRec bndr rhs)) = [(bndr, rhs)]
+              convertTopBinding (StgTopLifted (StgRec ls)) = ls
+
+
+type IdName = Var
+type Args = [Var]
+
+-- Types for handling code generation later on
+-- Heap objects, loosely following standard STG operational semantics
+data DotNetHeapObj = 
+    -- function object
+      FUN   { name :: IdName, freeVars :: Args, args :: Args, code :: DotNetExpr}
+    -- updatable thunk
+    | THUNK { name :: IdName, freeVars :: Args, args :: Args, code :: DotNetExpr}
+    -- thunk that only gets called once and can be garbage collected afterwards
+    | ONCE  { name :: IdName, freeVars :: Args, args :: Args, code :: DotNetExpr}
+     -- constructor application, always saturated
+    | CON   { conName :: String, conArgs :: [GenStgArg Var]}
+    -- deriving (Eq)
+
+data DotNetExpr = RAWSTG (GenStgExpr Var Var)
+
+-- converting closures to heap object representation while stripping unneeded info
+stgBinding2DotNet :: (Var, GenStgRhs Var Var) -> DotNetHeapObj 
+-- this is probably a function 
+stgBinding2DotNet (v, (StgRhsClosure ccs binfo freeVars ReEntrant args expr)) = 
+    FUN   v freeVars args (stgExpr2DotNetExpr expr)
+stgBinding2DotNet (v, (StgRhsClosure ccs binfo freeVars SingleEntry args expr)) = 
+    ONCE  v freeVars args (stgExpr2DotNetExpr expr)    
+stgBinding2DotNet (v, (StgRhsClosure ccs binfo freeVars flag args expr)) = 
+    THUNK v freeVars args (stgExpr2DotNetExpr expr)    
+stgBinding2DotNet (v, (StgRhsCon ccs dcon args)) = CON (stgShowDCon dcon) args
+
+
+stgExpr2DotNetExpr :: GenStgExpr Var Var -> DotNetExpr
+stgExpr2DotNetExpr e = RAWSTG e
+
+
+-- silly textual representation for testing purposes mostly (OLD)
+type TextProgram = [String]              
+-- convert bare to text
+bareToTextProgram :: BareStgProgram -> SM TextProgram
+bareToTextProgram bsp = mapM (\(v, rhs)-> stgProcessGenericBinding v rhs) bsp
+-- convert incoming stg to text
+stgToText :: [GenStgTopBinding Var Var] -> TextProgram
+stgToText stgp = evalState ((bareToTextProgram . simplifyStgToBare) stgp) initialCompilerState
+
+---------------------------------------------------------------
+-- OLDER CONVERT TO TEXT STUFF USED FOR UNDERSTANDING TYPES ETC
+---------------------------------------------------------------
+
+stgProcessBind :: GenStgTopBinding Var Var -> SM String
+stgProcessBind e@(StgTopStringLit bndr bs) = 
+    modify (\s -> s {isTopLevel = True}) >> 
+    return ("// [TOP STRING LITERAL] " ++ showVarWithType bndr ++ "\n"
+                  ++ (showGhc $ varName bndr) ++ " = " ++ show bs)
+    -- return ("STG Top String Literal: " ++ showGhc e)
+-- stgProcessBind (StgTopLifted bn) = stgProcessGenBinding bn ++ "\n"
+stgProcessBind (StgTopLifted bn) = 
+    modify (\s -> s {isTopLevel = True} ) >> stgProcessGenBinding bn
+-- stgProcessBind (StgTopLifted bn) = stgProcessGenBindingFiltered filterOutCons bn ++ "\n"
+
+{-
+StgNonRec bndr (GenStgRhs bndr occ)	 
+StgRec [(bndr, GenStgRhs bndr occ)]
+bndr are Id here which is an alias for Var, occ is as well???
+-}
+stgProcessGenBinding :: GenStgBinding Var Var -> SM String
+stgProcessGenBinding (StgNonRec bndr rhs) = stgProcessGenericBinding bndr rhs
+stgProcessGenBinding (StgRec ls) = do
+    st <- get
+    let fn acc (b,rhs) = acc ++ evalState (stgProcessGenericBinding b rhs) st
+    return (foldl fn "[REC]\n" ls ++ "[ENDREC]")
+    
+
+-- stgProcessGenericBinding :: GenStgBinding Var Var -> SM String
+stgProcessGenericBinding bndr rhs = do 
+    rhsRes <- stgProcessRHS rhs
+    s1 <- stab ("// " ++ showVarWithType bndr ++ "\n")
+    s2 <- stab("var " ++ (showGhc $ varName bndr) ++ " = " ++ rhsRes
+                ++ "\n")
+    return (s1 ++ s2)
+
+{-
+DataCon: https://downloads.haskell.org/~ghc/8.6.3/docs/html/libraries/ghc-8.6.3/DataCon.html#t:DataCon
+ -- opaque time, follow the link to get deconstruction functions
+
+data GenStgArg occ
+  = StgVarArg  occ
+  | StgLitArg  Literal
+
+  occ is now Id which is Var
+
+ data GenStgRhs bndr occ
+  = StgRhsClosure
+        CostCentreStack         -- CCS to be attached (default is CurrentCCS)
+        StgBinderInfo           -- Info about how this binder is used (see below)
+        [occ]                   -- non-global free vars; a list, rather than
+                                -- a set, because order is important
+        !UpdateFlag             -- ReEntrant | Updatable | SingleEntry
+        [bndr]                  -- arguments; if empty, then not a function;
+                                -- as above, order is important.
+        (GenStgExpr bndr occ)   -- body
+
+  | StgRhsCon
+        CostCentreStack  -- CCS to be attached (default is CurrentCCS).
+                         -- Top-level (static) ones will end up with
+                         -- DontCareCCS, because we don't count static
+                         -- data in heap profiles, and we don't set CCCS
+                         -- from static closure.
+        DataCon          -- Constructor. Never an unboxed tuple or sum, as those
+                         -- are not allocated.
+        [GenStgArg occ]  -- Args
+
+    with constructors it's easy, simply application of the constructor to it's arguments.
+    
+For closures, we don't care about cost center (do we?), binder info is interesting:
+data StgBinderInfo
+  = NoStgBinderInfo
+  | SatCallsOnly        -- All occurrences are *saturated* *function* calls
+                        -- This means we don't need to build an info table and
+                        -- slow entry code for the thing
+                        -- Thunks never get this value
+    ^^^ maybe helpful to optimize code but can ignore for now
+    For update flags:
+    A @ReEntrant@ closure may be entered multiple times, but should not be
+updated or blackholed. An @Updatable@ closure should be updated after
+evaluation (and may be blackholed during evaluation). A @SingleEntry@
+closure will only be entered once, and so need not be updated but may
+safely be blackholed.
+data UpdateFlag = ReEntrant | Updatable | SingleEntry
+-}
+-- ReEntrant closure is most likely a function
+stgProcessRHS :: GenStgRhs Var Var -> SM String
+stgProcessRHS e@(StgRhsClosure ccs binfo freeVars ReEntrant args expr) = do 
+    exprRes <- stgProcessExpr expr
+    return (
+        "\n/* free Vars: " 
+        ++ showVarList freeVars ++ " */\n"
+        ++ showVarList args
+        ++ " => {\n" ++ exprRes ++ "} ")
+-- this would be a THUNK
+stgProcessRHS e@(StgRhsClosure ccs binfo freeVars Updatable args expr) = do
+    exprRes <- stgProcessExpr expr
+    return ("new THUNK (" 
+        ++ showVarList freeVars ++ ", "
+        ++ showVarList args
+        ++ " => {\n" ++ exprRes ++ "} );")
+    -- keeping other closures as is for now
+stgProcessRHS e@(StgRhsClosure ccs binfo freeVars flag args expr) = do
+    exprRes <- stgProcessExpr expr
+    return ("[CLOSURE]" ++ 
+        showVarList freeVars ++ show flag ++ showVarList args 
+        ++ " . " ++ exprRes)
+stgProcessRHS e@(StgRhsCon ccs dcon args) = return ("new " ++ stgShowDCon dcon ++ processGenStgArgs args)
+    -- ++ "\n[CostCenter for above:]" ++ showGhc ccs
+
+filterOutCons (StgRhsClosure ccs binfo freeVars flag args expr) = True
+filterOutCons (StgRhsCon ccs dcon args) = False
+
+instance Show PrimOp where show = showGhc
+instance Show PrimCall where show = showGhc
+instance Show ForeignCall where show = showGhc
+deriving instance Show StgOp
+
+
+
+-- function application
+stgProcessExpr ::  GenStgExpr Var Var -> SM String
+stgProcessExpr (StgApp oc args) = do 
+    let ret = showVar oc ++ processGenStgArgs args
+    return ret
+stgProcessExpr (StgLit l) = return $ showGhc l
+-- constructor application
+stgProcessExpr (StgConApp dcon args types) = return (
+    "new " ++ stgShowDCon dcon ++ processGenStgArgs args) -- ++ " [TYPES]" ++ showGhc types
+-- operator application
+stgProcessExpr e@(StgOpApp op args tp) = return $ showGhc e -- (show op ++ processGenStgArgs args)
+-- apparently this is only used during transformation, so safely to ignore?
+-- stgProcessExpr e@(StgLam bndrs ex) = return ("[Lam]" ++ showGhc e) -- bndrs ++ " = " ++ stgProcessExpr ex
+-- case forces evaluation!!!
+-- (altCon, bndrs, ex)
+-- special case of only one default alternative - we DO NOT need switch statement in this case
+stgProcessExpr (StgCase ex bndr altType ((DEFAULT, bndrs, ex1):[]) ) = do
+    exprRes <- stgProcessExpr ex
+    exprRes1 <- stgProcessExpr ex1
+    s1 <- stab ("// ONE DEFAULT CASE: ALT TYPE: " ++ showGhc altType ++ "\n")
+    s2 <- stab ("var " ++ showGhc bndr ++ " = " ++ "EVAL (" ++ exprRes ++ ");\n")
+    s3 <- stab ("return " ++ exprRes1 ++ ";")
+    return (s1 ++ s2 ++ s3)
+stgProcessExpr (StgCase ex bndr altType alts) = do
+    exprRes <- stgProcessExpr ex
+    s1 <- stab ("// CASE: ALT TYPE: " ++ showGhc altType ++ "\n")
+    s2 <- stab ("var " ++ showGhc bndr ++ " = " ++ "EVAL (" ++ exprRes ++ ");\n")
+    s3 <- stab ("switch (" ++ showGhc bndr ++ ") {\n")
+    s4 <- stab "}"
+    incTab
+    altsRes <- processCaseAlts alts
+    decTab
+    return (s1 ++ s2 ++ s3 ++ altsRes ++ "\n" ++ s4)
+stgProcessExpr e@(StgLet binding expr) = do
+    exprRes <- stgProcessExpr expr
+    modify (\s -> s {isTopLevel = False} )
+    bRes <- stgProcessGenBinding binding
+    return ("\n" ++ bRes ++ "\nreturn " ++ exprRes)
+stgProcessExpr e = return ("[NOT IMPLEMENTED]" ++ showGhc e)
+
+processCaseAlts alts = foldM processCaseAlt "" alts
+processCaseAlt acc (altCon, bndrs, ex) = do
+    s1 <- stab (processAltCon altCon bndrs ++ ":\n")
+    incTab
+    exprRes <- stgProcessExpr ex
+    decTab
+    s2 <- stab (exprRes ++ "\n")
+    return (acc ++ s1 ++ s2)
+
+
+{-
+data GenStgArg occ
+  = StgVarArg  occ
+  | StgLitArg  Literal
+-}
+processGenStgArgs [] = ""
+processGenStgArgs (x:[]) = ".CALL(" ++ processGenStgArg x ++ ")"
+processGenStgArgs (x:xs) = ".CALL(" ++ processGenStgArg x ++
+    foldl (\acc v -> acc ++ ", " ++ processGenStgArg v) "" xs ++ ")"
+
+processGenStgArg (StgLitArg  lit) = showGhc lit
+processGenStgArg (StgVarArg  occ) = showVar occ
+
+processAltCon DEFAULT _ = "default"
+processAltCon (LitAlt lit) _ = "case " ++ showGhc lit
+processAltCon (DataAlt dc) bndrs = "case " ++ showGhc dc ++ " " ++ showVarList bndrs
+
+
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
 
@@ -194,244 +455,6 @@ data GenStgBinding pass
   = StgNonRec (BinderP pass) (GenStgRhs pass)
   | StgRec    [(BinderP pass, GenStgRhs pass)]
 -}
-stgProcessBind :: GenStgTopBinding Var Var -> SM String
-stgProcessBind e@(StgTopStringLit bndr bs) = 
-    modify (\s -> s {isTopLevel = True}) >> 
-    return ("// [TOP STRING LITERAL] " ++ showVarWithType bndr ++ "\n"
-                  ++ (showGhc $ varName bndr) ++ " = " ++ show bs)
-    -- return ("STG Top String Literal: " ++ showGhc e)
--- stgProcessBind (StgTopLifted bn) = stgProcessGenBinding bn ++ "\n"
-stgProcessBind (StgTopLifted bn) = 
-    modify (\s -> s {isTopLevel = True} ) >> stgProcessGenBinding bn
--- stgProcessBind (StgTopLifted bn) = stgProcessGenBindingFiltered filterOutCons bn ++ "\n"
-
-{-
-StgNonRec bndr (GenStgRhs bndr occ)	 
-StgRec [(bndr, GenStgRhs bndr occ)]
-bndr are Id here which is an alias for Var, occ is as well???
--}
-stgProcessGenBinding :: GenStgBinding Var Var -> SM String
-stgProcessGenBinding (StgNonRec bndr rhs) = stgProcessGenericBinding bndr rhs
-stgProcessGenBinding (StgRec ls) = do
-    st <- get
-    let fn acc (b,rhs) = acc ++ evalState (stgProcessGenericBinding b rhs) st
-    return (foldl fn "[REC]\n" ls ++ "[ENDREC]")
-    
-
--- stgProcessGenericBinding :: GenStgBinding Var Var -> SM String
-stgProcessGenericBinding bndr rhs = do 
-    rhsRes <- stgProcessRHS rhs
-    s1 <- stab ("// " ++ showVarWithType bndr ++ "\n")
-    s2 <- stab("var " ++ (showGhc $ varName bndr) ++ " = " ++ rhsRes
-                ++ "\n")
-    return (s1 ++ s2)
-
--- Filtering out some bindings / rhs we don't want:
--- Top level literals - don't loook like we need them in the compilation now
-isTopLevelLiteral :: GenStgTopBinding Var Var -> Bool
-isTopLevelLiteral (StgTopStringLit _ _) = True
-isTopLevelLiteral _ = False
--- top level constructor applications to what looks like some helpful type / kind manipulation stuff which 
--- we also probably don't need, at least initially
-isHelperConApp :: GenStgTopBinding Var Var -> Bool
-isHelperConApp (StgTopLifted (StgNonRec bndr _)) = elem (showVarType bndr) helperCons
-    where helperCons = ["KindRep", "TrName", "TyCon"]
-isHelperConApp _ = False
-
-allStgTopBindingFilters b = (isTopLevelLiteral b) || (isHelperConApp b)
-
--- We are stripping going down the GenStgTopBinding --> GenStgBinding hierarchy,
--- then killing the difference between REC and NONREC (may need it in the future, but not now???)
--- and simply representing the program as the list of bindings from Var to GenStgRhs
-type BareStgProgram = [(Var, GenStgRhs Var Var)]
--- function that does this simplification, then we can simply call stgProcessGenericBinding to create the program
-simplifyStgToBare :: [GenStgTopBinding Var Var] -> BareStgProgram
-simplifyStgToBare [] = []
-simplifyStgToBare (x:xs) = if (allStgTopBindingFilters x)
-        then simplifyStgToBare xs else (convertTopBinding x) ++ (simplifyStgToBare xs)
-        where convertTopBinding (StgTopLifted (StgNonRec bndr rhs)) = [(bndr, rhs)]
-              convertTopBinding (StgTopLifted (StgRec ls)) = ls
-
--- silly textual representation for testing purposes mostly
-type TextProgram = [String]              
--- convert bare to text
-bareToTextProgram :: BareStgProgram -> SM TextProgram
-bareToTextProgram bsp = mapM (\(v, rhs)-> stgProcessGenericBinding v rhs) bsp
--- convert incoming stg to text
-stgToText :: [GenStgTopBinding Var Var] -> TextProgram
-stgToText stgp = evalState ((bareToTextProgram . simplifyStgToBare) stgp) initialCompilerState
-
-
-
-
-{-
-DataCon: https://downloads.haskell.org/~ghc/8.6.3/docs/html/libraries/ghc-8.6.3/DataCon.html#t:DataCon
- -- opaque time, follow the link to get deconstruction functions
-
-data GenStgArg occ
-  = StgVarArg  occ
-  | StgLitArg  Literal
-
-  occ is now Id which is Var
-
- data GenStgRhs bndr occ
-  = StgRhsClosure
-        CostCentreStack         -- CCS to be attached (default is CurrentCCS)
-        StgBinderInfo           -- Info about how this binder is used (see below)
-        [occ]                   -- non-global free vars; a list, rather than
-                                -- a set, because order is important
-        !UpdateFlag             -- ReEntrant | Updatable | SingleEntry
-        [bndr]                  -- arguments; if empty, then not a function;
-                                -- as above, order is important.
-        (GenStgExpr bndr occ)   -- body
-
-  | StgRhsCon
-        CostCentreStack  -- CCS to be attached (default is CurrentCCS).
-                         -- Top-level (static) ones will end up with
-                         -- DontCareCCS, because we don't count static
-                         -- data in heap profiles, and we don't set CCCS
-                         -- from static closure.
-        DataCon          -- Constructor. Never an unboxed tuple or sum, as those
-                         -- are not allocated.
-        [GenStgArg occ]  -- Args
-
-    with constructors it's easy, simply application of the constructor to it's arguments.
-    
-For closures, we don't care about cost center (do we?), binder info is interesting:
-data StgBinderInfo
-  = NoStgBinderInfo
-  | SatCallsOnly        -- All occurrences are *saturated* *function* calls
-                        -- This means we don't need to build an info table and
-                        -- slow entry code for the thing
-                        -- Thunks never get this value
-    ^^^ maybe helpful to optimize code but can ignore for now
-    For update flags:
-    A @ReEntrant@ closure may be entered multiple times, but should not be
-updated or blackholed. An @Updatable@ closure should be updated after
-evaluation (and may be blackholed during evaluation). A @SingleEntry@
-closure will only be entered once, and so need not be updated but may
-safely be blackholed.
-data UpdateFlag = ReEntrant | Updatable | SingleEntry
--}
--- ReEntrant closure is most likely a function
-stgProcessRHS :: GenStgRhs Var Var -> SM String
-stgProcessRHS e@(StgRhsClosure ccs binfo freeVars ReEntrant args expr) = do 
-    exprRes <- stgProcessExpr expr
-    return (
-        "\n/* free Vars: " 
-        ++ showVarList freeVars ++ " */\n"
-        ++ showVarList args
-        ++ " => {\n" ++ exprRes ++ "} ")
--- this would be a THUNK
-stgProcessRHS e@(StgRhsClosure ccs binfo freeVars Updatable args expr) = do
-    exprRes <- stgProcessExpr expr
-    return ("new THUNK (" 
-        ++ showVarList freeVars ++ ", "
-        ++ showVarList args
-        ++ " => {\n" ++ exprRes ++ "} );")
-    -- keeping other closures as is for now
-stgProcessRHS e@(StgRhsClosure ccs binfo freeVars flag args expr) = do
-    exprRes <- stgProcessExpr expr
-    return ("[CLOSURE]" ++ 
-        showVarList freeVars ++ show flag ++ showVarList args 
-        ++ " . " ++ exprRes)
-stgProcessRHS e@(StgRhsCon ccs dcon args) = return ("new " ++ stgShowDCon dcon ++ processGenStgArgs args)
-    -- ++ "\n[CostCenter for above:]" ++ showGhc ccs
-
-filterOutCons (StgRhsClosure ccs binfo freeVars flag args expr) = True
-filterOutCons (StgRhsCon ccs dcon args) = False
-
-instance Show PrimOp where show = showGhc
-instance Show PrimCall where show = showGhc
-instance Show ForeignCall where show = showGhc
-deriving instance Show StgOp
-
-type IdName = String
--- Type for handling code generation later on
-data DotNetExpr = DNLit Literal -- literal
-    | FUN IdName [GenStgArg Var]
-    | PAP IdName [GenStgArg Var]
-    | CON IdName [GenStgArg Var] -- constructor application to a list of 
-    | THUNK 
-    | NOTIMPLEMENTED (GenStgExpr Var Var)
-    -- deriving (Eq)
-
-stgExpr2dnExpr :: GenStgExpr Var Var -> SM DotNetExpr
--- application: now simply converting to FUN, but have to detect PAPs where possible
--- as well as oversaturated applications (?)
-stgExpr2dnExpr (StgApp oc args) = pure $ FUN (showGhc $ varName oc) args
--- literals go in as is
-stgExpr2dnExpr (StgLit l) = pure $ DNLit l
--- constructor applications are guaranteed to be saturated so this is easy
-stgExpr2dnExpr (StgConApp dcon args types) = pure $ CON (showGhc $ dataConName dcon) args
-stgExpr2dnExpr e = return (NOTIMPLEMENTED e)
-
--- function application
-stgProcessExpr ::  GenStgExpr Var Var -> SM String
-stgProcessExpr (StgApp oc args) = do 
-    let ret = showVar oc ++ processGenStgArgs args
-    return ret
-stgProcessExpr (StgLit l) = return $ showGhc l
--- constructor application
-stgProcessExpr (StgConApp dcon args types) = return (
-    "new " ++ stgShowDCon dcon ++ processGenStgArgs args) -- ++ " [TYPES]" ++ showGhc types
--- operator application
-stgProcessExpr (StgOpApp op args tp) = return (show op ++ processGenStgArgs args)
--- apparently this is only used during transformation, so safely to ignore?
--- stgProcessExpr e@(StgLam bndrs ex) = return ("[Lam]" ++ showGhc e) -- bndrs ++ " = " ++ stgProcessExpr ex
--- case forces evaluation!!!
--- (altCon, bndrs, ex)
--- special case of only one default alternative - we DO NOT need switch statement in this case
-stgProcessExpr (StgCase ex bndr altType ((DEFAULT, bndrs, ex1):[]) ) = do
-    exprRes <- stgProcessExpr ex
-    exprRes1 <- stgProcessExpr ex1
-    s1 <- stab ("// ONE DEFAULT CASE: ALT TYPE: " ++ showGhc altType ++ "\n")
-    s2 <- stab ("var " ++ showGhc bndr ++ " = " ++ "EVAL (" ++ exprRes ++ ");\n")
-    s3 <- stab ("return " ++ exprRes1 ++ ";")
-    return (s1 ++ s2 ++ s3)
-stgProcessExpr (StgCase ex bndr altType alts) = do
-    exprRes <- stgProcessExpr ex
-    s1 <- stab ("// CASE: ALT TYPE: " ++ showGhc altType ++ "\n")
-    s2 <- stab ("var " ++ showGhc bndr ++ " = " ++ "EVAL (" ++ exprRes ++ ");\n")
-    s3 <- stab ("switch (" ++ showGhc bndr ++ ") {\n")
-    s4 <- stab "}"
-    incTab
-    altsRes <- processCaseAlts alts
-    decTab
-    return (s1 ++ s2 ++ s3 ++ altsRes ++ "\n" ++ s4)
-stgProcessExpr e@(StgLet binding expr) = do
-    exprRes <- stgProcessExpr expr
-    modify (\s -> s {isTopLevel = False} )
-    bRes <- stgProcessGenBinding binding
-    return ("\n" ++ bRes ++ "\nreturn " ++ exprRes)
-stgProcessExpr e = return ("[NOT IMPLEMENTED]" ++ showGhc e)
-
-processCaseAlts alts = foldM processCaseAlt "" alts
-processCaseAlt acc (altCon, bndrs, ex) = do
-    s1 <- stab (processAltCon altCon bndrs ++ ":\n")
-    incTab
-    exprRes <- stgProcessExpr ex
-    decTab
-    s2 <- stab (exprRes ++ "\n")
-    return (acc ++ s1 ++ s2)
-
-
-{-
-data GenStgArg occ
-  = StgVarArg  occ
-  | StgLitArg  Literal
--}
-processGenStgArgs [] = ""
-processGenStgArgs (x:[]) = ".CALL(" ++ processGenStgArg x ++ ")"
-processGenStgArgs (x:xs) = ".CALL(" ++ processGenStgArg x ++
-    foldl (\acc v -> acc ++ ", " ++ processGenStgArg v) "" xs ++ ")"
-
-processGenStgArg (StgLitArg  lit) = showGhc lit
-processGenStgArg (StgVarArg  occ) = showVar occ
-
-processAltCon DEFAULT _ = "default"
-processAltCon (LitAlt lit) _ = "case " ++ showGhc lit
-processAltCon (DataAlt dc) bndrs = "case " ++ showGhc dc ++ " " ++ showVarList bndrs
 {-
 
 https://downloads.haskell.org/~ghc/8.6.5/docs/html/libraries/ghc-8.6.5/StgSyn.html

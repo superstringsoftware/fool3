@@ -140,13 +140,13 @@ main = runGhc (Just libdir) $ do
     liftIO $ banner "Core Module - PREPPED!"
     liftIO $ putStrLn $ showGhc prep
 
-    
+    -}
     liftIO $ banner "STG"
     -- liftIO $ putStrLn $ showPpr dflags1 stgBindings
     liftIO $ mapM_ putStrLn (map showGhc stg_binds2)
     -- liftIO $ mapM_ (putStrLn . stgProcessBind) stgBindings
 
-    -}
+    
 
     liftIO $ banner "Class Instances"
     liftIO $ putStrLn $ showGhc ( mg_inst_env guts' )

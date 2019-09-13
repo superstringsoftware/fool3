@@ -7,6 +7,8 @@ import GHC.Prim
 -- import GHC.Float
 -- import Foreign.C.String
 
+-- funnyFunc x b = let t = if x == 0 then True else False in (b && t)
+
 -- repl x = x : repl x
 ------- BEGIN SMALLEST TEST PROGRAM
 {-
@@ -82,10 +84,10 @@ primNumTest 0# = 0#
 primNumTest 10# = 100#
 primNumTest x = x
 
-testLiteral = "Hello world"
 
 data Int = I# !Int#
 (I# x) - (I# y) = I# (x -# y)
+
 
 class Semigroup a where
     (+) :: a -> a -> a
