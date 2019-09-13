@@ -28,6 +28,7 @@ import HscTypes
 import CorePrep
 import CoreToStg
 import SimplStg
+import Literal
 
 import CoreSyn
 import StgSyn
@@ -37,6 +38,8 @@ import Var
 import Name (nameStableString)
 import Kind
 import IdInfo
+
+import TyCoRep -- Type data type (??)
 
 --import UniqDSet
 import DataCon
@@ -86,9 +89,75 @@ instance Show UpdateFlag where
     show Updatable = "\\u" 
     show SingleEntry = "\\s"
 
+{-
+Var Type is Kind which is Type which is here:
+http://hackage.haskell.org/package/ghc-8.6.5/docs/Type.html#t:Type (opaque type)
+data Type
+  -- See Note [Non-trivial definitional equality]
+  = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
+
+  | AppTy
+        Type
+        Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
+                        --
+                        --  1) Function: must /not/ be a 'TyConApp' or 'CastTy',
+                        --     must be another 'AppTy', or 'TyVarTy'
+                        --     See Note [Respecting definitional equality] (EQ1) about the
+                        --     no 'CastTy' requirement
+                        --
+                        --  2) Argument type
+
+  | TyConApp
+        TyCon
+        [KindOrType]    -- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
+                        -- Invariant: saturated applications of 'FunTyCon' must
+                        -- use 'FunTy' and saturated synonyms must use their own
+                        -- constructors. However, /unsaturated/ 'FunTyCon's
+                        -- do appear as 'TyConApp's.
+                        -- Parameters:
+                        --
+                        -- 1) Type constructor being applied to.
+                        --
+                        -- 2) Type arguments. Might not have enough type arguments
+                        --    here to saturate the constructor.
+                        --    Even type synonyms are not necessarily saturated;
+                        --    for example unsaturated type synonyms
+                        --    can appear as the right hand side of a type synonym.
+
+  | ForAllTy
+        !TyVarBinder
+        Type            -- ^ A Π type.
+
+  | FunTy Type Type     -- ^ t1 -> t2   Very common, so an important special case
+
+  | LitTy TyLit     -- ^ Type literals are similar to type constructors.
+
+  | CastTy
+        Type
+        KindCoercion  -- ^ A kind cast. The coercion is always nominal.
+                      -- INVARIANT: The cast is never refl.
+                      -- INVARIANT: The Type is not a CastTy (use TransCo instead)
+                      -- See Note [Respecting definitional equality] (EQ2) and (EQ3)
+
+  | CoercionTy
+        Coercion    -- ^ Injection of a Coercion into a type
+                    -- This should only ever be used in the RHS of an AppTy,
+                    -- in the list of a TyConApp, when applying a promoted
+                    -- GADT data constructor
+-}
+
+showType :: Type -> String
+showType (TyConApp tc kots) = "[TyConApp]" ++ showGhc tc ++ " " ++ showGhc kots
+showType t = "[NOT IMPLEMENTED] " ++ showGhc t
+
 -- showing vars
 showVar v = showGhc v ++ showVarDetails v -- showGhc (varName v) ++ " : " ++ showGhc (varType v)
 showVarDetails v = showGhc $ idDetails v
+
+showVarType v = (showGhc $ varType v)
+
+showVarWithType bndr = (showGhc $ varName bndr) ++ " :: " ++ (showGhc $ varType bndr)
+-- showVarWithType v = (showGhc $ varName v) ++ " :: " ++ (showType $ varType v)
 
 showVarList [] = "()"
 --showVarList (v:[]) = "[" ++ showVar v ++ "]"
@@ -128,8 +197,7 @@ data GenStgBinding pass
 stgProcessBind :: GenStgTopBinding Var Var -> SM String
 stgProcessBind e@(StgTopStringLit bndr bs) = 
     modify (\s -> s {isTopLevel = True}) >> 
-    return ("// " ++ (showGhc $ varName bndr) ++ " :: " 
-                  ++ (showGhc $ varType bndr) ++ "\n"
+    return ("// [TOP STRING LITERAL] " ++ showVarWithType bndr ++ "\n"
                   ++ (showGhc $ varName bndr) ++ " = " ++ show bs)
     -- return ("STG Top String Literal: " ++ showGhc e)
 -- stgProcessBind (StgTopLifted bn) = stgProcessGenBinding bn ++ "\n"
@@ -153,19 +221,48 @@ stgProcessGenBinding (StgRec ls) = do
 -- stgProcessGenericBinding :: GenStgBinding Var Var -> SM String
 stgProcessGenericBinding bndr rhs = do 
     rhsRes <- stgProcessRHS rhs
-    s1 <- stab ("// " ++ (showGhc $ varName bndr) ++ " :: " 
-                ++ (showGhc $ varType bndr) ++ "\n")
+    s1 <- stab ("// " ++ showVarWithType bndr ++ "\n")
     s2 <- stab("var " ++ (showGhc $ varName bndr) ++ " = " ++ rhsRes
                 ++ "\n")
     return (s1 ++ s2)
 
--- filtering out some rhs we don't want
-{-
-stgProcessGenBindingFiltered filt (StgNonRec bndr rhs) = stgProcessGenericBindingFiltered filt bndr rhs
-stgProcessGenBindingFiltered filt (StgRec ls) = foldl fn "[REC]\n" ls ++ "[ENDREC]"
-    where fn acc (b,rhs) = acc ++ stgProcessGenericBindingFiltered filt b rhs ++ "\n"
-stgProcessGenericBindingFiltered filt bndr rhs = if (filt rhs) then stgProcessGenericBinding bndr rhs else ""
--}
+-- Filtering out some bindings / rhs we don't want:
+-- Top level literals - don't loook like we need them in the compilation now
+isTopLevelLiteral :: GenStgTopBinding Var Var -> Bool
+isTopLevelLiteral (StgTopStringLit _ _) = True
+isTopLevelLiteral _ = False
+-- top level constructor applications to what looks like some helpful type / kind manipulation stuff which 
+-- we also probably don't need, at least initially
+isHelperConApp :: GenStgTopBinding Var Var -> Bool
+isHelperConApp (StgTopLifted (StgNonRec bndr _)) = elem (showVarType bndr) helperCons
+    where helperCons = ["KindRep", "TrName", "TyCon"]
+isHelperConApp _ = False
+
+allStgTopBindingFilters b = (isTopLevelLiteral b) || (isHelperConApp b)
+
+-- We are stripping going down the GenStgTopBinding --> GenStgBinding hierarchy,
+-- then killing the difference between REC and NONREC (may need it in the future, but not now???)
+-- and simply representing the program as the list of bindings from Var to GenStgRhs
+type BareStgProgram = [(Var, GenStgRhs Var Var)]
+-- function that does this simplification, then we can simply call stgProcessGenericBinding to create the program
+simplifyStgToBare :: [GenStgTopBinding Var Var] -> BareStgProgram
+simplifyStgToBare [] = []
+simplifyStgToBare (x:xs) = if (allStgTopBindingFilters x)
+        then simplifyStgToBare xs else (convertTopBinding x) ++ (simplifyStgToBare xs)
+        where convertTopBinding (StgTopLifted (StgNonRec bndr rhs)) = [(bndr, rhs)]
+              convertTopBinding (StgTopLifted (StgRec ls)) = ls
+
+-- silly textual representation for testing purposes mostly
+type TextProgram = [String]              
+-- convert bare to text
+bareToTextProgram :: BareStgProgram -> SM TextProgram
+bareToTextProgram bsp = mapM (\(v, rhs)-> stgProcessGenericBinding v rhs) bsp
+-- convert incoming stg to text
+stgToText :: [GenStgTopBinding Var Var] -> TextProgram
+stgToText stgp = evalState ((bareToTextProgram . simplifyStgToBare) stgp) initialCompilerState
+
+
+
 
 {-
 DataCon: https://downloads.haskell.org/~ghc/8.6.3/docs/html/libraries/ghc-8.6.3/DataCon.html#t:DataCon
@@ -200,8 +297,8 @@ data GenStgArg occ
 
     with constructors it's easy, simply application of the constructor to it's arguments.
     
-    for closures, we don't care about cost center (do we?), binder info is interesting:
-    data StgBinderInfo
+For closures, we don't care about cost center (do we?), binder info is interesting:
+data StgBinderInfo
   = NoStgBinderInfo
   | SatCallsOnly        -- All occurrences are *saturated* *function* calls
                         -- This means we don't need to build an info table and
@@ -249,14 +346,30 @@ instance Show PrimCall where show = showGhc
 instance Show ForeignCall where show = showGhc
 deriving instance Show StgOp
 
+type IdName = String
 -- Type for handling code generation later on
-data DotNetExpr = DNLit  -- literal
-    | DNCasePrim 
+data DotNetExpr = DNLit Literal -- literal
+    | FUN IdName [GenStgArg Var]
+    | PAP IdName [GenStgArg Var]
+    | CON IdName [GenStgArg Var] -- constructor application to a list of 
+    | THUNK 
+    | NOTIMPLEMENTED (GenStgExpr Var Var)
+    -- deriving (Eq)
+
+stgExpr2dnExpr :: GenStgExpr Var Var -> SM DotNetExpr
+-- application: now simply converting to FUN, but have to detect PAPs where possible
+-- as well as oversaturated applications (?)
+stgExpr2dnExpr (StgApp oc args) = pure $ FUN (showGhc $ varName oc) args
+-- literals go in as is
+stgExpr2dnExpr (StgLit l) = pure $ DNLit l
+-- constructor applications are guaranteed to be saturated so this is easy
+stgExpr2dnExpr (StgConApp dcon args types) = pure $ CON (showGhc $ dataConName dcon) args
+stgExpr2dnExpr e = return (NOTIMPLEMENTED e)
 
 -- function application
 stgProcessExpr ::  GenStgExpr Var Var -> SM String
 stgProcessExpr (StgApp oc args) = do 
-    let ret = showVar oc ++ " " ++ processGenStgArgs args
+    let ret = showVar oc ++ processGenStgArgs args
     return ret
 stgProcessExpr (StgLit l) = return $ showGhc l
 -- constructor application
@@ -291,7 +404,7 @@ stgProcessExpr e@(StgLet binding expr) = do
     modify (\s -> s {isTopLevel = False} )
     bRes <- stgProcessGenBinding binding
     return ("\n" ++ bRes ++ "\nreturn " ++ exprRes)
-stgProcessExpr e = return "NOT IMPLEMENTED" -- ++ showGhc e
+stgProcessExpr e = return ("[NOT IMPLEMENTED]" ++ showGhc e)
 
 processCaseAlts alts = foldM processCaseAlt "" alts
 processCaseAlt acc (altCon, bndrs, ex) = do
@@ -308,9 +421,9 @@ data GenStgArg occ
   = StgVarArg  occ
   | StgLitArg  Literal
 -}
-processGenStgArgs [] = "()"
-processGenStgArgs (x:[]) = "(" ++ processGenStgArg x ++ ")"
-processGenStgArgs (x:xs) = "(" ++ processGenStgArg x ++
+processGenStgArgs [] = ""
+processGenStgArgs (x:[]) = ".CALL(" ++ processGenStgArg x ++ ")"
+processGenStgArgs (x:xs) = ".CALL(" ++ processGenStgArg x ++
     foldl (\acc v -> acc ++ ", " ++ processGenStgArg v) "" xs ++ ")"
 
 processGenStgArg (StgLitArg  lit) = showGhc lit

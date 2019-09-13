@@ -111,6 +111,8 @@ main = runGhc (Just libdir) $ do
     -- setDynFlags dflags'
     stg_binds2 <- liftIO $ stg2stg dflags' stg
 
+    {-
+
     liftIO $ banner "Parsed Source"
     liftIO $ putStrLn $ showGhc ( parsedSource pmod )
 
@@ -144,9 +146,18 @@ main = runGhc (Just libdir) $ do
     liftIO $ mapM_ putStrLn (map showGhc stg_binds2)
     -- liftIO $ mapM_ (putStrLn . stgProcessBind) stgBindings
 
+    -}
+
+    liftIO $ banner "Class Instances"
+    liftIO $ putStrLn $ showGhc ( mg_inst_env guts' )
+
+    liftIO $ banner "Typed Toplevel Definitions"
+    liftIO $ mapM_ (putStrLn . showTyCon) (mg_tcs guts')
+
 
     liftIO $ banner "OUR STG COMPILATION"
-    liftIO $ mapM_ (\bind -> putStrLn (evalState (stgProcessBind bind) initialCompilerState)) stg_binds2 
+    -- liftIO $ mapM_ (\bind -> putStrLn (evalState (stgProcessBind bind) initialCompilerState)) stg_binds2 
+    liftIO $ mapM_ putStrLn (stgToText stg_binds2)
 
 
 

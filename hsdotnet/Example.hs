@@ -3,12 +3,24 @@
 module Example where
 
 import GHC.Prim
+-- import Prelude (undefined)
 -- import GHC.Float
 -- import Foreign.C.String
 
 -- repl x = x : repl x
+------- BEGIN SMALLEST TEST PROGRAM
+{-
+data Int = I# !Int#
+(I# x) + (I# y) = I# (x +# y)
 
+i = I# 10#
 
+print# :: a -> ()
+print# = print#
+
+main = print# (i + (I# 20#))
+-}
+------- END SMALLEST TEST PROGRAM
 
 {-
 map' _ [] = []
@@ -64,12 +76,13 @@ expDoubleStrange = expDoubleStrange
 
 
 -- BEGIN TEST PROGRAM FOR .NET COMPILATION
-
+-- foreign import ccall print :: List Int# -> Int#
 
 primNumTest 0# = 0#
 primNumTest 10# = 100#
 primNumTest x = x
 
+testLiteral = "Hello world"
 
 data Int = I# !Int#
 (I# x) - (I# y) = I# (x -# y)
@@ -108,7 +121,10 @@ length (Cons _ xs) = 1# +# length xs
 generate (I# 0#) = Nil
 generate n  = Cons n (generate (n- (I# 1#)))
 
-main = map (+(I# 10#)) (generate (I# 1000000#))
+print# :: List Int -> ()
+print# = print#
+
+main = print# (map (+(I# 10#)) (generate (I# 1000000#)))
 
 
 -- END TEST PROGRAM FOR .NET COMPILATION
