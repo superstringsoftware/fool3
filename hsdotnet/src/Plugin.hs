@@ -2,6 +2,7 @@
 module Plugin (plugin) where
 
 import Control.Monad.Trans
+import Control.Monad.State
 import GhcPlugins
 
 import DynFlags
@@ -111,7 +112,7 @@ pass guts = do
     -}
 
     liftIO $ banner "OUR STG COMPILATION"
-    liftIO $ mapM_ (putStrLn . stgProcessBind) stg_binds2
+    liftIO $ mapM_ (\bind -> putStrLn (evalState (stgProcessBind bind) initialCompilerState)) stg_binds2 
 
     
     {-

@@ -121,9 +121,10 @@ main = runGhc (Just libdir) $ do
   liftIO $ mapM_ putStrLn (map showGhc stg_binds2)
   -- liftIO $ mapM_ (putStrLn . stgProcessBind) stgBindings
 
-  liftIO $ banner "OUR STG COMPILATION"
+
+  -- liftIO $ banner "OUR STG COMPILATION"
   -- liftIO $ mapM_ (putStrLn . processBind) prep
-  liftIO $ mapM_ (putStrLn . stgProcessBind) stg_binds2
+  -- liftIO $ mapM_ (putStrLn . stgProcessBind) stg_binds2
   
 
 
