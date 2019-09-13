@@ -71,6 +71,13 @@ tab = do
     st <- get
     return (replicate (stringAlign st) ' ')
 
+-- helper method that returns a string aligned by current alignment
+stab :: String -> SM String
+stab s = do
+    st <- get
+    let t = replicate (stringAlign st) ' '
+    return (t ++ s)
+
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
 
@@ -142,10 +149,11 @@ stgProcessGenBinding (StgRec ls) = do
 -- stgProcessGenericBinding :: GenStgBinding Var Var -> SM String
 stgProcessGenericBinding bndr rhs = do 
     rhsRes <- stgProcessRHS rhs
-    return ("// " ++ (showGhc $ varName bndr) ++ " :: " 
-        ++ (showGhc $ varType bndr) ++ "\n"
-        ++ "var " ++ (showGhc $ varName bndr) ++ " = " ++ rhsRes
-        ++ "\n")
+    s1 <- stab ("// " ++ (showGhc $ varName bndr) ++ " :: " 
+                ++ (showGhc $ varType bndr) ++ "\n")
+    s2 <- stab("var " ++ (showGhc $ varName bndr) ++ " = " ++ rhsRes
+                ++ "\n")
+    return (s1 ++ s2)
 
 -- filtering out some rhs we don't want
 {-
@@ -255,30 +263,40 @@ stgProcessExpr (StgOpApp op args tp) = return (show op ++ processGenStgArgs args
 -- apparently this is only used during transformation, so safely to ignore?
 -- stgProcessExpr e@(StgLam bndrs ex) = return ("[Lam]" ++ showGhc e) -- bndrs ++ " = " ++ stgProcessExpr ex
 -- case forces evaluation!!!
+-- (altCon, bndrs, ex)
+-- special case of only one default alternative - we DO NOT need switch statement in this case
+stgProcessExpr (StgCase ex bndr altType ((DEFAULT, bndrs, ex1):[]) ) = do
+    exprRes <- stgProcessExpr ex
+    exprRes1 <- stgProcessExpr ex1
+    s1 <- stab ("// ONE DEFAULT CASE: ALT TYPE: " ++ showGhc altType ++ "\n")
+    s2 <- stab ("var " ++ showGhc bndr ++ " = " ++ "EVAL (" ++ exprRes ++ ");\n")
+    s3 <- stab ("return " ++ exprRes1 ++ ";")
+    return (s1 ++ s2 ++ s3)
 stgProcessExpr (StgCase ex bndr altType alts) = do
     exprRes <- stgProcessExpr ex
+    s1 <- stab ("// CASE: ALT TYPE: " ++ showGhc altType ++ "\n")
+    s2 <- stab ("var " ++ showGhc bndr ++ " = " ++ "EVAL (" ++ exprRes ++ ");\n")
+    s3 <- stab ("switch (" ++ showGhc bndr ++ ") {\n")
+    s4 <- stab "}"
     incTab
     altsRes <- processCaseAlts alts
     decTab
-    return ("// CASE: ALT TYPE: " ++ showGhc altType ++ 
-        "\nvar " ++ showGhc bndr ++ " = " 
-        ++ "EVAL (" ++ exprRes ++ ");\n"
-        ++ "switch (" ++ showGhc bndr ++ ")"
-        ++ altsRes)
+    return (s1 ++ s2 ++ s3 ++ altsRes ++ "\n" ++ s4)
 stgProcessExpr e@(StgLet binding expr) = do
     exprRes <- stgProcessExpr expr
     modify (\s -> s {isTopLevel = False} )
-    state <- get
-    return ("\n[Let]" ++ evalState (stgProcessGenBinding binding) state
-            ++ "\nreturn " ++ exprRes)
+    bRes <- stgProcessGenBinding binding
+    return ("\n" ++ bRes ++ "\nreturn " ++ exprRes)
 stgProcessExpr e = return "NOT IMPLEMENTED" -- ++ showGhc e
 
-processCaseAlts alts = foldM processCaseAlt "{\n" alts >>= \st -> return (st ++ "}")
+processCaseAlts alts = foldM processCaseAlt "" alts
 processCaseAlt acc (altCon, bndrs, ex) = do
+    s1 <- stab (processAltCon altCon bndrs ++ ":\n")
+    incTab
     exprRes <- stgProcessExpr ex
-    t <- tab
-    return (acc ++ t ++ processAltCon altCon bndrs ++ ":\n"
-        ++ t ++ t ++ exprRes ++ "\n")
+    decTab
+    s2 <- stab (exprRes ++ "\n")
+    return (acc ++ s1 ++ s2)
 
 
 {-
