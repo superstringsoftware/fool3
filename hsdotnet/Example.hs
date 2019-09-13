@@ -5,6 +5,15 @@ module Example where
 import GHC.Prim
 -- import GHC.Float
 -- import Foreign.C.String
+
+-- repl x = x : repl x
+
+
+
+{-
+map' _ [] = []
+map' f (x:xs) = (f x):(map' f xs)
+-}
 {-
 len :: [a] -> Int#
 len [] = 0#
@@ -56,14 +65,25 @@ expDoubleStrange = expDoubleStrange
 
 -- BEGIN TEST PROGRAM FOR .NET COMPILATION
 
+
 primNumTest 0# = 0#
 primNumTest 10# = 100#
 primNumTest x = x
 
 
 data Int = I# !Int#
-(I# x) + (I# y) = I# (x +# y)
 (I# x) - (I# y) = I# (x -# y)
+
+class Semigroup a where
+    (+) :: a -> a -> a
+    fun :: a -> Int
+
+instance Semigroup Int where
+    (I# x) + (I# y) = I# (x +# y)
+    fun x = x + (I# 5#)
+
+
+plust x = x + (I# 4#)
 
 data List a = Cons a (List a) | Nil
 

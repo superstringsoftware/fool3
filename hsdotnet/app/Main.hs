@@ -29,6 +29,7 @@ import HscTypes
 import CorePrep
 import CoreToStg
 import SimplStg
+import SimplCore
 
 import CoreSyn
 import StgSyn
@@ -43,6 +44,8 @@ import Control.Monad.Trans
 
 import Compiler
 
+import Control.Monad.State
+
 banner :: MonadIO m => String -> m ()
 banner msg = liftIO $ putStrLn (
   (replicate (fromIntegral n) '=')
@@ -56,76 +59,95 @@ banner msg = liftIO $ putStrLn (
 
 main :: IO ()
 main = runGhc (Just libdir) $ do
-  env <- getSession
-  dflags <- getSessionDynFlags
-  setSessionDynFlags $ dflags { hscTarget = HscAsm {-HscInterpreted, HscC-} 
-    -- , ghcLink = LinkInMemory
-  }
+    env <- getSession
+    dflags <- getSessionDynFlags
+    setSessionDynFlags $ dflags { hscTarget = HscAsm {-HscInterpreted, HscC-} 
+        -- , ghcLink = LinkInMemory
+    }
 
-  target <- guessTarget "Example.hs" Nothing
-  addTarget target
-  -- setTargets [target]
-  load LoadAllTargets
-  depanal [] True
-  modSum <- getModSummary $ mkModuleName "Example"
+    target <- guessTarget "Example.hs" Nothing
+    addTarget target
+    -- setTargets [target]
+    load LoadAllTargets
+    depanal [] True
+    modSum <- getModSummary $ mkModuleName "Example"
 
-  pmod <- parseModule modSum      -- ModuleSummary
-  tmod <- typecheckModule pmod    -- TypecheckedSource
-  dmod <- desugarModule tmod      -- DesugaredModule
-  let core = coreModule dmod      -- CoreModule
-  let mod   = ms_mod modSum
-  let loc   = ms_location modSum
-  let binds = mg_binds core
-  let tcs   = filter isDataTyCon (mg_tcs core) -- see note in source code: -- cg_tycons includes newtypes, for the benefit of External Core,
-  -- but we don't generate any code for newtypes
+    pmod <- parseModule modSum      -- ModuleSummary
+    tmod <- typecheckModule pmod    -- TypecheckedSource
+    dmod <- desugarModule tmod      -- DesugaredModule
+    let coreMod = coreModule dmod      -- CoreModule
+    let mod   = ms_mod modSum
+    let loc   = ms_location modSum
+    let core  = mg_binds coreMod
+    let tcs   = filter isDataTyCon (mg_tcs coreMod) -- see note in source code: -- cg_tycons includes newtypes, for the benefit of External Core,
+    -- but we don't generate any code for newtypes
 
-  -- http://hackage.haskell.org/package/ghc-8.6.5/docs/CorePrep.html
-  -- (prep, _) <- liftIO $ corePrepPgm env mod loc binds tcs
-  --stg <- liftIO $ coreToStg dflags (mg_module core) (mg_binds core)
-  -- let (stgBindings,_) = coreToStg dflags (mg_module core) (mg_binds core)
-  (prep, _) <- liftIO $ corePrepPgm env mod loc binds tcs
-  let (stg,_) = coreToStg dflags (mg_module core) prep
-  stg_binds2 <- liftIO $ stg2stg dflags stg
+    -- env <- getHscEnv
+    -- mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
+    -- let mod = mg_module guts
+    -- let (Just modSum) = mgLookupModule (hsc_mod_graph env) mod
+    -- let tcs = filter isDataTyCon (mg_tcs guts)
+    -- let loc   = ms_location modSum
+    -- prepping core
+    let dflags1 = foldl (\acc flag -> gopt_set acc flag) dflags [Opt_StgCSE, 
+            Opt_DoEtaReduction,
+            Opt_CallArity,
+            Opt_FunToThunk,
+            Opt_StgStats
+            ]
+    let dflags' = dflags1 -- dopt_set dflags1 Opt_D_dump_stg
+    let env' = env {hsc_dflags = dflags'}
+    -- run core2core passes
+    guts' <- liftIO $ core2core env' coreMod
+    let core' = mg_binds guts' 
+    (prep, _) <- liftIO $ corePrepPgm env' mod loc core' tcs
+    -- compiling to stg
+    -- gopt_set :: DynFlags -> GeneralFlag -> DynFlags
+    -- dopt_set :: DynFlags -> DumpFlag -> DynFlags
+    let (stg,_) = coreToStg dflags' mod prep
+    -- let dflags1 = dopt_set dflags Opt_D_dump_stg
+    -- setting stg optimization passes
+        -- , Opt_StgStats
+    -- setDynFlags dflags'
+    stg_binds2 <- liftIO $ stg2stg dflags' stg
+
+    liftIO $ banner "Parsed Source"
+    liftIO $ putStrLn $ showGhc ( parsedSource pmod )
+
+    liftIO $ banner "Renamed Module"
+    liftIO $ putStrLn $ showGhc ( tm_renamed_source tmod )
+
+    liftIO $ banner "Typechecked Module"
+    liftIO $ putStrLn $ showGhc ( tm_typechecked_source tmod )
+
+    liftIO $ banner "Typed Toplevel Definitions"
+    liftIO $ putStrLn $ showGhc ( modInfoTyThings (moduleInfo tmod) )
+
+    liftIO $ banner "Typed Toplevel Exports"
+    liftIO $ putStrLn $ showGhc ( modInfoExports (moduleInfo tmod) )
+
+    liftIO $ banner "Core Module"
+    liftIO $ putStrLn $ showGhc ( mg_binds coreMod )
+
+    liftIO $ banner "Type Declarations"
+    liftIO $ mapM_ (putStrLn . processTyThing) ( modInfoTyThings (moduleInfo tmod) )
+
+    -- liftIO $ banner "OUR CORE COMPILATION!!!"
+    -- liftIO $ mapM_ (putStrLn . processBind) binds
+
+    liftIO $ banner "Core Module - PREPPED!"
+    liftIO $ putStrLn $ showGhc prep
+
+    
+    liftIO $ banner "STG"
+    -- liftIO $ putStrLn $ showPpr dflags1 stgBindings
+    liftIO $ mapM_ putStrLn (map showGhc stg_binds2)
+    -- liftIO $ mapM_ (putStrLn . stgProcessBind) stgBindings
 
 
-  liftIO $ banner "Parsed Source"
-  liftIO $ putStrLn $ showGhc ( parsedSource pmod )
+    liftIO $ banner "OUR STG COMPILATION"
+    liftIO $ mapM_ (\bind -> putStrLn (evalState (stgProcessBind bind) initialCompilerState)) stg_binds2 
 
-  liftIO $ banner "Renamed Module"
-  liftIO $ putStrLn $ showGhc ( tm_renamed_source tmod )
-
-  liftIO $ banner "Typechecked Module"
-  liftIO $ putStrLn $ showGhc ( tm_typechecked_source tmod )
-
-  liftIO $ banner "Typed Toplevel Definitions"
-  liftIO $ putStrLn $ showGhc ( modInfoTyThings (moduleInfo tmod) )
-
-  liftIO $ banner "Typed Toplevel Exports"
-  liftIO $ putStrLn $ showGhc ( modInfoExports (moduleInfo tmod) )
-
-  liftIO $ banner "Core Module"
-  liftIO $ putStrLn $ showGhc ( mg_binds core )
-
-  liftIO $ banner "Type Declarations"
-  liftIO $ mapM_ (putStrLn . processTyThing) ( modInfoTyThings (moduleInfo tmod) )
-
-  -- liftIO $ banner "OUR CORE COMPILATION!!!"
-  -- liftIO $ mapM_ (putStrLn . processBind) binds
-
-  liftIO $ banner "Core Module - PREPPED!"
-  liftIO $ putStrLn $ showGhc prep
-
-  
-  liftIO $ banner "STG"
-  -- liftIO $ putStrLn $ showPpr dflags1 stgBindings
-  liftIO $ mapM_ putStrLn (map showGhc stg_binds2)
-  -- liftIO $ mapM_ (putStrLn . stgProcessBind) stgBindings
-
-
-  -- liftIO $ banner "OUR STG COMPILATION"
-  -- liftIO $ mapM_ (putStrLn . processBind) prep
-  -- liftIO $ mapM_ (putStrLn . stgProcessBind) stg_binds2
-  
 
 
   

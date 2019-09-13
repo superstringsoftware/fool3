@@ -126,8 +126,12 @@ data GenStgBinding pass
   | StgRec    [(BinderP pass, GenStgRhs pass)]
 -}
 stgProcessBind :: GenStgTopBinding Var Var -> SM String
-stgProcessBind (StgTopStringLit _ bs) = 
-    modify (\s -> s {isTopLevel = True}) >> return ("STG Top String Literal: " ++ show bs)
+stgProcessBind e@(StgTopStringLit bndr bs) = 
+    modify (\s -> s {isTopLevel = True}) >> 
+    return ("// " ++ (showGhc $ varName bndr) ++ " :: " 
+                  ++ (showGhc $ varType bndr) ++ "\n"
+                  ++ (showGhc $ varName bndr) ++ " = " ++ show bs)
+    -- return ("STG Top String Literal: " ++ showGhc e)
 -- stgProcessBind (StgTopLifted bn) = stgProcessGenBinding bn ++ "\n"
 stgProcessBind (StgTopLifted bn) = 
     modify (\s -> s {isTopLevel = True} ) >> stgProcessGenBinding bn

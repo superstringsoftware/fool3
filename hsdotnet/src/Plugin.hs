@@ -11,6 +11,7 @@ import HscTypes
 import CorePrep
 import CoreToStg
 import SimplStg
+import SimplCore
 
 import CoreSyn
 import StgSyn
@@ -68,6 +69,7 @@ pass guts = do
             ]
     let dflags' = dflags1 -- dopt_set dflags1 Opt_D_dump_stg
     let env' = env {hsc_dflags = dflags'}
+    -- run core2core passes
     (prep, _) <- liftIO $ corePrepPgm env' mod loc core tcs
     -- compiling to stg
     -- gopt_set :: DynFlags -> GeneralFlag -> DynFlags
