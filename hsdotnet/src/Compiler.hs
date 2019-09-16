@@ -122,7 +122,11 @@ convertStgBinding (StgRec ls) = ls
 type IdName = (String, Maybe Type)
 type Args = [Var]
 
-var2IdName v = (showVarName v, Just $ varType v)
+-- var2IdName v = (showVarName v, Just $ varType v)
+var2IdName v = (showGhc v ++ extractVarDetails v, Just $ varType v)
+
+extractVarInfo v = showGhc $ arityInfo (idInfo v)
+extractVarDetails v = showGhc (idDetails v)
 
 -- Types for handling code generation later on
 -- Heap objects, loosely following standard STG operational semantics
@@ -172,26 +176,47 @@ data DotNetExpr = RAWSTG (GenStgExpr Var Var) -- non implemented conversion yet
     | PRIMOP  IdName [GenStgArg Var]
     | PRIMCALL IdName [GenStgArg Var]
     | FOREIGNCALL IdName [GenStgArg Var]
-    -- Program - used to desconstruct let bindings as in effect they create a separate isolated piece of code
+    -- let bindings as in effect they create a separate isolated piece of code
     | LET DotNetObj DotNetExpr -- let (binding) in (expr)  
     | LETREC DotNetProgram DotNetExpr -- same but letrec
-    -- the (relatively) easy part is done, now we need to deconstruct and convert CASE and LET, which get represented
-    -- by different low-level constructs
-
+    -- Case: only 1 default option, so simple evaluation and return
+    -- varName - variable to bind expr to and evaluate (CASE drives evaluation!)
+    -- retExpr - expression to return
+    | CASESIMPLE { bndrName :: String, expr :: DotNetExpr, retExpr :: DotNetExpr}
+    | CASE {bndrName :: String, expr :: DotNetExpr, 
+            defaultCase :: Maybe DotNetExpr, 
+            cases :: [(AltCon, [String], DotNetExpr)], altType :: AltType }
+    
 
 stgExpr2DotNetExpr :: GenStgExpr Var Var -> DotNetExpr
 stgExpr2DotNetExpr (StgLit lit) = LITERAL lit
 stgExpr2DotNetExpr (StgApp occ []) = VAR (var2IdName occ)
 stgExpr2DotNetExpr (StgApp occ args) = FUNCALL (var2IdName occ) args -- no PAP analysis now!
+-- constructor application
 stgExpr2DotNetExpr (StgConApp dcon args tp) = CONCALL (stgShowDCon dcon, Nothing) args
+-- primops and foreign calls
 stgExpr2DotNetExpr (StgOpApp (StgPrimOp pop) args tp) = PRIMOP (showGhc pop, Nothing) args
 stgExpr2DotNetExpr (StgOpApp (StgPrimCallOp pop) args tp) = PRIMCALL (showGhc pop, Nothing) args
 stgExpr2DotNetExpr (StgOpApp (StgFCallOp pop _) args tp) = FOREIGNCALL (showGhc pop, Nothing) args
+-- let bindings
 stgExpr2DotNetExpr (StgLet (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
 stgExpr2DotNetExpr (StgLet (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
 stgExpr2DotNetExpr (StgLetNoEscape (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
 stgExpr2DotNetExpr (StgLetNoEscape (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
+-- case - 1 default option
+stgExpr2DotNetExpr (StgCase ex bndr altType ((DEFAULT, bndrs, ex1):[]) ) = 
+    CASESIMPLE (showGhc bndr) (stgExpr2DotNetExpr ex) (stgExpr2DotNetExpr ex1)
+-- general case
+stgExpr2DotNetExpr (StgCase ex bndr altType alts) = 
+    CASE (showGhc bndr) (stgExpr2DotNetExpr ex) (maybeDefault alts) (convertAlts alts) altType
+    where maybeDefault ((DEFAULT, bndrs, ex):[]) = Just (stgExpr2DotNetExpr ex)
+          maybeDefault _ = Nothing
+          convertAlts ((DEFAULT, bndrs, ex):xs) = convertAlts xs
+          convertAlts [] = []
+          convertAlts ((con,bndrs, ex):xs) = (con, map showGhc bndrs, stgExpr2DotNetExpr ex):(convertAlts xs)
 stgExpr2DotNetExpr e = RAWSTG e
+
+
 
 stg2DotNet :: [GenStgTopBinding Var Var] -> DotNetProgram
 stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
@@ -199,6 +224,10 @@ stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
 -- classes to output different options of the code
 class CSharpable a where
     toCSharp :: a -> SM String
+
+instance CSharpable a => CSharpable (Maybe a) where
+    toCSharp Nothing = return ""
+    toCSharp (Just x) = toCSharp x
 
 class ILable a where
     toIL :: a -> SM String
@@ -212,8 +241,11 @@ instance CSharpable DotNetObj where
 -- Ok this is a bit tricky - if an expr inside our closure is a LET or CASE then we process the code inside LET / CASE
 -- further down the hierarchy; if it's something else - we return the result (cause it's a var or a function call)
 _scs n fv ar c@(LET _ _) con = _scsR n fv ar c con False
+_scs n fv ar c@(CASESIMPLE _ _ _) con = _scsR n fv ar c con False
+_scs n fv ar c@(CASE _ _ _ _ _) con = _scsR n fv ar c con False
 _scs n fv ar c con = _scsR n fv ar c con True
 _scsR n fv ar c con addRet = do
+    -- s0 <- stab ("/* " ++ showGhc (snd n) ++ "*/\n" )
     s1 <- stab ((fst n) ++ " = new " 
             ++ con ++ "("          
             ++ showGhc fv ++ ", "
@@ -223,18 +255,18 @@ _scsR n fv ar c con addRet = do
     r1 <- stab "return "
     decTab
     s3 <- stab "})\n"
-    if addRet then return (s1 ++ r1 ++ s2 ++ s3) else return (s1 ++ s2 ++ s3)
+    if addRet then return (s1 ++ r1 ++ s2 ++ "\n" ++ s3) else return (s1 ++ s2 ++ "\n" ++ s3)
     
 
 instance CSharpable DotNetExpr where
     toCSharp (RAWSTG e) = return $ "[NOT IMPLEMENTED] " ++ "(" ++ showGhc e ++ ")\n"
     toCSharp (VAR v) = return $ fst v
     toCSharp (LITERAL l) = return $ showGhc l
-    toCSharp (FUNCALL (n,_) args) = return (n ++ ".CALL" ++ showGhc args ++ "\n")
-    toCSharp (CONCALL (n,_) args) = return ("new " ++ n ++ showGhc args ++ "\n")
-    toCSharp (PRIMOP (n,_) args) = return ("[PRIMOP]" ++ n ++ ".CALL" ++ showGhc args ++ "\n")
-    toCSharp (PRIMCALL (n,_) args) = return ("[PRIMCALL]" ++ n ++ ".CALL" ++ showGhc args ++ "\n")
-    toCSharp (FOREIGNCALL (n,_) args) = return ("[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args ++ "\n")
+    toCSharp (FUNCALL (n,_) args) = return (n ++ ".CALL" ++ showGhc args)
+    toCSharp (CONCALL (n,_) args) = return ("new " ++ n ++ showGhc args)
+    toCSharp (PRIMOP (n,_) args) = return ("[PRIMOP]" ++ n ++ ".CALL" ++ showGhc args)
+    toCSharp (PRIMCALL (n,_) args) = return ("[PRIMCALL]" ++ n ++ ".CALL" ++ showGhc args)
+    toCSharp (FOREIGNCALL (n,_) args) = return ("[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args)
     -- let .. in let - is a separate case, don't need "return" there!!!
     toCSharp (LET o e@(LET _ _)) = (liftM2 (++) (toCSharp o) (toCSharp e)) >>= (\s -> pure $ "\n" ++ s)
     toCSharp (LET o e) = do
@@ -242,6 +274,34 @@ instance CSharpable DotNetExpr where
         s2 <- (toCSharp o)
         return ("\n" ++ s2 ++ s1)
     toCSharp (LETREC p e) = return ("[REC]" ++ show p ++ "return " ++ show e ++ "\n")
+    toCSharp (CASESIMPLE n e re) = do
+        s1 <- toCSharp e >>= \x -> stab (n ++ " = EVAL(" ++ x ++ ")\n")
+        s2 <- toCSharp re >>= \x -> stab ("return " ++ x)
+        return ("\n" ++ s1 ++ s2)
+    toCSharp (CASE n e def cases altType) = do
+        s1 <- toCSharp e
+        s2 <- stab (n ++ " = EVAL(" ++ s1 ++ ")\n")
+        s6 <- stab ("switch (" ++ n ++ ") {\n")
+        incTab 
+        s3 <- altsToCSharp cases
+        defSt <- toCSharp def
+        s4 <- stab ("default: " ++ defSt)
+        decTab
+        s7 <- stab "}"
+        let s5 = if (defSt == "") then "" else s4
+        return ("\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ s7)
+
+altsToCSharp alts = foldM altToCSharp "" alts
+altToCSharp acc (altCon, bndrs, ex) = do
+    s1 <- stab (altConToCSharp altCon bndrs ++ ":\n")
+    incTab
+    exprRes <- toCSharp ex
+    s2 <- stab (exprRes ++ "\n")
+    decTab
+    return (acc ++ s1 ++ s2)
+        
+altConToCSharp (LitAlt lit) _ = "case " ++ showGhc lit
+altConToCSharp (DataAlt dc) bndrs = "case " ++ showGhc dc ++ " " ++ show bndrs
     
 stgToText :: [GenStgTopBinding Var Var] -> TextProgram
 stgToText stgp = evalState (mapM toCSharp (stg2DotNet stgp)) initialCompilerState
