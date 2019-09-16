@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim, UnboxedTuples, NoImplicitPrelude #-} -- , NoImplicitPrelude
+{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim, UnboxedTuples #-} -- , NoImplicitPrelude
 
 module Example where
 
@@ -7,12 +7,16 @@ import GHC.Prim
 -- import GHC.Float
 -- import Foreign.C.String
 
-{-
+g x = funcTest x
+
+f = [10, 20, 1]
+f1 = f
+
 funcTest :: Int -> Int
 funcTest s = let x = s + 2 
              in let y = s * s
                 in y - x
--}
+
 {-
 letFuncTest s = let y = s + 2
                     z = s * s
@@ -115,6 +119,7 @@ expDoubleStrange = expDoubleStrange
 
 
 -- BEGIN TEST PROGRAM FOR .NET COMPILATION
+{-
 foreign import ccall exp :: Int# -> Int#
 
 -- primNumTest 0# = 0#
@@ -165,7 +170,7 @@ print# = print#
 
 main = print# (map (+(I# 10#)) (generate (I# 1000000#)))
 
-
+-}
 -- END TEST PROGRAM FOR .NET COMPILATION
 
 

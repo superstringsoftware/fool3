@@ -178,6 +178,76 @@ data DotNetExpr = RAWSTG (GenStgExpr Var Var) -- non implemented conversion yet
     -- the (relatively) easy part is done, now we need to deconstruct and convert CASE and LET, which get represented
     -- by different low-level constructs
 
+
+stgExpr2DotNetExpr :: GenStgExpr Var Var -> DotNetExpr
+stgExpr2DotNetExpr (StgLit lit) = LITERAL lit
+stgExpr2DotNetExpr (StgApp occ []) = VAR (var2IdName occ)
+stgExpr2DotNetExpr (StgApp occ args) = FUNCALL (var2IdName occ) args -- no PAP analysis now!
+stgExpr2DotNetExpr (StgConApp dcon args tp) = CONCALL (stgShowDCon dcon, Nothing) args
+stgExpr2DotNetExpr (StgOpApp (StgPrimOp pop) args tp) = PRIMOP (showGhc pop, Nothing) args
+stgExpr2DotNetExpr (StgOpApp (StgPrimCallOp pop) args tp) = PRIMCALL (showGhc pop, Nothing) args
+stgExpr2DotNetExpr (StgOpApp (StgFCallOp pop _) args tp) = FOREIGNCALL (showGhc pop, Nothing) args
+stgExpr2DotNetExpr (StgLet (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
+stgExpr2DotNetExpr (StgLet (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
+stgExpr2DotNetExpr (StgLetNoEscape (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
+stgExpr2DotNetExpr (StgLetNoEscape (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
+stgExpr2DotNetExpr e = RAWSTG e
+
+stg2DotNet :: [GenStgTopBinding Var Var] -> DotNetProgram
+stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
+
+-- classes to output different options of the code
+class CSharpable a where
+    toCSharp :: a -> SM String
+
+class ILable a where
+    toIL :: a -> SM String
+    
+instance CSharpable DotNetObj where
+    toCSharp (CON v n ar) = stab (fst v ++ " = new " ++ n ++ showGhc ar ++ "\n")
+    toCSharp e@(FUN n fv ar c) = _scs n fv ar c "FUN"
+    toCSharp e@(ONCE n fv ar c) = _scs n fv ar c "THUNK_ONCE"
+    toCSharp e@(THUNK n fv ar c) = _scs n fv ar c "THUNK"
+-- helper function
+-- Ok this is a bit tricky - if an expr inside our closure is a LET or CASE then we process the code inside LET / CASE
+-- further down the hierarchy; if it's something else - we return the result (cause it's a var or a function call)
+_scs n fv ar c@(LET _ _) con = _scsR n fv ar c con False
+_scs n fv ar c con = _scsR n fv ar c con True
+_scsR n fv ar c con addRet = do
+    s1 <- stab ((fst n) ++ " = new " 
+            ++ con ++ "("          
+            ++ showGhc fv ++ ", "
+            ++ "(" ++ showGhc ar ++ if addRet then ")=> {\n" else ")=> {" )
+    incTab
+    s2 <- toCSharp c
+    r1 <- stab "return "
+    decTab
+    s3 <- stab "})\n"
+    if addRet then return (s1 ++ r1 ++ s2 ++ s3) else return (s1 ++ s2 ++ s3)
+    
+
+instance CSharpable DotNetExpr where
+    toCSharp (RAWSTG e) = return $ "[NOT IMPLEMENTED] " ++ "(" ++ showGhc e ++ ")\n"
+    toCSharp (VAR v) = return $ fst v
+    toCSharp (LITERAL l) = return $ showGhc l
+    toCSharp (FUNCALL (n,_) args) = return (n ++ ".CALL" ++ showGhc args ++ "\n")
+    toCSharp (CONCALL (n,_) args) = return ("new " ++ n ++ showGhc args ++ "\n")
+    toCSharp (PRIMOP (n,_) args) = return ("[PRIMOP]" ++ n ++ ".CALL" ++ showGhc args ++ "\n")
+    toCSharp (PRIMCALL (n,_) args) = return ("[PRIMCALL]" ++ n ++ ".CALL" ++ showGhc args ++ "\n")
+    toCSharp (FOREIGNCALL (n,_) args) = return ("[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args ++ "\n")
+    -- let .. in let - is a separate case, don't need "return" there!!!
+    toCSharp (LET o e@(LET _ _)) = (liftM2 (++) (toCSharp o) (toCSharp e)) >>= (\s -> pure $ "\n" ++ s)
+    toCSharp (LET o e) = do
+        s1 <- (toCSharp e >>= \x -> stab ("return " ++ x))
+        s2 <- (toCSharp o)
+        return ("\n" ++ s2 ++ s1)
+    toCSharp (LETREC p e) = return ("[REC]" ++ show p ++ "return " ++ show e ++ "\n")
+    
+stgToText :: [GenStgTopBinding Var Var] -> TextProgram
+stgToText stgp = evalState (mapM toCSharp (stg2DotNet stgp)) initialCompilerState
+
+    
+-- simple show instances
 instance Show DotNetObj where
     show (CON v n ar) = fst v ++ " = new " ++ n ++ showGhc ar ++ "\n"
     show e@(FUN _ _ _ _) = _s e "FUN"
@@ -204,22 +274,6 @@ instance Show DotNetExpr where
     show (LET o e) = show o ++ "return " ++ show e ++ "\n"
     show (LETREC p e) = "[REC]" ++ show p ++ "return " ++ show e ++ "\n"
 
-stgExpr2DotNetExpr :: GenStgExpr Var Var -> DotNetExpr
-stgExpr2DotNetExpr (StgLit lit) = LITERAL lit
-stgExpr2DotNetExpr (StgApp occ []) = VAR (var2IdName occ)
-stgExpr2DotNetExpr (StgApp occ args) = FUNCALL (var2IdName occ) args -- no PAP analysis now!
-stgExpr2DotNetExpr (StgConApp dcon args tp) = CONCALL (stgShowDCon dcon, Nothing) args
-stgExpr2DotNetExpr (StgOpApp (StgPrimOp pop) args tp) = PRIMOP (showGhc pop, Nothing) args
-stgExpr2DotNetExpr (StgOpApp (StgPrimCallOp pop) args tp) = PRIMCALL (showGhc pop, Nothing) args
-stgExpr2DotNetExpr (StgOpApp (StgFCallOp pop _) args tp) = FOREIGNCALL (showGhc pop, Nothing) args
-stgExpr2DotNetExpr (StgLet (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
-stgExpr2DotNetExpr (StgLet (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
-stgExpr2DotNetExpr (StgLetNoEscape (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
-stgExpr2DotNetExpr (StgLetNoEscape (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
-stgExpr2DotNetExpr e = RAWSTG e
-
-stg2DotNet :: [GenStgTopBinding Var Var] -> DotNetProgram
-stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
 
 -- silly textual representation for testing purposes mostly (OLD)
 type TextProgram = [String]              
@@ -227,8 +281,8 @@ type TextProgram = [String]
 bareToTextProgram :: BareStgProgram -> SM TextProgram
 bareToTextProgram bsp = mapM (\(v, rhs)-> stgProcessGenericBinding v rhs) bsp
 -- convert incoming stg to text
-stgToText :: [GenStgTopBinding Var Var] -> TextProgram
-stgToText stgp = evalState ((bareToTextProgram . simplifyStgToBare) stgp) initialCompilerState
+stgToTextOld :: [GenStgTopBinding Var Var] -> TextProgram
+stgToTextOld stgp = evalState ((bareToTextProgram . simplifyStgToBare) stgp) initialCompilerState
 
 ---------------------------------------------------------------
 -- OLDER CONVERT TO TEXT STUFF USED FOR UNDERSTANDING TYPES ETC
