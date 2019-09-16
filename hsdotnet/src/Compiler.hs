@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, StandaloneDeriving #-}
+{-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, RecordWildCards #-}
 
 {-
 Compilation sequence goes in phases:
@@ -107,16 +107,27 @@ simplifyStgToBare :: [GenStgTopBinding Var Var] -> BareStgProgram
 simplifyStgToBare [] = []
 simplifyStgToBare (x:xs) = if (allStgTopBindingFilters x)
         then simplifyStgToBare xs else (convertTopBinding x) ++ (simplifyStgToBare xs)
-        where convertTopBinding (StgTopLifted (StgNonRec bndr rhs)) = [(bndr, rhs)]
-              convertTopBinding (StgTopLifted (StgRec ls)) = ls
+        
+convertTopBinding :: GenStgTopBinding Var Var -> BareStgProgram
+convertTopBinding (StgTopLifted x) = convertStgBinding x
 
+-- need this separately as this is used in let expressions!
+convertStgBinding :: GenStgBinding Var Var -> BareStgProgram
+convertStgBinding (StgNonRec bndr rhs) = [(bndr, rhs)]
+convertStgBinding (StgRec ls) = ls
 
-type IdName = Var
+-- we want to store all op applications together, 
+-- thus adding some tags to process StgOpApp below
+-- data VarType = GHCType Type | DATACON | PRIMOP | PRIMCALL | FOREIGN              
+type IdName = (String, Maybe Type)
 type Args = [Var]
+
+var2IdName v = (showVarName v, Just $ varType v)
 
 -- Types for handling code generation later on
 -- Heap objects, loosely following standard STG operational semantics
-data DotNetHeapObj = 
+-- 'name' is always the variable to which we are binding the expression
+data DotNetObj = 
     -- function object
       FUN   { name :: IdName, freeVars :: Args, args :: Args, code :: DotNetExpr}
     -- updatable thunk
@@ -124,26 +135,91 @@ data DotNetHeapObj =
     -- thunk that only gets called once and can be garbage collected afterwards
     | ONCE  { name :: IdName, freeVars :: Args, args :: Args, code :: DotNetExpr}
      -- constructor application, always saturated
-    | CON   { conName :: String, conArgs :: [GenStgArg Var]}
+    | CON   { name :: IdName, conName :: String, conArgs :: [GenStgArg Var]}
     -- deriving (Eq)
 
-data DotNetExpr = RAWSTG (GenStgExpr Var Var)
+-- following BareStgProgram
+type DotNetProgram = [DotNetObj]
 
 -- converting closures to heap object representation while stripping unneeded info
-stgBinding2DotNet :: (Var, GenStgRhs Var Var) -> DotNetHeapObj 
+stgBinding2DotNet :: (Var, GenStgRhs Var Var) -> DotNetObj 
 -- this is probably a function 
 stgBinding2DotNet (v, (StgRhsClosure ccs binfo freeVars ReEntrant args expr)) = 
-    FUN   v freeVars args (stgExpr2DotNetExpr expr)
+    FUN   (var2IdName v) freeVars args (stgExpr2DotNetExpr expr)
 stgBinding2DotNet (v, (StgRhsClosure ccs binfo freeVars SingleEntry args expr)) = 
-    ONCE  v freeVars args (stgExpr2DotNetExpr expr)    
+    ONCE  (var2IdName v) freeVars args (stgExpr2DotNetExpr expr)    
 stgBinding2DotNet (v, (StgRhsClosure ccs binfo freeVars flag args expr)) = 
-    THUNK v freeVars args (stgExpr2DotNetExpr expr)    
-stgBinding2DotNet (v, (StgRhsCon ccs dcon args)) = CON (stgShowDCon dcon) args
+    THUNK (var2IdName v) freeVars args (stgExpr2DotNetExpr expr)    
+stgBinding2DotNet (v, (StgRhsCon ccs dcon args)) = CON (var2IdName v) (stgShowDCon dcon) args
 
+stgProgram2DotNetProgram :: BareStgProgram -> DotNetProgram
+stgProgram2DotNetProgram p = map stgBinding2DotNet p
+
+-- Expression representation
+{-
+StgCase (GenStgExpr bndr occ) bndr AltType [GenStgAlt bndr occ]	 
+StgLet (GenStgBinding bndr occ) (GenStgExpr bndr occ)	 
+StgLetNoEscape (GenStgBinding bndr occ) (GenStgExpr bndr occ)	 
+StgTick (Tickish bndr) (GenStgExpr bndr occ)
+-}
+data DotNetExpr = RAWSTG (GenStgExpr Var Var) -- non implemented conversion yet
+    | VAR IdName -- lone Var not being applied to anything, corresponds to App Var [] in Stg
+    | LITERAL Literal
+    -- various calls
+    | FUNCALL IdName [GenStgArg Var] 
+    | PAPCALL IdName [GenStgArg Var] -- partial function application (if we know it at compile time)
+    | CONCALL IdName [GenStgArg Var] -- constructor application, more or less equal to CON in Heap Objects
+    | PRIMOP  IdName [GenStgArg Var]
+    | PRIMCALL IdName [GenStgArg Var]
+    | FOREIGNCALL IdName [GenStgArg Var]
+    -- Program - used to desconstruct let bindings as in effect they create a separate isolated piece of code
+    | LET DotNetObj DotNetExpr -- let (binding) in (expr)  
+    | LETREC DotNetProgram DotNetExpr -- same but letrec
+    -- the (relatively) easy part is done, now we need to deconstruct and convert CASE and LET, which get represented
+    -- by different low-level constructs
+
+instance Show DotNetObj where
+    show (CON v n ar) = fst v ++ " = new " ++ n ++ showGhc ar ++ "\n"
+    show e@(FUN _ _ _ _) = _s e "FUN"
+    show e@(ONCE _ _ _ _) = _s e "THUNK_ONCE"
+    show e@(THUNK _ _ _ _) = _s e "THUNK"
+-- helper function
+_s o con = (fst $ name o) ++ " = new " 
+            ++ con ++ "("          
+            ++ showGhc (freeVars o) ++ ", "
+            ++ "(" ++ showGhc (args o) ++ ")=> {\n"
+            ++ show (code o) ++ "})\n"
+
+instance Show DotNetExpr where
+    show (RAWSTG e) = "[NOT IMPLEMENTED] " ++ "(" ++ showGhc e ++ ")\n"
+    show (VAR v) = fst v
+    show (LITERAL l) = showGhc l
+    show (FUNCALL (n,_) args) = n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (CONCALL (n,_) args) = "new " ++ n ++ showGhc args ++ "\n"
+    show (PRIMOP (n,_) args) = "[PRIMOP]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (PRIMCALL (n,_) args) = "[PRIMCALL]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (FOREIGNCALL (n,_) args) = "[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    -- let .. in let - is a separate case, don't need "return" there!!!
+    show (LET o e@(LET _ _)) = show o ++ show e 
+    show (LET o e) = show o ++ "return " ++ show e ++ "\n"
+    show (LETREC p e) = "[REC]" ++ show p ++ "return " ++ show e ++ "\n"
 
 stgExpr2DotNetExpr :: GenStgExpr Var Var -> DotNetExpr
+stgExpr2DotNetExpr (StgLit lit) = LITERAL lit
+stgExpr2DotNetExpr (StgApp occ []) = VAR (var2IdName occ)
+stgExpr2DotNetExpr (StgApp occ args) = FUNCALL (var2IdName occ) args -- no PAP analysis now!
+stgExpr2DotNetExpr (StgConApp dcon args tp) = CONCALL (stgShowDCon dcon, Nothing) args
+stgExpr2DotNetExpr (StgOpApp (StgPrimOp pop) args tp) = PRIMOP (showGhc pop, Nothing) args
+stgExpr2DotNetExpr (StgOpApp (StgPrimCallOp pop) args tp) = PRIMCALL (showGhc pop, Nothing) args
+stgExpr2DotNetExpr (StgOpApp (StgFCallOp pop _) args tp) = FOREIGNCALL (showGhc pop, Nothing) args
+stgExpr2DotNetExpr (StgLet (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
+stgExpr2DotNetExpr (StgLet (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
+stgExpr2DotNetExpr (StgLetNoEscape (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
+stgExpr2DotNetExpr (StgLetNoEscape (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
 stgExpr2DotNetExpr e = RAWSTG e
 
+stg2DotNet :: [GenStgTopBinding Var Var] -> DotNetProgram
+stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
 
 -- silly textual representation for testing purposes mostly (OLD)
 type TextProgram = [String]              
@@ -416,6 +492,7 @@ showVar v = showGhc v ++ showVarDetails v -- showGhc (varName v) ++ " : " ++ sho
 showVarDetails v = showGhc $ idDetails v
 
 showVarType v = (showGhc $ varType v)
+showVarName v = showGhc (varName v)
 
 showVarWithType bndr = (showGhc $ varName bndr) ++ " :: " ++ (showGhc $ varType bndr)
 -- showVarWithType v = (showGhc $ varName v) ++ " :: " ++ (showType $ varType v)

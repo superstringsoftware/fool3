@@ -1,18 +1,25 @@
 ﻿<Properties StartupConfiguration="{42E22914-82E2-4F99-834B-02207672ECC8}|Default">
-  <MonoDevelop.Ide.Workbench ActiveDocument="rts/CLOSURE.cs">
+  <MonoDevelop.Ide.Workbench ActiveDocument="rts/Idea3.cs">
     <Files>
-      <File FileName="rts/Program.cs" Line="279" Column="5" />
+      <File FileName="rts/Program.cs" Line="359" Column="13" />
       <File FileName="rts/Program.il" Line="217" Column="26" />
-      <File FileName="rts/CLOSURE.cs" Line="49" Column="35" />
+      <File FileName="rts/CLOSURE.cs" Line="319" Column="13" />
+      <File FileName="rts/Idea3.cs" Line="4" Column="5" />
     </Files>
     <Pads>
       <Pad Id="ProjectPad">
         <State name="__root__">
           <Node name="rts" expanded="True">
             <Node name="rts" expanded="True">
-              <Node name="CLOSURE.cs" selected="True" />
+              <Node name="Idea3.cs" selected="True" />
             </Node>
           </Node>
+        </State>
+      </Pad>
+      <Pad Id="MonoDevelop.Debugger.WatchPad">
+        <State>
+          <Value>xs</Value>
+          <Value>args</Value>
         </State>
       </Pad>
     </Pads>

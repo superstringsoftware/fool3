@@ -7,6 +7,43 @@ import GHC.Prim
 -- import GHC.Float
 -- import Foreign.C.String
 
+{-
+funcTest :: Int -> Int
+funcTest s = let x = s + 2 
+             in let y = s * s
+                in y - x
+-}
+{-
+letFuncTest s = let y = s + 2
+                    z = s * s
+                in  y * z
+
+
+letFuncTest :: forall a. Num a => a -> a
+[LclIdX, Arity=2, Unf=OtherCon []] =
+    [] \r [$dNum_s1bR s]
+        let {
+          sat_s1c7 [Occ=Once] :: a
+          [LclId] =
+              [$dNum_s1bR s] \u [] * $dNum_s1bR s s; } in
+        let {
+          sat_s1c6 [Occ=Once] :: a
+          [LclId] =
+              [$dNum_s1bR s] \u []
+                  let {
+                    sat_s1c5 [Occ=Once] :: a
+                    [LclId] =
+                        [$dNum_s1bR] \u []
+                            let {
+                              sat_s1c4 [Occ=Once] :: Integer
+                              [LclId] =
+                                  CCCS S#! [2#];
+                            } in  fromInteger $dNum_s1bR sat_s1c4;
+                  } in  + $dNum_s1bR s sat_s1c5;
+        } in  * $dNum_s1bR sat_s1c6 sat_s1c7;
+
+-}
+
 -- funnyFunc x b = let t = if x == 0 then True else False in (b && t)
 
 -- repl x = x : repl x
@@ -78,11 +115,11 @@ expDoubleStrange = expDoubleStrange
 
 
 -- BEGIN TEST PROGRAM FOR .NET COMPILATION
--- foreign import ccall print :: List Int# -> Int#
+foreign import ccall exp :: Int# -> Int#
 
-primNumTest 0# = 0#
-primNumTest 10# = 100#
-primNumTest x = x
+-- primNumTest 0# = 0#
+-- primNumTest 10# = 100#
+primNumTest x = exp x
 
 
 data Int = I# !Int#
@@ -117,8 +154,8 @@ head (Cons x _) = x
 foldr f z Nil     = z
 foldr f z (Cons x xs) = x `f` foldr f z xs
 
-length Nil = 0#
-length (Cons _ xs) = 1# +# length xs
+length Nil = (I# 0#)
+length (Cons _ xs) = (I# 1#) + length xs
 
 generate (I# 0#) = Nil
 generate n  = Cons n (generate (n- (I# 1#)))

@@ -271,6 +271,26 @@ namespace SuperstringSolutions.HSNet.STG
             throw new Exception("Fallen out of case switch - this shouldn't happen!");
         }
 
+        public static FUN foldr = new FUN(foldr_code, 3);
+        public static CLOSURE foldr_code(CLOSURE[] args)
+        {
+            // foldr f z xs
+            // case xs of ...
+            var xs = args[2].ENTER as CON;
+            switch (xs.__CONSTAG__)
+            {
+                // Nil -> z
+                case 1: return args[2];
+                // Cons y ys
+                case 2:
+                    // let h = {f z ys} \u {}. foldr f z ys
+                    var h = new THUNK(args[0], new CLOSURE[] { args[1], xs.Vals[1] });
+                    // in f x h
+                    return new THUNK(args[0], new CLOSURE[] { xs.Vals[0], h });
+            }
+            throw new Exception("Fallen out of case switch - this shouldn't happen!");
+        }
+
         public static FUN length = new FUN(length_code, 1);
         public static CLOSURE length_code(CLOSURE[] args)
         {
@@ -296,7 +316,7 @@ namespace SuperstringSolutions.HSNet.STG
         {
             Console.WriteLine(args[0].ENTER.ToString() );
             return null;
-        }
+        }   
 
         public static CLOSURE generateIO(int n)
         {

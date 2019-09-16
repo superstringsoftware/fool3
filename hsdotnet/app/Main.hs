@@ -156,8 +156,8 @@ main = runGhc (Just libdir) $ do
 
 
     liftIO $ banner "OUR STG COMPILATION"
-    -- liftIO $ mapM_ (\bind -> putStrLn (evalState (stgProcessBind bind) initialCompilerState)) stg_binds2 
-    liftIO $ mapM_ putStrLn (stgToText stg_binds2)
+    -- liftIO $ mapM_ putStrLn (stgToText stg_binds2)
+    liftIO $ mapM_ (putStrLn . show) (stg2DotNet stg_binds2)
 
 
 
