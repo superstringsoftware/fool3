@@ -66,7 +66,8 @@ expr = Ex.buildExpressionParser (binops ++ [[unop],[binop]]) factor
 typeAp :: Parser Type
 typeAp = do
   tcon <- try (TCon <$> uIdentifier) <|> (TVar <$> lIdentifier)
-  vars <- many $ try (TCon <$> uIdentifier) <|> try ( TVar <$> lIdentifier ) <|> parens typeAp
+  vars <- many $ try (TCon <$> uIdentifier) <|> try ( TVar <$> lIdentifier ) 
+                 <|> try (parens typeAp) <|> (TExpr <$> argument)
   if null vars then return tcon -- concrete type
   else return $ foldl TApp tcon vars -- type application
 
@@ -127,6 +128,13 @@ lambda = do
     let ex = Lam args body tp
     return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
 
+patternMatch :: Parser Expr
+patternMatch = do
+    h <- arguments
+    reservedOp "="
+    t <- expr
+    return $ PatternMatch h t
+
 -- simple top-level binding of a symbol to expression, without lambdas
 binding :: Parser Expr
 binding = do
@@ -137,6 +145,23 @@ binding = do
 -- Tuple that data constructors return, can only contain names or "_" symbols    
 consTuple :: Parser Expr
 consTuple = braces (many symbolId) >>= \args -> return (Tuple "" args ToDerive)
+
+{-
+-- one case like | x == 0 -> 1
+oneCase :: Parser (Expr, Expr)
+oneCase = do
+  left <- expr
+  reservedOp "->"
+  right <- expr
+  return (left, right)
+
+caseExpression :: Parser Expr
+caseExpression = do
+  inspect <- try (parens expr) <|> symbolId <?> "caseExpression failed in inspect"
+  reservedOp "?"
+  cases <- sepBy1 oneCase (reservedOp "|")
+  return $ Case inspect cases
+-}
 
 argument :: Parser Expr
 argument = try containers
@@ -172,8 +197,9 @@ factor = try consTuple <|> arguments -- try caseExpression <|> arguments -- argu
 
 defn :: Parser Expr
 defn =  try lambda
-        <|> binding
-        <|> expr
+        <|> try binding
+        <|> patternMatch
+        -- <|> expr
 
 toplevel :: Parser [Expr]
 toplevel = many $ do

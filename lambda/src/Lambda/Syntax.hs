@@ -16,6 +16,7 @@ data Type
   | TCon Name -- TyCon -- Maybe, String, Int etc - just a name of the constructor
   | TApp Type Type -- Constructor application - Maybe Int, List a etc
   | TArr Type Type -- Function sig - Maybe a -> String etc
+  | TExpr Expr -- since we will support dependent types, type constructors can be applied to quite complicated expressions
   -- | TForall [Pred] [TVar] Type
   | ToDerive -- added it to handle initial parsing
   -- | TClass Name -- for initial typeclass parsing, might change this
@@ -32,6 +33,8 @@ data Expr =
   | App Expr Expr
   | Tuple ConsTag [Expr] Type -- polymorphic tuple. 
   | Let [Binding] Expr -- bindings "in" Expr; top level function definitions go here as well
+  | PatternMatch Expr Expr -- 1 occurence of pattern match
+  | Case Expr [(Expr,Expr)] -- case Expr1 of ... Expr2 -> Expr3
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | EMPTY
