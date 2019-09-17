@@ -43,6 +43,7 @@ import IdInfo
 import Control.Monad.Trans
 
 import Compiler
+import CSharpGen
 
 import Control.Monad.State
 

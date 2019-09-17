@@ -1,6 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables, StandaloneDeriving #-}
 
 {-
+OLD LEGACY STUFF!!!
+
 Compilation sequence goes in phases:
 https://downloads.haskell.org/~ghc/8.6.3/docs/html/libraries/ghc-8.6.3/src/DriverPipeline.html
 
@@ -18,7 +20,7 @@ there's a lot of interesting initializations that's worth understanding and then
 
 -}
 
-module CompilerText where
+module OLDCompilerText where
 
 import GHC
 
@@ -41,96 +43,31 @@ import IdInfo
 
 --import UniqDSet
 import DataCon
+import TyCoRep -- Type data type (??)
 
 import PrimOp
 import ForeignCall
 
 import Control.Monad.State
 
-data CompilerState = CompilerState {
-    stringAlign :: Int,
-    isTopLevel :: Bool
-}
+import Compiler
 
--- state monad for code generation
--- most code gen actions happen in Expr -> SM String actions
-type SM = State CompilerState
+-- silly textual representation for testing purposes mostly (OLD)         
+-- convert bare to text
+bareToTextProgram :: BareStgProgram -> SM TextProgram
+bareToTextProgram bsp = mapM (\(v, rhs)-> stgProcessGenericBinding v rhs) bsp
+-- convert incoming stg to text
+stgToTextOld :: [GenStgTopBinding Var Var] -> TextProgram
+stgToTextOld stgp = evalState ((bareToTextProgram . simplifyStgToBare) stgp) initialCompilerState
 
-initialCompilerState = CompilerState {
-    stringAlign = 0,
-    isTopLevel = True
-}
+---------------------------------------------------------------
+-- OLDER CONVERT TO TEXT STUFF USED FOR UNDERSTANDING TYPES ETC
+---------------------------------------------------------------
 
-incTab :: SM ()
-incTab = modify (\s -> s { stringAlign = (stringAlign s) + 4 } )
-
-decTab :: SM ()
-decTab = modify (\s -> s { stringAlign = (stringAlign s) - 4 } )
-
-tab :: SM String
-tab = do
-    st <- get
-    return (replicate (stringAlign st) ' ')
-
--- helper method that returns a string aligned by current alignment
-stab :: String -> SM String
-stab s = do
-    st <- get
-    let t = replicate (stringAlign st) ' '
-    return (t ++ s)
-
-showGhc :: (Outputable a) => a -> String
-showGhc = showPpr unsafeGlobalDynFlags
-
-instance Show UpdateFlag where
-    show ReEntrant = "\\r" 
-    show Updatable = "\\u" 
-    show SingleEntry = "\\s"
-
--- showing vars
-showVar v = showGhc v ++ showVarDetails v -- showGhc (varName v) ++ " : " ++ showGhc (varType v)
-showVarDetails v = showGhc $ idDetails v
-
-showVarList [] = "()"
---showVarList (v:[]) = "[" ++ showVar v ++ "]"
-showVarList (v:vs) = "(" ++ showVar v ++ (foldl (\acc v1 -> acc ++ ", " ++ showVar v1) "" vs) ++ ")"
-
--- Mapping TyThings
-processTyThing e@(ATyCon tc) = "TyCon: " ++ showGhc e ++
-    "\nVars: " ++ showGhc (tyConTyVars tc) ++
-    "\nConstructors: " ++ showGhc (tyConDataCons tc)
-    ++ "\n"
-processTyThing e@(AnId var) = "Var: " ++ showVar var
-processTyThing e = showGhc e
-
--- Mapping STG
--- http://hackage.haskell.org/package/ghc-lib-8.8.1/docs/StgSyn.html#t:GenStgRhs
-{-
-stg2stg is the final pass that gives us a list of
-type StgTopBinding = GenStgTopBinding Vanilla -- vanilla is simply a pass tag
-
-but then we have annTopBindingsFreeVars :: [StgTopBinding] -> [CgStgTopBinding] - should we call it?
-it's in /compiler/stgSyn/StgFVs.hs
-
-
--}
-
-{-
--- | A top-level binding.
-data GenStgTopBinding pass
--- See Note [CoreSyn top-level string literals]
-  = StgTopLifted (GenStgBinding pass)
-  | StgTopStringLit Id ByteString
-
-data GenStgBinding pass
-  = StgNonRec (BinderP pass) (GenStgRhs pass)
-  | StgRec    [(BinderP pass, GenStgRhs pass)]
--}
 stgProcessBind :: GenStgTopBinding Var Var -> SM String
 stgProcessBind e@(StgTopStringLit bndr bs) = 
     modify (\s -> s {isTopLevel = True}) >> 
-    return ("// " ++ (showGhc $ varName bndr) ++ " :: " 
-                  ++ (showGhc $ varType bndr) ++ "\n"
+    return ("// [TOP STRING LITERAL] " ++ showVarWithType bndr ++ "\n"
                   ++ (showGhc $ varName bndr) ++ " = " ++ show bs)
     -- return ("STG Top String Literal: " ++ showGhc e)
 -- stgProcessBind (StgTopLifted bn) = stgProcessGenBinding bn ++ "\n"
@@ -154,19 +91,10 @@ stgProcessGenBinding (StgRec ls) = do
 -- stgProcessGenericBinding :: GenStgBinding Var Var -> SM String
 stgProcessGenericBinding bndr rhs = do 
     rhsRes <- stgProcessRHS rhs
-    s1 <- stab ("// " ++ (showGhc $ varName bndr) ++ " :: " 
-                ++ (showGhc $ varType bndr) ++ "\n")
+    s1 <- stab ("// " ++ showVarWithType bndr ++ "\n")
     s2 <- stab("var " ++ (showGhc $ varName bndr) ++ " = " ++ rhsRes
                 ++ "\n")
     return (s1 ++ s2)
-
--- filtering out some rhs we don't want
-{-
-stgProcessGenBindingFiltered filt (StgNonRec bndr rhs) = stgProcessGenericBindingFiltered filt bndr rhs
-stgProcessGenBindingFiltered filt (StgRec ls) = foldl fn "[REC]\n" ls ++ "[ENDREC]"
-    where fn acc (b,rhs) = acc ++ stgProcessGenericBindingFiltered filt b rhs ++ "\n"
-stgProcessGenericBindingFiltered filt bndr rhs = if (filt rhs) then stgProcessGenericBinding bndr rhs else ""
--}
 
 {-
 DataCon: https://downloads.haskell.org/~ghc/8.6.3/docs/html/libraries/ghc-8.6.3/DataCon.html#t:DataCon
@@ -201,8 +129,8 @@ data GenStgArg occ
 
     with constructors it's easy, simply application of the constructor to it's arguments.
     
-    for closures, we don't care about cost center (do we?), binder info is interesting:
-    data StgBinderInfo
+For closures, we don't care about cost center (do we?), binder info is interesting:
+data StgBinderInfo
   = NoStgBinderInfo
   | SatCallsOnly        -- All occurrences are *saturated* *function* calls
                         -- This means we don't need to build an info table and
@@ -250,25 +178,7 @@ instance Show PrimCall where show = showGhc
 instance Show ForeignCall where show = showGhc
 deriving instance Show StgOp
 
-type IdName = String
--- Type for handling code generation later on
-data DotNetExpr = DNLit Literal -- literal
-    | FUN IdName [GenStgArg Var]
-    | PAP IdName [GenStgArg Var]
-    | CON IdName [GenStgArg Var] -- constructor application to a list of 
-    | THUNK 
-    | NOTIMPLEMENTED (GenStgExpr Var Var)
-    -- deriving (Eq)
 
-stgExpr2dnExpr :: GenStgExpr Var Var -> SM DotNetExpr
--- application: now simply converting to FUN, but have to detect PAPs where possible
--- as well as oversaturated applications (?)
-stgExpr2dnExpr (StgApp oc args) = pure $ FUN (showGhc $ varName oc) args
--- literals go in as is
-stgExpr2dnExpr (StgLit l) = pure $ DNLit l
--- constructor applications are guaranteed to be saturated so this is easy
-stgExpr2dnExpr (StgConApp dcon args types) = pure $ CON (showGhc $ dataConName dcon) args
-stgExpr2dnExpr e = return (NOTIMPLEMENTED e)
 
 -- function application
 stgProcessExpr ::  GenStgExpr Var Var -> SM String
@@ -280,7 +190,7 @@ stgProcessExpr (StgLit l) = return $ showGhc l
 stgProcessExpr (StgConApp dcon args types) = return (
     "new " ++ stgShowDCon dcon ++ processGenStgArgs args) -- ++ " [TYPES]" ++ showGhc types
 -- operator application
-stgProcessExpr (StgOpApp op args tp) = return (show op ++ processGenStgArgs args)
+stgProcessExpr e@(StgOpApp op args tp) = return $ showGhc e -- (show op ++ processGenStgArgs args)
 -- apparently this is only used during transformation, so safely to ignore?
 -- stgProcessExpr e@(StgLam bndrs ex) = return ("[Lam]" ++ showGhc e) -- bndrs ++ " = " ++ stgProcessExpr ex
 -- case forces evaluation!!!
@@ -336,6 +246,115 @@ processGenStgArg (StgVarArg  occ) = showVar occ
 processAltCon DEFAULT _ = "default"
 processAltCon (LitAlt lit) _ = "case " ++ showGhc lit
 processAltCon (DataAlt dc) bndrs = "case " ++ showGhc dc ++ " " ++ showVarList bndrs
+
+
+
+instance Show UpdateFlag where
+    show ReEntrant = "\\r" 
+    show Updatable = "\\u" 
+    show SingleEntry = "\\s"
+
+{-
+Var Type is Kind which is Type which is here:
+http://hackage.haskell.org/package/ghc-8.6.5/docs/Type.html#t:Type (opaque type)
+data Type
+  -- See Note [Non-trivial definitional equality]
+  = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
+
+  | AppTy
+        Type
+        Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
+                        --
+                        --  1) Function: must /not/ be a 'TyConApp' or 'CastTy',
+                        --     must be another 'AppTy', or 'TyVarTy'
+                        --     See Note [Respecting definitional equality] (EQ1) about the
+                        --     no 'CastTy' requirement
+                        --
+                        --  2) Argument type
+
+  | TyConApp
+        TyCon
+        [KindOrType]    -- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
+                        -- Invariant: saturated applications of 'FunTyCon' must
+                        -- use 'FunTy' and saturated synonyms must use their own
+                        -- constructors. However, /unsaturated/ 'FunTyCon's
+                        -- do appear as 'TyConApp's.
+                        -- Parameters:
+                        --
+                        -- 1) Type constructor being applied to.
+                        --
+                        -- 2) Type arguments. Might not have enough type arguments
+                        --    here to saturate the constructor.
+                        --    Even type synonyms are not necessarily saturated;
+                        --    for example unsaturated type synonyms
+                        --    can appear as the right hand side of a type synonym.
+
+  | ForAllTy
+        !TyVarBinder
+        Type            -- ^ A Π type.
+
+  | FunTy Type Type     -- ^ t1 -> t2   Very common, so an important special case
+
+  | LitTy TyLit     -- ^ Type literals are similar to type constructors.
+
+  | CastTy
+        Type
+        KindCoercion  -- ^ A kind cast. The coercion is always nominal.
+                      -- INVARIANT: The cast is never refl.
+                      -- INVARIANT: The Type is not a CastTy (use TransCo instead)
+                      -- See Note [Respecting definitional equality] (EQ2) and (EQ3)
+
+  | CoercionTy
+        Coercion    -- ^ Injection of a Coercion into a type
+                    -- This should only ever be used in the RHS of an AppTy,
+                    -- in the list of a TyConApp, when applying a promoted
+                    -- GADT data constructor
+-}
+
+showType :: Type -> String
+showType (TyConApp tc kots) = "[TyConApp]" ++ showGhc tc ++ " " ++ showGhc kots
+showType t = "[NOT IMPLEMENTED] " ++ showGhc t
+
+
+
+showVarWithType bndr = (showGhc $ varName bndr) ++ " :: " ++ (showGhc $ varType bndr)
+-- showVarWithType v = (showGhc $ varName v) ++ " :: " ++ (showType $ varType v)
+
+showVarList [] = "()"
+--showVarList (v:[]) = "[" ++ showVar v ++ "]"
+showVarList (v:vs) = "(" ++ showVar v ++ (foldl (\acc v1 -> acc ++ ", " ++ showVar v1) "" vs) ++ ")"
+
+-- Mapping TyThings
+processTyThing e@(ATyCon tc) = "TyCon: " ++ showGhc e ++
+    "\nVars: " ++ showGhc (tyConTyVars tc) ++
+    "\nConstructors: " ++ showGhc (tyConDataCons tc)
+    ++ "\n"
+processTyThing e@(AnId var) = "Var: " ++ showVar var
+processTyThing e = showGhc e
+
+-- Mapping STG
+-- http://hackage.haskell.org/package/ghc-lib-8.8.1/docs/StgSyn.html#t:GenStgRhs
+{-
+stg2stg is the final pass that gives us a list of
+type StgTopBinding = GenStgTopBinding Vanilla -- vanilla is simply a pass tag
+
+but then we have annTopBindingsFreeVars :: [StgTopBinding] -> [CgStgTopBinding] - should we call it?
+it's in /compiler/stgSyn/StgFVs.hs
+
+
+-}
+
+{-
+-- | A top-level binding.
+data GenStgTopBinding pass
+-- See Note [CoreSyn top-level string literals]
+  = StgTopLifted (GenStgBinding pass)
+  | StgTopStringLit Id ByteString
+
+data GenStgBinding pass
+  = StgNonRec (BinderP pass) (GenStgRhs pass)
+  | StgRec    [(BinderP pass, GenStgRhs pass)]
+-}
 {-
 
 https://downloads.haskell.org/~ghc/8.6.5/docs/html/libraries/ghc-8.6.5/StgSyn.html
@@ -401,19 +420,4 @@ data Module = Module
                 TrName   -- Module name                 
 -}
 
-    -- tyConName :: TyCon -> Name
-    -- tyConKind :: TyCon -> Kind
-    -- tyConTyVars :: TyCon -> [TyVar]
-    -- tyConDataCons :: TyCon -> [DataCon]
--- TODO: http://hackage.haskell.org/package/ghc-8.6.5/docs/TyCon.html#
-showTyCon tc = showGhc (tyConName tc) ++ "(" ++ showGhc (tyConTyVars tc) ++ ") : " 
-    ++ showGhc (tyConKind tc) ++
-    " = { " ++ showDataConList (tyConDataCons tc) ++ " }"
-
--- http://hackage.haskell.org/package/ghc-8.6.5/docs/DataCon.html#t:DataCon
--- read deconstruction for better data con representation
-showDataCon dcon = (showGhc $ getName dcon) -- ++ "`" ++ (showGhc $ dataConTag dcon)   
-showDataConList [] = "{}"
-showDataConList (dc:dcs) = "{" ++ showDataCon dc ++ 
-    (foldl (\acc d -> acc ++ ", " ++ showDataCon d) "" dcs) ++ "}"
-stgShowDCon = showDataCon -- legacy
+    

@@ -53,7 +53,7 @@ letFuncTest :: forall a. Num a => a -> a
 -- repl x = x : repl x
 ------- BEGIN SMALLEST TEST PROGRAM
 -- import Prelude(undefined)
-{-
+
 data Int = I# !Int#
 (I# x) + (I# y) = I# (x +# y)
 
@@ -63,7 +63,7 @@ print# :: a -> ()
 print# = print#
 
 main = print# (i + (I# 20#))
--}
+
 ------- END SMALLEST TEST PROGRAM
 
 {-
@@ -120,7 +120,7 @@ expDoubleStrange = expDoubleStrange
 
 
 -- BEGIN TEST PROGRAM FOR .NET COMPILATION
-
+{-
 foreign import ccall "exp" exp :: Int# -> Int#
 
 -- primNumTest 0# = 0#
@@ -170,7 +170,7 @@ print# :: List Int -> ()
 print# = print#
 
 main = print# (map (+(I# 10#)) (generate (I# 1000000#)))
-
+-}
 
 -- END TEST PROGRAM FOR .NET COMPILATION
 

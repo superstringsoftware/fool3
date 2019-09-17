@@ -106,7 +106,7 @@ pass guts = do
     liftIO $ putStrLn $ showGhc stg_binds2
 
     liftIO $ banner "Typed Toplevel Definitions"
-    liftIO $ mapM_ (putStrLn . showTyCon) (mg_tcs guts)
+    -- liftIO $ mapM_ (putStrLn . showTyCon) (mg_tcs guts)
     
     {-
     liftIO $ banner "OUR STG BEFORE STG2STG"
@@ -114,7 +114,7 @@ pass guts = do
     -}
 
     liftIO $ banner "OUR STG COMPILATION"
-    liftIO $ mapM_ (\bind -> putStrLn (evalState (stgProcessBind bind) initialCompilerState)) stg_binds2 
+    -- liftIO $ mapM_ (\bind -> putStrLn (evalState (stgProcessBind bind) initialCompilerState)) stg_binds2 
 
     
     {-
