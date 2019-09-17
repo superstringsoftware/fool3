@@ -124,8 +124,19 @@ lambda = do
     var@(Var _ tp) <- variable -- identifier
     args <- (reservedOp "=" *> reservedOp "\\" *> many variable)
     body <- try (reservedOp "." *> expr) <|> pure EMPTY
-    let expr = Lam args body tp
-    return $ Let [(var, expr)] EMPTY -- top level function, no "in" for LET
+    let ex = Lam args body tp
+    return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
+
+-- simple top-level binding of a symbol to expression, without lambdas
+binding :: Parser Expr
+binding = do
+    var@(Var _ tp) <- variable -- identifier
+    body <- (reservedOp "=" *> expr)
+    return $ Let [(var, body)] EMPTY -- top level function, no "in" for LET
+
+-- Tuple that data constructors return, can only contain names or "_" symbols    
+consTuple :: Parser Expr
+consTuple = braces (many symbolId) >>= \args -> return (Tuple "" args ToDerive)
 
 argument :: Parser Expr
 argument = try containers
@@ -157,10 +168,12 @@ contents p = do
 
 factor :: Parser Expr
 -- factor = try caseExpression <|> try call <|> try ifthen <|> argument -- arguments -- try letins <|>
-factor = arguments -- try caseExpression <|> arguments -- arguments -- try letins <|>
+factor = try consTuple <|> arguments -- try caseExpression <|> arguments -- arguments -- try letins <|>
 
 defn :: Parser Expr
-defn =  try lambda <|> expr
+defn =  try lambda
+        <|> binding
+        <|> expr
 
 toplevel :: Parser [Expr]
 toplevel = many $ do

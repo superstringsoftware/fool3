@@ -1,18 +1,18 @@
 plus : Int = \x:Int y:Int . x + y;
-{-
-I# : Int    = \x:Int#.    {_}
 
-False : Bool = {}
-True : Bool = {}
+I# : Int    = \x:Int#.    {_};
 
-Nothing : Maybe a = {}
-Just : Maybe a = \x:a. {_}
+False : Bool = {};
+True : Bool = {};
 
-Nil : List a = {}
-Cons : List a = \x:a xs:(List a). {head tail}
+Nothing : (Maybe a) = {};
+Just : (Maybe a) = \x:a. {_};
 
-plus : Int = \x:Int y:Int . x +# y
+Nil : (List a) = {};
+Cons : (List a) = \x:a xs:(List a). {head tail};
 
-Vector : Vector a n = \a:* n:Int . {primarray# a n}
--}
+plus : Int = \x:Int y:Int . x +# y;
+
+Vector : (Vector a n) = \arr:(primarray# a n) n:Int . {_ _};
+
 

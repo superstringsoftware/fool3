@@ -109,7 +109,7 @@ loadFileNew nm = do
     case res of
         Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
         -- desugaring on the first pass
-        Right exprs -> liftIO (putStrLn "... successfully loaded.")
+        Right exprs -> liftIO (mapM_ print exprs) >> liftIO (putStrLn "... successfully loaded.")
 
 
 -- Haskeline loop stacked into 3-monad stack
