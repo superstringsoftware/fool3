@@ -35,7 +35,7 @@ emptyDef    = Tok.LanguageDef
             , commentLine    = "--"
             , nestedComments = False
             , identStart     = letter <|> char '_'
-            , identLetter    = alphaNum <|> oneOf "_'"
+            , identLetter    = alphaNum <|> oneOf "_'#"
             , opStart        = opLetter emptyDef
             , opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
             , reservedOpNames= []
@@ -47,7 +47,7 @@ emptyDef    = Tok.LanguageDef
 lexer :: TokenParserIS ParserState
 lexer = Tok.makeTokenParser style
     where
-    ops = [";","=",",",".",":", "->","<",">", "|", "?", "<:"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
+    ops = [";","=",",",".",":", "->","<",">", "|", "?", "<:", "\\"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
     names = ["instance","extern","if","then","else","in","for"
             ,"binary", "unary", "let", "class", "case", "of", "type", "where", "∃", "∀", "exists"]
     style = emptyDef {

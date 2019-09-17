@@ -25,12 +25,15 @@ dependencies:
 - hashtables
 - parsec
 - vector
+- mtl
+- haskeline
+- directory
 
 library:
   source-dirs: src
 
 executables:
-  lambda-exe:
+  tlam:
     main:                Main.hs
     source-dirs:         app
     ghc-options:

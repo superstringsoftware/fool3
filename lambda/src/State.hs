@@ -24,3 +24,9 @@ data CurrentFlags = CurrentFlags {
   , pretty    :: Bool -- pretty print or raw output
   , tracing   :: Bool -- whether to trace execution steps
 } deriving Show
+
+initializeInterpreter :: IO InterpreterState
+initializeInterpreter = return $ InterpreterState {
+    logs = [],
+    currentFlags = CurrentFlags False True False      
+}
