@@ -100,9 +100,10 @@ typeVar = do
   return $ TVar name
 
 -- variable with type (or any identified for that matter, including function definitions)
+-- including operators
 variable :: Parser Var
 variable = do
-  name <- identifier --emptyStringParser -- added unnamed variables for easier record parsing
+  name <- try (parens op) <|> identifier --emptyStringParser -- added unnamed variables for easier record parsing
   typ <- typeSignature
   return $ Var name typ
 
