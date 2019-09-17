@@ -52,6 +52,7 @@ letFuncTest :: forall a. Num a => a -> a
 
 -- repl x = x : repl x
 ------- BEGIN SMALLEST TEST PROGRAM
+-- import Prelude(undefined)
 {-
 data Int = I# !Int#
 (I# x) + (I# y) = I# (x +# y)

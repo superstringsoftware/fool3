@@ -48,12 +48,14 @@ import PrimOp
 import ForeignCall
 
 import Control.Monad.State
-
-import Data.List.Index
+import Data.List.Index (imapM, ifind)
+import Data.Foldable (foldlM)
 
 data CompilerState = CompilerState {
     stringAlign :: Int,
-    isTopLevel :: Bool
+    isTopLevel :: Bool,
+    -- when we are creating FUN / THUNKs with free vars, need this to convert names to field numbers in the C# class
+    currentFreeVars :: Args 
 }
 
 -- state monad for code generation
@@ -62,8 +64,18 @@ type SM = State CompilerState
 
 initialCompilerState = CompilerState {
     stringAlign = 0,
-    isTopLevel = True
+    isTopLevel = True,
+    currentFreeVars = []
 }
+
+pushFreeVars :: Args -> SM ()
+pushFreeVars fv = modify (\s -> s {currentFreeVars = fv})
+
+popFreeVars :: SM ()
+popFreeVars = modify (\s -> s {currentFreeVars = []})
+
+readFreeVars :: SM Args
+readFreeVars = get >>= pure . currentFreeVars
 
 incTab :: SM ()
 incTab = modify (\s -> s { stringAlign = (stringAlign s) + 4 } )
@@ -184,10 +196,10 @@ data DotNetExpr = RAWSTG (GenStgExpr Var Var) -- non implemented conversion yet
     -- Case: only 1 default option, so simple evaluation and return
     -- varName - variable to bind expr to and evaluate (CASE drives evaluation!)
     -- retExpr - expression to return
-    | CASEDEFAULT { bndrName :: String, expr :: DotNetExpr, retExpr :: DotNetExpr}
+    | CASEDEFAULT { bndrName :: String, expr :: DotNetExpr, retExpr :: DotNetExpr, altType :: AltType }
     -- casesimple - only 1 case, this means it is used only for pattern matching but there's 
     -- in fact no branching needed in the code, so also - evaluation, pattern match, return
-    | CASESIMPLE { bndrName :: String, expr :: DotNetExpr, singleCase :: (AltCon, [String], DotNetExpr)}
+    | CASESIMPLE { bndrName :: String, expr :: DotNetExpr, singleCase :: (AltCon, [String], DotNetExpr), altType :: AltType }
     | CASE {bndrName :: String, expr :: DotNetExpr, 
             defaultCase :: Maybe DotNetExpr, 
             cases :: [(AltCon, [String], DotNetExpr)], altType :: AltType }
@@ -221,10 +233,10 @@ stgExpr2DotNetExpr (StgLetNoEscape (StgNonRec bndr rhs) expr) = LET (stgBinding2
 stgExpr2DotNetExpr (StgLetNoEscape (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
 -- case - 1 default option
 stgExpr2DotNetExpr (StgCase ex bndr altType ((DEFAULT, bndrs, ex1):[]) ) = 
-    CASEDEFAULT (showGhc bndr) (stgExpr2DotNetExpr ex) (stgExpr2DotNetExpr ex1)
+    CASEDEFAULT (showGhc bndr) (stgExpr2DotNetExpr ex) (stgExpr2DotNetExpr ex1) altType
 -- case - 1 option, so driving eval and pattern match but no branching
 stgExpr2DotNetExpr (StgCase ex bndr altType ((con, bndrs, expr):[]) ) = 
-    CASESIMPLE (showGhc bndr) (stgExpr2DotNetExpr ex) (con, map showGhc bndrs, stgExpr2DotNetExpr expr)    
+    CASESIMPLE (showGhc bndr) (stgExpr2DotNetExpr ex) (con, map showGhc bndrs, stgExpr2DotNetExpr expr) altType
 -- general case
 stgExpr2DotNetExpr (StgCase ex bndr altType alts) = 
     CASE (showGhc bndr) (stgExpr2DotNetExpr ex) (maybeDefault alts) (convertAlts alts) altType
@@ -241,6 +253,7 @@ stg2DotNet :: [GenStgTopBinding Var Var] -> DotNetProgram
 stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
 
 -- classes to output different options of the code
+-- to C#
 class CSharpable a where
     toCSharp :: a -> SM String
 
@@ -248,11 +261,12 @@ instance CSharpable a => CSharpable (Maybe a) where
     toCSharp Nothing = return ""
     toCSharp (Just x) = toCSharp x
 
+-- to .Net CLR IL    
 class ILable a where
     toIL :: a -> SM String
     
 instance CSharpable DotNetObj where
-    toCSharp (CON v n ar) = stab (fst v ++ " = new " ++ n ++ showGhc ar ++ "\n")
+    toCSharp (CON v n ar) = stab (fst v ++ " = new " ++ n ++ args2CSharp ar ++ "\n")
     toCSharp e@(FUN n fv ar c) = _scs n fv ar c "FUN"
     toCSharp e@(ONCE n fv ar c) = _scs n fv ar c "THUNK_ONCE"
     toCSharp e@(THUNK n fv ar c) = _scs n fv ar c "THUNK"
@@ -261,28 +275,75 @@ instance CSharpable DotNetObj where
 -- further down the hierarchy; if it's something else - we return the result (cause it's a var or a function call)
 _scs n fv ar c con = _scsR n fv ar c con (not $ isACaseOrLet c)
 _scsR n fv ar c con addRet = do
-    -- s0 <- stab ("/* " ++ showGhc (snd n) ++ "*/\n" )
+    s0 <- varargs2CSharpLookup fv
     s1 <- stab ((fst n) ++ " = new " 
             ++ con ++ "("          
-            ++ showGhc fv ++ ", "
-            ++ "(" ++ showGhc ar ++ if addRet then ")=> {\n" else ")=> {" )
+            ++ s0 ++ ", "
+            ++ args2CSharp ar ++ if addRet then "=> {\n" else "=> {" )
     incTab
+    pushFreeVars fv
     s2 <- toCSharp c
+    popFreeVars
     r1 <- stab "return "
     decTab
     s3 <- stab "})\n"
     if addRet then return (s1 ++ r1 ++ s2 ++ "\n" ++ s3) else return (s1 ++ s2 ++ "\n" ++ s3)
-    
+
+-- converting free vars to arguments in a new closure object call
+freeVars2CSharp [] = "CLOSURE.EMPTY"
+freeVars2CSharp (x:xs) =  (foldl fn ("new CLOSURE[] {" ++ showGhc x) xs) ++ "}"
+    where fn acc v = acc ++ ", " ++ showGhc v
+
+-- converting function arguments to proper function call syntax in c#
+args2CSharp [] = "()"
+args2CSharp (x:xs) =  (foldl fn ("(" ++ showGhc x) xs) ++ ")"
+    where fn acc v = acc ++ ", " ++ showGhc v
+
+-- converting arguments to proper names taking into account current free vars context of the function / thunk
+-- (stored in the state monad)
+varargs2CSharpLookup :: Args -> SM String
+varargs2CSharpLookup []     = pure "CLOSURE.EMPTY"
+varargs2CSharpLookup (x:xs) = do
+    s1 <- convertFreeVar x
+    s2 <- (foldlM fn ("new CLOSURE[] {" ++ s1) xs)
+    return (s2 ++ "}")
+    where fn acc v = do
+                        s1 <- convertFreeVar v
+                        return (acc ++ ", " ++ s1)
+          convertFreeVar x = do
+                let name = showGhc x
+                freeVars <- readFreeVars
+                -- ok this is terribly inefficient as we are searching var list every time
+                let fv = ifind (\i el -> name == (showGhc el) ) freeVars
+                return $ maybe name ( \(i,_) -> "__freeVars[" ++ show i ++ "]" ) fv
+
+args2CSharpLookup :: [GenStgArg Var] -> SM String
+args2CSharpLookup []     = pure "()"
+args2CSharpLookup (x:xs) = do
+    s1 <- convertFreeVar x
+    s2 <- (foldlM fn ("(" ++ s1) xs)
+    return (s2 ++ ")")
+    where fn acc v = do
+                        s1 <- convertFreeVar v
+                        return (acc ++ ", " ++ s1)
+          convertFreeVar (StgLitArg  lit) = pure $ showGhc lit
+          convertFreeVar (StgVarArg  x) = do
+                let name = showGhc x
+                freeVars <- readFreeVars
+                -- ok this is terribly inefficient as we are searching var list every time
+                let fv = ifind (\i el -> name == (showGhc el) ) freeVars
+                return $ maybe name ( \(i,_) -> "__freeVars[" ++ show i ++ "]" ) fv
+
 
 instance CSharpable DotNetExpr where
     toCSharp (RAWSTG e) = return $ "[NOT IMPLEMENTED] " ++ "(" ++ showGhc e ++ ")\n"
     toCSharp (VAR v) = return $ fst v
     toCSharp (LITERAL l) = return $ showGhc l
-    toCSharp (FUNCALL (n,_) args) = return (n ++ ".CALL" ++ showGhc args)
-    toCSharp (CONCALL (n,_) args) = return ("new " ++ n ++ showGhc args)
-    toCSharp (PRIMOP (n,_) args) = return ("[PRIMOP]" ++ n ++ ".CALL" ++ showGhc args)
-    toCSharp (PRIMCALL (n,_) args) = return ("[PRIMCALL]" ++ n ++ ".CALL" ++ showGhc args)
-    toCSharp (FOREIGNCALL (n,_) args) = return ("[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args)
+    toCSharp (FUNCALL (n,_) args)  = args2CSharpLookup args >>= \s -> pure (n ++ ".CALL" ++ s ++ ";")
+    toCSharp (CONCALL (n,_) args)  = args2CSharpLookup args >>= \s -> pure ("new " ++ n ++ s ++ ";")
+    toCSharp (PRIMOP (n,_) args)   = args2CSharpLookup args >>= \s -> pure ("[PRIMOP]" ++ n ++ ".CALL" ++ s ++ ";")
+    toCSharp (PRIMCALL (n,_) args) = args2CSharpLookup args >>= \s -> pure ("[PRIMCALL]" ++ n ++ ".CALL" ++ s ++ ";")
+    toCSharp (FOREIGNCALL (n,_) args) = args2CSharpLookup args >>= \s -> pure ("[FOREIGN]" ++ n ++ ".CALL" ++ s ++ ";")
     -- let .. in let - is a separate case, don't need "return" there!!!
     toCSharp (LET o e@(LET _ _)) = (liftM2 (++) (toCSharp o) (toCSharp e)) >>= (\s -> pure $ "\n" ++ s)
     -- normal let transforms to a number of var assignments and then a return for "in" expression
@@ -292,20 +353,20 @@ instance CSharpable DotNetExpr where
         return ("\n" ++ s2 ++ s1)
     toCSharp (LETREC p e) = return ("[REC]" ++ show p ++ "return " ++ show e ++ "\n")
     -- only one case and it is default - flat code with evaluation and return
-    toCSharp (CASEDEFAULT n e re) = do
+    toCSharp (CASEDEFAULT n e re altType) = do
         s1 <- toCSharp e >>= \x -> stab (n ++ " = EVAL(" ++ x ++ ")\n")
         s2 <- if (isACaseOrLet re) then
                     do toCSharp re >>= stab
               else do toCSharp re >>= \x -> stab ("return " ++ x)
-        return ("/* [CASEDEFAULT] */\n" ++ s1 ++ s2)
+        return ("/* [CASEDEFAULT][" ++ showGhc altType ++ "] */"  ++ "\n" ++ s1 ++ s2)
     -- toCSharp (CASESIMPLE n e (con, bndrs, re)) = do
-    toCSharp (CASESIMPLE n e (con, bndrs, re)) = do
+    toCSharp (CASESIMPLE n e (con, bndrs, re) altType) = do
         s1 <- toCSharp e >>= \x -> stab (n ++ " = EVAL(" ++ x ++ ")\n")
         s2 <- if (isACaseOrLet re) then
                 do toCSharp re >>= stab
               else do toCSharp re >>= \x -> stab ("return " ++ x)
         s3 <- altToPatternMatch bndrs n >>= pure . (foldl (++) "")
-        return ("/* [CASESIMPLE] */\n" ++ s1 ++ s3 ++ s2)
+        return ("/* [CASESIMPLE][" ++ showGhc altType ++ "] */" ++ (altConToComment con bndrs) ++ "\n" ++ s1 ++ s3 ++ s2)
     toCSharp (CASE n e def cases altType) = do
         s1 <- toCSharp e
         s2 <- stab (n ++ " = EVAL(" ++ s1 ++ ")\n")
@@ -316,10 +377,10 @@ instance CSharpable DotNetExpr where
         defSt <- toCSharp def
         decTab
         s4 <- stab ("default: " ++ defSt)
-        decTab
+        decTab        
         s7 <- stab "}"
         let s5 = if (defSt == "") then "" else s4
-        return ("/* [CASE] */\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ s7)
+        return ("/* [CASE][" ++ showGhc altType ++ "] */\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ "\n" ++ s7)
 
 -- converts pattern match constructor application to descructuring assignment of C# datatypes
 -- bndrs is a list of var names in Con application
@@ -342,12 +403,16 @@ altToCSharp n acc (altCon, bndrs, ex) = do
         
 altConToCSharp (LitAlt lit) _ = "case " ++ showGhc lit
 altConToCSharp (DataAlt dc) bndrs = "case /* " ++ showGhc dc ++ show bndrs ++ " */ " ++ show (dataConTag dc)
+
+altConToComment (DataAlt dc) bndrs = "/* " ++ showGhc dc ++ show bndrs ++ " */ "
+altConToComment (LitAlt lit) _ = "/* " ++ showGhc lit ++ " */"
     
 stgToText :: [GenStgTopBinding Var Var] -> TextProgram
 stgToText stgp = evalState (mapM toCSharp (stg2DotNet stgp)) initialCompilerState
 
-    
--- simple show instances
+--------------------------------------------------------
+-- simple show instances converting to text - LEGACY
+--------------------------------------------------------
 instance Show DotNetObj where
     show (CON v n ar) = fst v ++ " = new " ++ n ++ showGhc ar ++ "\n"
     show e@(FUN _ _ _ _) = _s e "FUN"
@@ -762,7 +827,7 @@ showTyCon tc = showGhc (tyConName tc) ++ "(" ++ showGhc (tyConTyVars tc) ++ ") :
 
 -- http://hackage.haskell.org/package/ghc-8.6.5/docs/DataCon.html#t:DataCon
 -- read deconstruction for better data con representation
-showDataCon dcon = (showGhc $ getName dcon) -- ++ "`" ++ (showGhc $ dataConTag dcon)   
+showDataCon dcon = showGhc dcon -- (showGhc $ getName dcon) -- ++ "`" ++ (showGhc $ dataConTag dcon)   
 showDataConList [] = "{}"
 showDataConList (dc:dcs) = "{" ++ showDataCon dc ++ 
     (foldl (\acc d -> acc ++ ", " ++ showDataCon d) "" dcs) ++ "}"
