@@ -26,7 +26,7 @@ instance CSharpable a => CSharpable (Maybe a) where
 
     
 instance CSharpable DotNetObj where
-    toCSharp (CON v n ar) = stab (fst v ++ " = new " ++ n ++ args2CSharp ar ++ ";\n")
+    toCSharp (CON v n1 ar) = args2CSharpLookup ar >>= \s1 -> stab (fst v ++ " = new " ++ n ++ s1 ++ ";\n") where n = funString2String n1
     toCSharp e@(FUN n fv ar c) = _scs n fv ar c "FUN"
     toCSharp e@(ONCE n fv ar c) = _scs n fv ar c "THUNK_ONCE"
     toCSharp e@(THUNK n fv ar c) = _scs n fv ar c "THUNK"
@@ -37,7 +37,7 @@ _scs n fv ar c con = _scsR n fv ar c con (not $ isACaseOrLet c)
 _scsR n fv ar c con addRet = do
     ins <- checkTopLevel >>= pure . not
     s0 <- varargs2CSharpLookup fv
-    s1 <- stab ( (if ins then "var " else "") ++ (fst n) ++ " = new " 
+    s1 <- stab ( (if ins then "var " else "") ++ n' ++ " = new " 
             ++ con ++ "("          
             ++ s0 ++ ", "
             ++ args2CSharp ar ++ if addRet then "=> {\n" else "=> {" )
@@ -49,6 +49,7 @@ _scsR n fv ar c con addRet = do
     decTab
     s3 <- stab "})\n"
     if addRet then return (s1 ++ r1 ++ s2 ++ ";\n" ++ s3) else return (s1 ++ s2 ++ "\n" ++ s3)
+    where n' = funString2String (fst n) 
 
 -- converting free vars to arguments in a new closure object call
 freeVars2CSharp [] = "CLOSURE.EMPTY"
@@ -90,7 +91,7 @@ args2CSharpLookup (x:xs) = do
     where fn acc v = do
                         s1 <- convertFreeVar v
                         return (acc ++ ", " ++ s1)
-          convertFreeVar (StgLitArg  lit) = pure $ showGhc lit
+          convertFreeVar (StgLitArg  lit) = pure $ lit2CSharp lit
           convertFreeVar (StgVarArg  x) = do
                 let name = showGhc x
                 freeVars <- readFreeVars
@@ -102,12 +103,12 @@ args2CSharpLookup (x:xs) = do
 instance CSharpable DotNetExpr where
     toCSharp (RAWSTG e) = return $ "[NOT IMPLEMENTED] " ++ "(" ++ showGhc e ++ ")\n"
     toCSharp (VAR v) = lookupFreeVar $ fst v
-    toCSharp (LITERAL l) = return $ showGhc l
-    toCSharp (FUNCALL (n,_) args)  = args2CSharpLookup args >>= \s -> pure (n ++ ".CALL" ++ s)
-    toCSharp (CONCALL (n,_) args)  = args2CSharpLookup args >>= \s -> pure ("new " ++ n ++ s)
-    toCSharp (PRIMOP (n,_) args)   = args2CSharpLookup args >>= \s -> pure ("[PRIMOP]" ++ n ++ ".CALL" ++ s)
-    toCSharp (PRIMCALL (n,_) args) = args2CSharpLookup args >>= \s -> pure ("[PRIMCALL]" ++ n ++ ".CALL" ++ s)
-    toCSharp (FOREIGNCALL (n,_) args) = args2CSharpLookup args >>= \s -> pure ("[FOREIGN]" ++ n ++ ".CALL" ++ s)
+    toCSharp (LITERAL l) = return $ lit2CSharp l
+    toCSharp (FUNCALL (n1,_) args)  = args2CSharpLookup args >>= \s -> pure (n ++ ".CALL" ++ s) where n = funString2String n1
+    toCSharp (CONCALL (n1,_) args)  = args2CSharpLookup args >>= \s -> pure ("new " ++ n ++ s) where n = funString2String n1
+    toCSharp (PRIMOP (n1,_) args)   = args2CSharpLookup args >>= \s -> pure ("PRIMOPS." ++ n ++ s) where n = funString2String n1
+    toCSharp (PRIMCALL (n1,_) args) = args2CSharpLookup args >>= \s -> pure ("[PRIMCALL]" ++ n ++ ".CALL" ++ s) where n = funString2String n1
+    toCSharp (FOREIGNCALL (n1,_) args) = args2CSharpLookup args >>= \s -> pure ("[FOREIGN]" ++ n ++ ".CALL" ++ s) where n = funString2String n1
     -- let .. in let - is a separate case, don't need "return" there!!!
     toCSharp (LET o e@(LET _ _)) = (liftM2 (++) (toCSharp o) (toCSharp e)) >>= (\s -> pure $ "\n" ++ s)
     -- normal let transforms to a number of var assignments and then a return for "in" expression
@@ -117,23 +118,23 @@ instance CSharpable DotNetExpr where
         return ("\n" ++ s2 ++ s1)
     toCSharp (LETREC p e) = return ("[REC]" ++ show p ++ "return " ++ show e ++ ";\n")
     -- only one case and it is default - flat code with evaluation and return
+    -- Needs TONS AND TONS OF REFACTORING!!!!!
     toCSharp (CASEDEFAULT n e re altType) = do
-        s1 <- toCSharp e >>= \x -> stab ("var " ++ n ++ " = EVAL(" ++ x ++ ");\n")
+        s1 <- processCaseEval n e
         s2 <- if (isACaseOrLet re) then
                     do toCSharp re >>= stab
               else do toCSharp re >>= \x -> stab ("return " ++ x ++ ";")
         return ("/* [CASEDEFAULT][" ++ showGhc altType ++ "] */"  ++ "\n" ++ s1 ++ s2)
     -- toCSharp (CASESIMPLE n e (con, bndrs, re)) = do
     toCSharp (CASESIMPLE n e (con, bndrs, re) altType) = do
-        s1 <- toCSharp e >>= \x -> stab ("var " ++ n ++ " = EVAL(" ++ x ++ ");\n")
+        s1 <- processCaseEval n e
         s2 <- if (isACaseOrLet re) then
                 do toCSharp re >>= stab
               else do toCSharp re >>= \x -> stab ("return " ++ x ++ ";")
         s3 <- altToPatternMatch bndrs n >>= pure . (foldl (++) "")
         return ("/* [CASESIMPLE][" ++ showGhc altType ++ "] */" ++ (altConToComment con bndrs) ++ "\n" ++ s1 ++ s3 ++ s2)
     toCSharp (CASE n e def cases altType) = do
-        s1 <- toCSharp e
-        s2 <- stab ("var " ++ n ++ " = EVAL(" ++ s1 ++ ");\n")
+        s2 <- processCaseEval n e
         s6 <- stab ("switch (" ++ n ++ ") {\n")
         incTab 
         s3 <- altsToCSharp n cases
@@ -145,6 +146,15 @@ instance CSharpable DotNetExpr where
         s7 <- stab "}"
         let s5 = if (defSt == "") then "" else s4
         return ("/* [CASE][" ++ showGhc altType ++ "] */\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ "\n" ++ s7)
+
+----------------------------------------------------------------------
+-- VARSIOUS HELPER FUNCTIONS
+---------------------------------------------------------------------- 
+
+-- processing case statement, it's eval part
+-- primop doesn't need additional EVAL call
+processCaseEval n e@(PRIMOP _ _) = toCSharp e >>= \x -> stab ("var " ++ n ++ " = " ++ x ++ ";\n")
+processCaseEval n e = toCSharp e >>= \x -> stab ("var " ++ n ++ " = STG.EVAL(" ++ x ++ ");\n")
 
 -- converts pattern match constructor application to descructuring assignment of C# datatypes
 -- bndrs is a list of var names in Con application
@@ -175,3 +185,25 @@ altConToComment (LitAlt lit) _ = "/* " ++ showGhc lit ++ " */"
 stgToText :: [GenStgTopBinding Var Var] -> TextProgram
 stgToText stgp = evalState (mapM toCSharp (stg2DotNet stgp)) initialCompilerState
 
+-- converting illegal function names to proper c#
+funChar2String :: Char -> String
+funChar2String '+' = "Plus"
+funChar2String '-' = "Minus"
+funChar2String '*' = "Star"
+funChar2String '=' = "Eq"
+funChar2String '>' = "GT"
+funChar2String '<' = "LT"
+funChar2String '.' = "Dot"
+funChar2String ':' = "Colon"
+funChar2String '$' = "DLR"
+funChar2String '#' = "Hash"
+funChar2String c = [c]
+
+funString2String s = foldl fn "" s
+        where fn acc c = acc ++ funChar2String c
+
+lit2CSharp l = foldl fn "" (showGhc l)
+        where fn acc c = acc ++ litCharChange c
+
+litCharChange '#' = ""
+litCharChange c = [c]

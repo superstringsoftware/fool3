@@ -2,10 +2,18 @@
 
 module Example where
 
-import GHC.Prim
--- import Prelude (undefined)
+-- import GHC.Prim
+import Prelude
 -- import GHC.Float
 -- import Foreign.C.String
+
+-- BEGIN TEST PROGRAM WITH PRELUDE
+l = [1,2,3,4,5]
+
+-- main = putStrLn $ show $ map (*2) l
+main = putStrLn "Hello World"
+-- END TEST PROGRAM WITH PRELUDE
+
 {-
 g x = funcTest x
 
@@ -53,7 +61,7 @@ letFuncTest :: forall a. Num a => a -> a
 -- repl x = x : repl x
 ------- BEGIN SMALLEST TEST PROGRAM
 -- import Prelude(undefined)
-
+{-
 data Int = I# !Int#
 (I# x) + (I# y) = I# (x +# y)
 
@@ -63,7 +71,7 @@ print# :: a -> ()
 print# = print#
 
 main = print# (i + (I# 20#))
-
+-}
 ------- END SMALLEST TEST PROGRAM
 
 {-

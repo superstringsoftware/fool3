@@ -63,9 +63,9 @@ main = runGhc (Just libdir) $ do
     env <- getSession
     dflags <- getSessionDynFlags
     setSessionDynFlags $ dflags { hscTarget = HscAsm {-HscInterpreted, HscC-} 
-        -- , ghcLink = LinkInMemory
+        , ghcLink = LinkInMemory
     }
-
+    -- "./baselib/src/GHC/Base.hs"
     target <- guessTarget "Example.hs" Nothing
     addTarget target
     -- setTargets [target]
