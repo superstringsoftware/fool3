@@ -49,6 +49,8 @@ import ForeignCall
 
 import Control.Monad.State
 
+import Data.List.Index
+
 data CompilerState = CompilerState {
     stringAlign :: Int,
     isTopLevel :: Bool
@@ -182,11 +184,25 @@ data DotNetExpr = RAWSTG (GenStgExpr Var Var) -- non implemented conversion yet
     -- Case: only 1 default option, so simple evaluation and return
     -- varName - variable to bind expr to and evaluate (CASE drives evaluation!)
     -- retExpr - expression to return
-    | CASESIMPLE { bndrName :: String, expr :: DotNetExpr, retExpr :: DotNetExpr}
+    | CASEDEFAULT { bndrName :: String, expr :: DotNetExpr, retExpr :: DotNetExpr}
+    -- casesimple - only 1 case, this means it is used only for pattern matching but there's 
+    -- in fact no branching needed in the code, so also - evaluation, pattern match, return
+    | CASESIMPLE { bndrName :: String, expr :: DotNetExpr, singleCase :: (AltCon, [String], DotNetExpr)}
     | CASE {bndrName :: String, expr :: DotNetExpr, 
             defaultCase :: Maybe DotNetExpr, 
             cases :: [(AltCon, [String], DotNetExpr)], altType :: AltType }
     
+-- helper cons checks we need to drive code generation
+isACase CASESIMPLE {..} = True
+isACase CASEDEFAULT {..} = True
+isACase CASE {..} = True
+isACase _ = False
+
+isALet (LET _ _) = True
+isALet (LETREC _ _) = True
+isALet _ = False
+
+isACaseOrLet e = (isACase e) || (isALet e)
 
 stgExpr2DotNetExpr :: GenStgExpr Var Var -> DotNetExpr
 stgExpr2DotNetExpr (StgLit lit) = LITERAL lit
@@ -205,11 +221,14 @@ stgExpr2DotNetExpr (StgLetNoEscape (StgNonRec bndr rhs) expr) = LET (stgBinding2
 stgExpr2DotNetExpr (StgLetNoEscape (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
 -- case - 1 default option
 stgExpr2DotNetExpr (StgCase ex bndr altType ((DEFAULT, bndrs, ex1):[]) ) = 
-    CASESIMPLE (showGhc bndr) (stgExpr2DotNetExpr ex) (stgExpr2DotNetExpr ex1)
+    CASEDEFAULT (showGhc bndr) (stgExpr2DotNetExpr ex) (stgExpr2DotNetExpr ex1)
+-- case - 1 option, so driving eval and pattern match but no branching
+stgExpr2DotNetExpr (StgCase ex bndr altType ((con, bndrs, expr):[]) ) = 
+    CASESIMPLE (showGhc bndr) (stgExpr2DotNetExpr ex) (con, map showGhc bndrs, stgExpr2DotNetExpr expr)    
 -- general case
 stgExpr2DotNetExpr (StgCase ex bndr altType alts) = 
     CASE (showGhc bndr) (stgExpr2DotNetExpr ex) (maybeDefault alts) (convertAlts alts) altType
-    where maybeDefault ((DEFAULT, bndrs, ex):[]) = Just (stgExpr2DotNetExpr ex)
+    where maybeDefault ((DEFAULT, bndrs, ex):_) = Just (stgExpr2DotNetExpr ex)
           maybeDefault _ = Nothing
           convertAlts ((DEFAULT, bndrs, ex):xs) = convertAlts xs
           convertAlts [] = []
@@ -240,10 +259,7 @@ instance CSharpable DotNetObj where
 -- helper function
 -- Ok this is a bit tricky - if an expr inside our closure is a LET or CASE then we process the code inside LET / CASE
 -- further down the hierarchy; if it's something else - we return the result (cause it's a var or a function call)
-_scs n fv ar c@(LET _ _) con = _scsR n fv ar c con False
-_scs n fv ar c@(CASESIMPLE _ _ _) con = _scsR n fv ar c con False
-_scs n fv ar c@(CASE _ _ _ _ _) con = _scsR n fv ar c con False
-_scs n fv ar c con = _scsR n fv ar c con True
+_scs n fv ar c con = _scsR n fv ar c con (not $ isACaseOrLet c)
 _scsR n fv ar c con addRet = do
     -- s0 <- stab ("/* " ++ showGhc (snd n) ++ "*/\n" )
     s1 <- stab ((fst n) ++ " = new " 
@@ -269,39 +285,63 @@ instance CSharpable DotNetExpr where
     toCSharp (FOREIGNCALL (n,_) args) = return ("[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args)
     -- let .. in let - is a separate case, don't need "return" there!!!
     toCSharp (LET o e@(LET _ _)) = (liftM2 (++) (toCSharp o) (toCSharp e)) >>= (\s -> pure $ "\n" ++ s)
+    -- normal let transforms to a number of var assignments and then a return for "in" expression
     toCSharp (LET o e) = do
         s1 <- (toCSharp e >>= \x -> stab ("return " ++ x))
         s2 <- (toCSharp o)
         return ("\n" ++ s2 ++ s1)
     toCSharp (LETREC p e) = return ("[REC]" ++ show p ++ "return " ++ show e ++ "\n")
-    toCSharp (CASESIMPLE n e re) = do
+    -- only one case and it is default - flat code with evaluation and return
+    toCSharp (CASEDEFAULT n e re) = do
         s1 <- toCSharp e >>= \x -> stab (n ++ " = EVAL(" ++ x ++ ")\n")
-        s2 <- toCSharp re >>= \x -> stab ("return " ++ x)
-        return ("\n" ++ s1 ++ s2)
+        s2 <- if (isACaseOrLet re) then
+                    do toCSharp re >>= stab
+              else do toCSharp re >>= \x -> stab ("return " ++ x)
+        return ("/* [CASEDEFAULT] */\n" ++ s1 ++ s2)
+    -- toCSharp (CASESIMPLE n e (con, bndrs, re)) = do
+    toCSharp (CASESIMPLE n e (con, bndrs, re)) = do
+        s1 <- toCSharp e >>= \x -> stab (n ++ " = EVAL(" ++ x ++ ")\n")
+        s2 <- if (isACaseOrLet re) then
+                do toCSharp re >>= stab
+              else do toCSharp re >>= \x -> stab ("return " ++ x)
+        s3 <- altToPatternMatch bndrs n >>= pure . (foldl (++) "")
+        return ("/* [CASESIMPLE] */\n" ++ s1 ++ s3 ++ s2)
     toCSharp (CASE n e def cases altType) = do
         s1 <- toCSharp e
         s2 <- stab (n ++ " = EVAL(" ++ s1 ++ ")\n")
         s6 <- stab ("switch (" ++ n ++ ") {\n")
         incTab 
-        s3 <- altsToCSharp cases
+        s3 <- altsToCSharp n cases
+        incTab
         defSt <- toCSharp def
+        decTab
         s4 <- stab ("default: " ++ defSt)
         decTab
         s7 <- stab "}"
         let s5 = if (defSt == "") then "" else s4
-        return ("\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ s7)
+        return ("/* [CASE] */\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ s7)
 
-altsToCSharp alts = foldM altToCSharp "" alts
-altToCSharp acc (altCon, bndrs, ex) = do
+-- converts pattern match constructor application to descructuring assignment of C# datatypes
+-- bndrs is a list of var names in Con application
+-- vname is a name of variable being destructured
+altToPatternMatch bndrs vname = imapM (fn vname) bndrs
+        where fn vn i b = stab ("var " ++ b ++ " = " ++ vn ++ ".__f" ++ show i ++ "__;\n")
+
+altsToCSharp n alts = foldM (altToCSharp n) "" alts
+altToCSharp n acc (altCon, bndrs, ex) = do
     s1 <- stab (altConToCSharp altCon bndrs ++ ":\n")
     incTab
-    exprRes <- toCSharp ex
-    s2 <- stab (exprRes ++ "\n")
+    -- exprRes <- toCSharp ex
+    exprRes <- if (isACaseOrLet ex) then
+        do toCSharp ex >>= stab
+      else do toCSharp ex >>= \x -> stab ("return " ++ x)
+    let s2 = (exprRes ++ "\n")
+    s3 <- altToPatternMatch bndrs n >>= pure . (foldl (++) "")
     decTab
-    return (acc ++ s1 ++ s2)
+    return (acc ++ s1 ++ s3 ++ s2)
         
 altConToCSharp (LitAlt lit) _ = "case " ++ showGhc lit
-altConToCSharp (DataAlt dc) bndrs = "case " ++ showGhc dc ++ " " ++ show bndrs
+altConToCSharp (DataAlt dc) bndrs = "case /* " ++ showGhc dc ++ show bndrs ++ " */ " ++ show (dataConTag dc)
     
 stgToText :: [GenStgTopBinding Var Var] -> TextProgram
 stgToText stgp = evalState (mapM toCSharp (stg2DotNet stgp)) initialCompilerState

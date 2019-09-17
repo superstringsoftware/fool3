@@ -25,6 +25,7 @@ dependencies:
 - ghc
 - ghc-paths
 - haskeline 
+- ilist
 
 library:
   source-dirs: src
