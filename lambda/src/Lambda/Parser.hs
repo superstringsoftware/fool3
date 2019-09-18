@@ -141,8 +141,10 @@ lambda = do
     reservedOp "="
     preds <- try predicates <|> pure []
     args <- (reservedOp "\\" *> many1 variable )
+    setCurrentArity (length args)
     body <- try (reservedOp "." *> expr) <|> pure EMPTY
     let ex = Lam args body tp preds
+    setCurrentArity 0
     return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
 
 anonConstructor :: Parser Expr
@@ -173,12 +175,44 @@ typeclass = do
     s <- braces (sepBy1 defn (reservedOp ";")) <?> "error while parsing typeclass"
     return $ Tuple "" s ToDerive
 
+-- pattern match inside a function    
+lambdaPatternMatch :: Parser Expr
+lambdaPatternMatch = do
+    h <- argumentsOnly
+    a <- getCurrentArity
+    reservedOp "->"
+    t <- expr
+    if ( (length h) /= a ) 
+        then fail ("function has arity " ++ show a ++ " but pattern match has " ++ show (length h) ++ " arguments")             
+        else return $ PatternMatch h t
+
+argumentsOnly :: Parser [Expr]
+argumentsOnly = do
+    args <- many1 argument
+    return args
+    
+
+-- function with pattern matches defined inside
+{-
+length:Int = \ ls:(List a) . {
+    Nil -> 0;
+    (Cons _ xs) -> 1 + length xs
+};
+-}    
+patternsInsideLambda :: Parser Expr
+patternsInsideLambda = do
+    s <- braces (sepBy1 lambdaPatternMatch (reservedOp ";")) <?> "error while parsing patterns inside lambda"
+    return $ Patterns s
+
+
+-- top-level pattern match, like in Haskell
 patternMatch :: Parser Expr
 patternMatch = do
     h <- arguments
     reservedOp "="
     t <- expr
-    return $ PatternMatch h t
+    return $ PatternMatch [h] t
+
 
 -- simple top-level binding of a symbol to expression, without lambdas
 binding :: Parser Expr
@@ -226,15 +260,15 @@ contents p = do
 
 factor :: Parser Expr
 -- factor = try caseExpression <|> try call <|> try ifthen <|> argument -- arguments -- try letins <|>
-factor = try typeclass <|> try consTuple <|> arguments -- try caseExpression <|> arguments -- arguments -- try letins <|>
+factor = try patternsInsideLambda <|> try typeclass <|> try consTuple <|> arguments -- try caseExpression <|> arguments -- arguments -- try letins <|>
 
 defn :: Parser Expr
 defn =  do
     expr <- try lambda
             <|> try anonConstructor
             <|> try binding
-            <|> try patternMatch
-            <|> expr
+            <|> patternMatch
+            -- <|> expr
             <?> "lambda, binding, pattern match or expression"
     return expr
         

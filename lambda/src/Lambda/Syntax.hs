@@ -42,9 +42,15 @@ data Expr =
   -}
   | Lam [Var] Expr Type [Pred] 
   | App Expr [Expr] -- tuple application mechanism (since even haskell eventually gets there!!!): Expr1 (Expr1,...,Exprn)
-  | Tuple ConsTag [Expr] Type -- polymorphic tuple. 
+  -- polymorphic tuple representing values - DATA CONSTRUCTORS return it, also used in TYPECLASSES
+  | Tuple ConsTag [Expr] Type 
   | Let [Binding] Expr -- bindings "in" Expr; top level function definitions go here as well with EMPTY "in"
-  | PatternMatch Expr Expr -- 1 occurence of pattern match
+  -- 1 occurence of pattern match
+  -- since we are NOT repeating function name on the left side of the pattern match but put ONLY arguments there,
+  -- first [Expr] here is simply a list of expressions to which lambda bound variables need to be evaluated!!!
+  -- second expression is the normal function as usual
+  | PatternMatch [Expr] Expr 
+  | Patterns [Expr] -- only PatternMatch should be used inside here, used inside lambda with patterns!!!
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | EMPTY
@@ -68,7 +74,7 @@ afterparse (Lam vars ex typ preds) = Lam vars (afterparse ex) typ preds
 afterparse (App ex exs) = App (afterparse ex) (map afterparse exs)
 afterparse (Tuple cons exs typ) = Tuple cons (map afterparse exs) typ
 afterparse (Let bnds ex) = Let (map ( \(v,e)-> (v,afterparse e) ) bnds ) (afterparse ex)
-afterparse (PatternMatch e1 e2) = PatternMatch (afterparse e1) (afterparse e2)
+afterparse (PatternMatch args e2) = PatternMatch (map afterparse args) (afterparse e2)
 
 afterparse e = e
 
@@ -124,9 +130,11 @@ instance Printer Expr where
   ppr (UnaryOp n e) = n ++ ppr e
   ppr (Tuple cons exprs typ) = cons ++ (showListCuBr ppr exprs) ++ " : " ++ ppr typ
   ppr (App f args) = ppr f ++ " " ++ (showListRoBrPlain ppr args)
-  ppr (PatternMatch e1 e2) = ppr e1 ++ " = " ++ ppr e2
+  ppr (Patterns ps) = showListCuBr ppr1 ps
+      where ppr1 (PatternMatch args e2) = (showListPlain ppr args) ++ " -> " ++ ppr e2
+  ppr (PatternMatch args e2) = (showListPlain ppr args) ++ " = " ++ ppr e2
   ppr e = show e
-  -- λ
+  -- λ  
 
 -- function that generically outputs a list of values   
 showListWFormat :: (a -> String) -> String -> String -> String -> String -> [a] -> String

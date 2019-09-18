@@ -67,6 +67,13 @@ processCommand (":env":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
 
+processCommand (":all":"-d":_) = do
+    mod <- get >>= \s -> pure (parsedModule s)
+    liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
+processCommand (":all":_) = do
+    mod <- get >>= \s -> pure (parsedModule s)
+    liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )    
+    
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
 processCommand (":a":"-d":_) = processCommand [":all","-d"]
@@ -111,12 +118,12 @@ loadFileNew nm = do
         Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
         -- desugaring on the first pass
         Right exprs -> do
-                liftIO (mapM_ (putStrLn . ppr) exprs) 
+                liftIO (mapM_ (putStrLn . show) exprs) 
                 liftIO (putStrLn "... successfully loaded.")
                 liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
                 afterparserPass
                 mod <- get >>= \s -> pure (parsedModule s)
-                liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )
+                liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 
 
 -- Haskeline loop stacked into 3-monad stack

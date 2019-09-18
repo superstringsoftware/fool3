@@ -1,3 +1,5 @@
+-- we can't parse pattern matches with operators using operator syntax on the left side, need to use function syntax!
+
 I# : Int    = \x:Int#.    {_};
 
 False : Bool = {};
@@ -32,14 +34,21 @@ Monoid Int = {
     Z0 = 0
 };
 
-map _ Nil = Nil;
-map f (Cons x xs) = Cons (f x) (map f xs);
+-- pattern match syntax for functions - match ONLY arguments!!!
+map = \f ls:(List a) . {
+    Nil -> Nil;
+    f (Cons x xs) -> Cons (f x) (map f xs)
+};
 
-length Nil = 0;
-length (Cons _ xs) = 1 + length xs;
+length:Int = \ ls:(List a) . {
+    Nil -> 0;
+    (Cons _ xs) -> 1 + length xs
+};
 
 s = "hello";
 
 g = <1, 27.4, 14>;
 
 square n = n * n;
+
+(*) x y = x *# y;

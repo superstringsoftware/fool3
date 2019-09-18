@@ -9,6 +9,7 @@ import Lambda.Syntax
 
 import Control.Monad.Trans.State.Strict
 
+-- this needs to be run right after parsing
 afterparserPass :: IntState ()
 afterparserPass = do
     s <- get

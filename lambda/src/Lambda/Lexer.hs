@@ -13,13 +13,22 @@ import State
 -- and Parsec is ParsecT s u Identity, so we are making u = ParserState
 data ParserState = ParserState {
     -- count :: Int,
-    parserLog :: [String]
+    parserLog :: [String],
+    currentArity :: !Int -- when we are parsing a function, store current arity here - needed for error messages while parsing, e.g. with pattern match mismatch etc.
 } deriving Show
 
 initialParserState = ParserState {
     -- count = 0,
-    parserLog = []
+    parserLog = [],
+    currentArity = 0
 }
+
+-- helper functions to manipulate state
+setCurrentArity :: Int -> Parser ()
+setCurrentArity a = modifyState (\s -> s {currentArity = a})
+
+getCurrentArity :: Parser Int
+getCurrentArity = getState >>= pure . currentArity
 
 addParserLog :: String -> ParserState -> ParserState
 addParserLog s ps = ps { parserLog = s : (parserLog ps) }
