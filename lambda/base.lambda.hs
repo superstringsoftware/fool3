@@ -62,6 +62,14 @@ Monoid : Class = ∃ Semigroup a => \a. {
 
 fact : a = ∃ (Num a, Ord a) => \n:a;
 
+Semigroup Int = {
+    (+) (I# x) (I# y) = I# (x +# y)
+};
+
+Monoid Int = {
+    Z0 = 0
+};
+
 
 
 

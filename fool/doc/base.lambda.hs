@@ -181,7 +181,7 @@ instance RingOverRing (Vector Double) Double where type Res (Vector Double) Doub
 
 
 -- enough with abstract algebra
-∀a ∃ Num a => fact : a = \n:a. n ?
+fact : a = ∀a ∃ Num a =>  \n:a. n ?
     0         -> 1
   | otherwise -> n * fact (n - 1);
 
