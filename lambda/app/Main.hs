@@ -13,6 +13,7 @@ import Control.Monad (zipWithM_, void, when)
 
 import Lambda.Syntax
 import Lambda.Parser
+import Lambda.Pipeline
 
 
 -- need this 3-monad stack to make sure Haskeline works with our state monad
@@ -39,7 +40,7 @@ processNew line = do
                 Right ex1 -> do
                     liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received interactive expression: " -- ++ (show $ length ex)
                     liftIO $ print ex1 -- show what was parsed first
-                    -- now processing it in interpreter immediately
+                    
 
 
 showHelp :: IO ()
@@ -102,14 +103,20 @@ processSet _ _ = liftIO $ putStrLn "Unknown :set command. Type :h[elp] to show a
 
 loadFileNew :: String -> IntState ()
 loadFileNew nm = do
-    st <- get
     liftIO $ putStrLn $ "Loading file: " ++ nm
     res <- parseToplevelFile nm
     -- liftIO $ print res
+    st <- get
     case res of
         Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
         -- desugaring on the first pass
-        Right exprs -> liftIO (mapM_ print exprs) >> liftIO (putStrLn "... successfully loaded.")
+        Right exprs -> do
+                liftIO (mapM_ (putStrLn . ppr) exprs) 
+                liftIO (putStrLn "... successfully loaded.")
+                liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
+                afterparserPass
+                mod <- get >>= \s -> pure (parsedModule s)
+                liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )
 
 
 -- Haskeline loop stacked into 3-monad stack

@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings, NamedFieldPuns, FlexibleInstances #-}
 
+-- Surface language syntax, Expr is generated directly from the Parser
+
 module Lambda.Syntax
 where
 
--- testing different lambda machinery - based on currying and based on tuples
 type Name = String
 type ConsTag = String
 
@@ -20,7 +21,7 @@ data Type
   = TVar Name -- TVar -- a:* - careful, we CANNOT use 'Id' constructor from Var here
   | HighVar Name [Pred] -- for rank-n polymorphism, predicates for a specific type variable
   | TCon Name -- TyCon -- Maybe, String, Int etc - just a name of the constructor
-  | TApp Type Type -- Constructor application - Maybe Int, List a etc
+  | TApp Type [Type] -- Constructor application - Maybe Int, List a etc; as it should be always saturated tuple is a nobrainer
   | TArr Type Type -- Function sig - Maybe a -> String etc
   | TExpr Expr -- since we will support dependent types, type constructors can be applied to quite complicated expressions
   -- | TForall [Pred] [TVar] Type
@@ -34,13 +35,17 @@ data Type
 data Expr = 
     VarId Name
   | Lit Literal
-  | Lam [Var] Expr Type [Pred] -- predicates here apply to the whole function, for rank-n need to use HighVar in Type
-  | App Expr Expr
+  {-| 
+    Predicates here apply to the whole function, for rank-n need to use HighVar in Type
+    if a function 'Expr' is a 'Tuple' - it's a data constructor!!!
+    "normal" functions expression will be either 'Let' (with in non-EMPTY!) or 'App'
+  -}
+  | Lam [Var] Expr Type [Pred] 
+  | App Expr [Expr] -- tuple application mechanism (since even haskell eventually gets there!!!): Expr1 (Expr1,...,Exprn)
   | Tuple ConsTag [Expr] Type -- polymorphic tuple. 
-  | Let [Binding] Expr -- bindings "in" Expr; top level function definitions go here as well
+  | Let [Binding] Expr -- bindings "in" Expr; top level function definitions go here as well with EMPTY "in"
   | PatternMatch Expr Expr -- 1 occurence of pattern match
   | BinaryOp Name Expr Expr
-  | ResBinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | EMPTY
   deriving (Show, Eq)
@@ -49,3 +54,88 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
                LString !String | LList [Expr] | LVec [Expr]
                deriving (Eq, Show)
 
+
+-- the very first pass that we run right after parsing the source file               
+afterparse :: Expr -> Expr
+afterparse (BinaryOp n e1 e2) = App (VarId n) (e1:e2:[])
+afterparse (UnaryOp n e) = App (VarId n) (e:[])
+-- top level binding: this is a DATA CONSTRUCTOR (unnamed tuple, bound to typed var) - crazy pattern, need to simplify
+-- we are naming the tuple and assigning it's type to var type, since that's how types are being created
+afterparse (Let (( v@(Var n typ) , (Tuple "" args ToDerive) ):[]) EMPTY ) = Let [(v, Tuple n (map afterparse args) typ )] EMPTY 
+afterparse (Let (( v@(Var n typ) , (Lam vars (Tuple "" args ToDerive) typ1 preds )):[]) EMPTY ) = 
+  Let [(v, Lam vars (Tuple n (map afterparse args) typ) typ1 preds )] EMPTY 
+afterparse (Lam vars ex typ preds) = Lam vars (afterparse ex) typ preds
+afterparse (App ex exs) = App (afterparse ex) (map afterparse exs)
+afterparse (Tuple cons exs typ) = Tuple cons (map afterparse exs) typ
+afterparse (Let bnds ex) = Let (map ( \(v,e)-> (v,afterparse e) ) bnds ) (afterparse ex)
+afterparse (PatternMatch e1 e2) = PatternMatch (afterparse e1) (afterparse e2)
+
+afterparse e = e
+
+-- check if tuple is anonymous, need it for some passes
+isAnonymousTuple (Tuple "" _ _) = True
+isAnonymousTuple _ = False
+
+class Printer a where
+  ppr :: a -> String
+
+{-
+instance Printer a => Printer [a] where
+  ppr = showListWFormat ppr "[" "]" ", " "[]"
+-}
+
+instance Printer Pred where
+  ppr Unconstrained = ""
+  ppr (Exists typ) = "∃" ++ ppr typ
+  
+
+instance Printer [Pred] where
+  ppr [] = ""
+  ppr preds = (showListRoBr ppr preds) ++ " => "
+  
+instance Printer Literal where
+  ppr (LInt i) = show i
+  ppr (LFloat i) = show i
+  ppr (LChar i) = show i
+  ppr (LString i) = show i
+  ppr (LList []) = "[]" 
+  ppr (LList (x:xs)) = foldl fn ("[" ++ ppr x) xs ++ "]"
+      where fn acc e = acc ++ ", " ++ ppr e
+  ppr (LVec []) = "< >"
+  ppr (LVec (x:xs)) = foldl fn ("<" ++ ppr x) xs ++ ">"
+      where fn acc e = acc ++ ", " ++ ppr e
+
+instance Printer Type where
+  ppr ToDerive = "(?)"
+  ppr (TCon n) = n
+  ppr (TApp con args) = "(" ++ ppr con ++ " " ++ (showListPlain ppr args) ++ ")"
+  ppr (TVar n) = n
+  ppr e = show e
+
+instance Printer Var where
+  ppr (Var n t) = n ++ ":" ++ ppr t      
+
+instance Printer Expr where
+  ppr (Lit l) = ppr l
+  ppr (VarId v) = v
+  ppr (Let ((v,e):[]) _ ) = ppr v ++ " = " ++ ppr e
+  ppr (Lam vars expr tp preds) = ppr preds ++ "λ " ++ (showListPlain ppr vars) ++ " . " ++ ppr expr
+  ppr (BinaryOp n e1 e2) = ppr e1 ++ " " ++ n ++ " " ++ ppr e2
+  ppr (UnaryOp n e) = n ++ ppr e
+  ppr (Tuple cons exprs typ) = cons ++ (showListCuBr ppr exprs) ++ " : " ++ ppr typ
+  ppr (App f args) = ppr f ++ " " ++ (showListRoBrPlain ppr args)
+  ppr (PatternMatch e1 e2) = ppr e1 ++ " = " ++ ppr e2
+  ppr e = show e
+  -- λ
+
+-- function that generically outputs a list of values   
+showListWFormat :: (a -> String) -> String -> String -> String -> String -> [a] -> String
+showListWFormat showF beginWith endWith sep empty [] = empty
+showListWFormat showF beginWith endWith sep empty (x:xs) = foldl fn (beginWith ++ showF x) xs ++ endWith
+    where fn acc e = acc ++ sep ++ showF e
+
+showListSqBr fun = showListWFormat fun "[" "]" ", " "[]"
+showListRoBr fun = showListWFormat fun "(" ")" ", " "()"     
+showListCuBr fun = showListWFormat fun "{" "}" ", " "{}"     
+showListPlain fun = showListWFormat fun "" "" " " ""
+showListRoBrPlain fun = showListWFormat fun "(" ")" " " ""

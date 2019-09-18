@@ -7,38 +7,7 @@ Nothing : (Maybe a) = {};
 Just : (Maybe a) = \x:a. {_};
 
 Nil : (List a) = {};
-(<>) : (List a) = \x:a xs:(List a); -- . {head tail};
-
-plus : Int = \x:Int y:Int . x +# y;
-
-Vector : (Vector a n) = \arr:(primarray# a n) n:Int . {_ _};
-
-Nil  : (Vect 0 a) = {};
-Cons : (Vect (k+1) a) = \head:a tail:(Vect k a). {head tail};
-
-fact : Int = \n:Int;
-fact 0 = 1;
-fact n = n * fact (n - 1);
-
-(+) : Int = \x y . x +# y;
-
-g = map (+2) lst;
-
-tr x y = x == y;
-
-Person : (Person a) = \name:String 
-    age:Int 
-    tag:a; --. {name age tag};
-
--- Employee : (Employee <: Person) = \s:Int . {salary};
-Employee = Person Int;
-
-r*(x+y) == r*x+r*y;
-(+) (I# x) (I# y) = I# (x +# y);
-
-Test : Test = \f:(Int -> String);
-
-t x y = x ≠ y;
+Cons : (List a) = \x:a xs:(List a); -- . {head tail};
 
 Eq : Class = \a:Type . {
     (==):Bool = \x:a y:a. not (x /= y);
@@ -52,24 +21,25 @@ Semigroup : Class = \a:Type . {
     associativity = x + (y + z) == (x + y) + z 
 };
 
-tt : a;
-
-ZZ;
-
 Monoid : Class = ∃ Semigroup a => \a. {
     Z0:a
 };
 
-fact : a = ∃ (Num a, Ord a) => \n:a;
-
 Semigroup Int = {
     (+) (I# x) (I# y) = I# (x +# y)
 };
-
 Monoid Int = {
     Z0 = 0
 };
 
+map _ Nil = Nil;
+map f (Cons x xs) = Cons (f x) (map f xs);
 
+length Nil = 0;
+length (Cons _ xs) = 1 + length xs;
 
+s = "hello";
 
+g = <1, 27.4, 14>;
+
+square n = n * n;

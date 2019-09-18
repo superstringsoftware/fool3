@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 --------------------------------------------------------------------
 -- |
 -- Module    :  Parser
@@ -22,7 +23,7 @@ import Control.Applicative ((<$>), liftA2)
 import Control.Monad (foldM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 
 
 import qualified Data.Vector.Unboxed as U
@@ -38,7 +39,7 @@ import Lambda.Syntax
 binop = Ex.Infix  (BinaryOp <$> op) Ex.AssocLeft
 unop  = Ex.Prefix (UnaryOp <$> op)
 
-binary s assoc = Ex.Infix (reservedOp s >> return (ResBinaryOp s)) assoc
+binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
 binaryCustom s assoc = Ex.Infix (op >>= \s -> return (BinaryOp s)) assoc
 
 op :: Parser String
@@ -68,7 +69,7 @@ typeAp = do
   vars <- many $ try (TCon <$> uIdentifier) <|> try ( TVar <$> lIdentifier ) 
                  <|> try (parens typeAp) <|> (TExpr <$> argument)
   if null vars then return tcon -- concrete type
-  else return $ foldl TApp tcon vars -- type application
+  else return $ TApp tcon vars -- foldl TApp tcon vars -- type application
 
 -- :a->b->String etc
 tArr :: Parser Type
@@ -106,6 +107,12 @@ variable = do
   typ <- typeSignature
   return $ Var name typ
 
+anonVariable :: Parser Var
+anonVariable = do
+    typ <- strictTypeSignature
+    return $ Var "" typ
+  
+
 typedId :: Parser Expr
 typedId = do
   name <- try (parens op) <|> identifier --emptyStringParser -- added unnamed variables for easier record parsing
@@ -133,16 +140,26 @@ lambda = do
     var@(Var _ tp) <- variable -- identifier
     reservedOp "="
     preds <- try predicates <|> pure []
-    args <- (reservedOp "\\" *> many variable)
+    args <- (reservedOp "\\" *> many1 variable )
     body <- try (reservedOp "." *> expr) <|> pure EMPTY
     let ex = Lam args body tp preds
     return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
 
+anonConstructor :: Parser Expr
+anonConstructor = do
+    var@(Var _ tp) <- variable -- identifier
+    reservedOp "="
+    preds <- try predicates <|> pure []
+    args <- (reservedOp "\\" *> many1 anonVariable)
+    body <- try (reservedOp "." *> expr) <|> pure EMPTY
+    let ex = Lam args body tp preds
+    return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
+    
 predicate :: Parser Pred
 predicate = do
     tcon <- (TCon <$> uIdentifier) <?> "type class name" 
     vars <- many1 $ (TVar <$> lIdentifier)                
-    return $ Exists $ foldl TApp tcon vars -- type application
+    return $ Exists $ TApp tcon vars -- foldl TApp tcon vars -- type application
 
 predicates :: Parser [Pred]
 predicates = do
@@ -187,8 +204,10 @@ argument = try containers
 
 arguments :: Parser Expr
 arguments = do
-    args <- many1 argument
-    return $ foldl1 App args -- need to use left fold here because application is highest precedence
+    args@(f:xs) <- many1 argument
+    --return $ foldl1 App args -- need to use left fold here because application is highest precedence
+    let er = if (xs == []) then f else (App f xs)
+    return er
   
 containers :: Parser Expr
 containers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
@@ -210,18 +229,25 @@ factor :: Parser Expr
 factor = try typeclass <|> try consTuple <|> arguments -- try caseExpression <|> arguments -- arguments -- try letins <|>
 
 defn :: Parser Expr
-defn =  try lambda
-        <|> try binding
-        <|> try patternMatch
-        <|> expr
-        <?> "lambda, binding, pattern match or expression"
+defn =  do
+    expr <- try lambda
+            <|> try anonConstructor
+            <|> try binding
+            <|> try patternMatch
+            <|> expr
+            <?> "lambda, binding, pattern match or expression"
+    return expr
         
         
 
 toplevel :: Parser [Expr]
 toplevel = many $ do
+    pos <- getPosition
     def <- defn
     reservedOp ";"
+    ints <- lift get 
+    let pm = (def, SourceInfo (sourceLine pos) (sourceColumn pos) ""):(parsedModule ints)
+    lift $ put ints {parsedModule = pm}    
     return def
     
 -- parseExpr :: String -> Either ParseError Expr
