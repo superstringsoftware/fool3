@@ -38,16 +38,15 @@ import Lambda.Syntax
 binop = Ex.Infix  (BinaryOp <$> op) Ex.AssocLeft
 unop  = Ex.Prefix (UnaryOp <$> op)
 
-binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
+binary s assoc = Ex.Infix (reservedOp s >> return (ResBinaryOp s)) assoc
+binaryCustom s assoc = Ex.Infix (op >>= \s -> return (BinaryOp s)) assoc
 
 op :: Parser String
 op = operator
     
 binops = [[binary "=" Ex.AssocLeft]
-        ,[binary "*" Ex.AssocLeft,
-            binary "/" Ex.AssocLeft]
-        ,[binary "+" Ex.AssocLeft,
-            binary "-" Ex.AssocLeft]
+        ,[binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft, binary "*#" Ex.AssocLeft, binary "/#" Ex.AssocLeft]
+        ,[binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft, binary "+#" Ex.AssocLeft, binary "-#" Ex.AssocLeft]
         ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
 
     
@@ -56,7 +55,7 @@ lIdentifier = skipMany space >> lookAhead lower >> identifier
 uIdentifier = skipMany space >> lookAhead upper >> identifier
     
 expr :: Parser Expr
-expr = Ex.buildExpressionParser (binops ++ [[unop],[binop]]) factor
+expr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) factor
 -- expr = Ex.buildExpressionParser ([]) factor
 
 ---------------------------------------------------------------------------------------------------
@@ -107,6 +106,12 @@ variable = do
   typ <- typeSignature
   return $ Var name typ
 
+typedId :: Parser Expr
+typedId = do
+  name <- try (parens op) <|> identifier --emptyStringParser -- added unnamed variables for easier record parsing
+  typ <- strictTypeSignature
+  let v = Var name typ
+  return $ Let [(v,EMPTY)] EMPTY
 ---------------------------------------------------------------------------------------------------
 int :: Parser Literal
 int = LInt . fromInteger <$> integer
@@ -118,16 +123,38 @@ stringVal :: Parser Literal
 stringVal = LString <$> stringLit
 
 symbolId :: Parser Expr
-symbolId = VarId <$> identifier
+symbolId = do 
+    s <- (try (parens op) <|> identifier)
+    return $ VarId s
 
 -- everything is a function
 lambda :: Parser Expr
 lambda = do
     var@(Var _ tp) <- variable -- identifier
-    args <- (reservedOp "=" *> reservedOp "\\" *> many variable)
+    reservedOp "="
+    preds <- try predicates <|> pure []
+    args <- (reservedOp "\\" *> many variable)
     body <- try (reservedOp "." *> expr) <|> pure EMPTY
-    let ex = Lam args body tp
+    let ex = Lam args body tp preds
     return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
+
+predicate :: Parser Pred
+predicate = do
+    tcon <- (TCon <$> uIdentifier) <?> "type class name" 
+    vars <- many1 $ (TVar <$> lIdentifier)                
+    return $ Exists $ foldl TApp tcon vars -- type application
+
+predicates :: Parser [Pred]
+predicates = do
+    try (reserved "exists") <|> reserved "∃"
+    preds <- try (parens (sepBy1 predicate (reservedOp ",") )) <|> (predicate >>= \p -> pure [p])
+    reservedOp "=>"
+    return preds
+
+typeclass :: Parser Expr    
+typeclass = do
+    s <- braces (sepBy1 defn (reservedOp ";")) <?> "error while parsing typeclass"
+    return $ Tuple "" s ToDerive
 
 patternMatch :: Parser Expr
 patternMatch = do
@@ -147,30 +174,16 @@ binding = do
 consTuple :: Parser Expr
 consTuple = braces (many symbolId) >>= \args -> return (Tuple "" args ToDerive)
 
-{-
--- one case like | x == 0 -> 1
-oneCase :: Parser (Expr, Expr)
-oneCase = do
-  left <- expr
-  reservedOp "->"
-  right <- expr
-  return (left, right)
-
-caseExpression :: Parser Expr
-caseExpression = do
-  inspect <- try (parens expr) <|> symbolId <?> "caseExpression failed in inspect"
-  reservedOp "?"
-  cases <- sepBy1 oneCase (reservedOp "|")
-  return $ Case inspect cases
--}
 
 argument :: Parser Expr
 argument = try containers
     <|> try (parens expr)
+    <|> try typedId
     <|> try (Lit <$> floating)
     <|> try (Lit <$> int)
     <|> try (Lit <$> stringVal)
     <|> symbolId
+    <?> "container, literal, symbol id or parenthesized expression"
 
 arguments :: Parser Expr
 arguments = do
@@ -194,13 +207,16 @@ contents p = do
 
 factor :: Parser Expr
 -- factor = try caseExpression <|> try call <|> try ifthen <|> argument -- arguments -- try letins <|>
-factor = try consTuple <|> arguments -- try caseExpression <|> arguments -- arguments -- try letins <|>
+factor = try typeclass <|> try consTuple <|> arguments -- try caseExpression <|> arguments -- arguments -- try letins <|>
 
 defn :: Parser Expr
 defn =  try lambda
         <|> try binding
-        <|> patternMatch
-        -- <|> expr
+        <|> try patternMatch
+        <|> expr
+        <?> "lambda, binding, pattern match or expression"
+        
+        
 
 toplevel :: Parser [Expr]
 toplevel = many $ do

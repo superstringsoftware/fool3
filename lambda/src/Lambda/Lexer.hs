@@ -37,7 +37,7 @@ emptyDef    = Tok.LanguageDef
             , identStart     = letter <|> char '_'
             , identLetter    = alphaNum <|> oneOf "_'#"
             , opStart        = opLetter emptyDef
-            , opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
+            , opLetter       = oneOf (":!#$%&*+./<=>?@\\^|-~" ++ "•§≠∑®†ø©˙∆˚¬…æ≈ç√∫≤≥÷¿˘¯˜◊∏ˇ‰Œ±·°‡›‹€") -- unicode stuff
             , reservedOpNames= []
             , reservedNames  = []
             , caseSensitive  = True
@@ -47,9 +47,9 @@ emptyDef    = Tok.LanguageDef
 lexer :: TokenParserIS ParserState
 lexer = Tok.makeTokenParser style
     where
-    ops = [";","=",",",".",":", "::", "->","<",">", "|", "?", "<:", "\\"] -- ["+","*","-","/",";","=",",","<",">","|",":"]
-    names = ["instance","extern","if","then","else","in","for"
-            ,"binary", "unary", "let", "class", "case", "of", "type", "where", "∃", "∀", "exists"]
+    ops = [";","=",",",".",":", "::", "->", "=>", "<",">", "|", "?", "<:", "\\"]
+    names = ["instance","extern","if","then","else","in",
+            "let", "class", "case", "of", "type", "where", "∃", "∀", "exists", "forall"]
     style = emptyDef {
                 Tok.commentStart   = "{-"
                 , Tok.commentEnd     = "-}"
