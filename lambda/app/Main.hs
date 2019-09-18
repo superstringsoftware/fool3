@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Control.Monad.Trans
@@ -11,6 +12,9 @@ import Data.Functor.Identity
 import State
 import Control.Monad (zipWithM_, void, when)
 
+import qualified Data.Text.IO as T (readFile)
+import qualified Data.Text as T
+
 import Lambda.Syntax
 import Lambda.Parser
 import Lambda.Pipeline
@@ -23,7 +27,7 @@ type InputTState a = InputT (StateT InterpreterState IO) a
 -- baseLibPath = "prog1.fool.hs" -- "base.fool.hs"
 baseLibPath = "base.lambda.hs"
 
-processNew :: String -> IntState ()
+processNew :: T.Text -> IntState ()
 processNew line = do
     res <- parseToplevel line
     case res of
@@ -73,7 +77,7 @@ processCommand (":all":"-d":_) = do
 processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )    
-    
+
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
 processCommand (":a":"-d":_) = processCommand [":all","-d"]
@@ -111,19 +115,21 @@ processSet _ _ = liftIO $ putStrLn "Unknown :set command. Type :h[elp] to show a
 loadFileNew :: String -> IntState ()
 loadFileNew nm = do
     liftIO $ putStrLn $ "Loading file: " ++ nm
-    res <- parseToplevelFile nm
+    fileText <- liftIO (T.readFile nm)
+    res <- parseWholeFile fileText nm
     -- liftIO $ print res
     st <- get
+    put $ st { currentSource = fileText }
     case res of
-        Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "errors:") >> liftIO (print err)
+        Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (print err)
         -- desugaring on the first pass
         Right exprs -> do
-                liftIO (mapM_ (putStrLn . show) exprs) 
+                -- liftIO (mapM_ (putStrLn . show) exprs) 
                 liftIO (putStrLn "... successfully loaded.")
                 liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
                 afterparserPass
-                mod <- get >>= \s -> pure (parsedModule s)
-                liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
+                -- mod <- get >>= \s -> pure (parsedModule s)
+                -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 
 
 -- Haskeline loop stacked into 3-monad stack
@@ -137,13 +143,13 @@ loop = do
                 -- if starts with ":" - then it's a command
                 (':':_) -> lift (processCommand (words input)) >> loop
                 -- otherwise parsing our language input
-                _ -> lift (processNew input) >> loop
+                _ -> lift (processNew $ T.pack input) >> loop
 
 runInterpreter :: InputTState ()
 runInterpreter = do
     liftIO $ putStrLn "Loading base library..."
     lift $ loadFileNew baseLibPath
-    lift $ processCommand [":all"]
+    -- lift $ processCommand [":all"]
     loop
 
 main :: IO ()

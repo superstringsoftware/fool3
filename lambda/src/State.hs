@@ -29,7 +29,8 @@ data InterpreterState = InterpreterState {
     logs     :: [String],
     currentFlags :: CurrentFlags,
     -- this is being filled by the parser as we go, so last line in the file will be first here!
-    parsedModule :: LTProgram 
+    parsedModule :: LTProgram,
+    currentSource :: Text
 } deriving Show
 
 data CurrentFlags = CurrentFlags {
@@ -42,5 +43,6 @@ initializeInterpreter :: IO InterpreterState
 initializeInterpreter = return $ InterpreterState {
     logs = [],
     currentFlags = CurrentFlags False True False,
-    parsedModule = []
+    parsedModule = [],
+    currentSource = ""
 }

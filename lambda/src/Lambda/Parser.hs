@@ -25,6 +25,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 
+import qualified Data.Text.IO as T (readFile)
 
 import qualified Data.Vector.Unboxed as U
 
@@ -290,6 +291,9 @@ parseExpr s = runParserT (contents expr) initialParserState "<stdin>" s
 --parseToplevel :: String -> Either ParseError [Expr]
 parseToplevel s = runParserT (contents defn) initialParserState "<stdin>" s
 
+-- give a text and then parse it - need to store source for error reporting
+parseWholeFile s fn = runParserT (contents toplevel) initialParserState fn s
+
 -- parse a given file
 parseToplevelFile :: String -> IntState (Either ParseError [Expr])
 parseToplevelFile name = parseFromFile (contents toplevel) name initialParserState
@@ -297,7 +301,7 @@ parseToplevelFile name = parseFromFile (contents toplevel) name initialParserSta
 parseFromFile :: Parser a -> String -> ParserState -> IntState (Either ParseError a)
 -- redefining parse from file to work with our state - just a quick and dirty fix
 parseFromFile p fname st
-    = liftIO (readFile fname) >>= runPT p st fname
+    = liftIO (T.readFile fname) >>= runParserT p st fname
              
     
     

@@ -9,6 +9,8 @@ import Text.Parsec.Token as Tok
 
 import State
 
+import Data.Text
+
 -- our parser's user state - remember that parser is ParsecT s u m a
 -- and Parsec is ParsecT s u Identity, so we are making u = ParserState
 data ParserState = ParserState {
@@ -33,9 +35,9 @@ getCurrentArity = getState >>= pure . currentArity
 addParserLog :: String -> ParserState -> ParserState
 addParserLog s ps = ps { parserLog = s : (parserLog ps) }
 
-type Parser = ParsecT String ParserState IntState
-type LanguageDefIS st = Tok.GenLanguageDef String st IntState
-type TokenParserIS st = Tok.GenTokenParser String st IntState
+type Parser = ParsecT Text ParserState IntState
+type LanguageDefIS st = Tok.GenLanguageDef Text st IntState
+type TokenParserIS st = Tok.GenTokenParser Text st IntState
 
 emptyDef   :: LanguageDefIS st
 emptyDef    = Tok.LanguageDef
