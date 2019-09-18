@@ -26,6 +26,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 
 import qualified Data.Text.IO as T (readFile)
+import qualified Data.Text as L
 
 import qualified Data.Vector.Unboxed as U
 
@@ -33,6 +34,19 @@ import State
 import Lambda.Lexer
 import Lambda.Syntax
 
+-- used to show syntax errors together with source (first argument)
+showSyntaxError :: L.Text -> ParseError -> String
+showSyntaxError s err = L.unpack $ L.unlines [
+      "  ",
+      "  " <> lineContents,
+      "  " <> ((L.replicate col " ") <> "^"),
+      (L.pack $ show err)
+    ]
+  where
+    lineContents = (L.lines s) !! line
+    pos  = errorPos err
+    line = sourceLine pos - 1
+    col  = fromIntegral $ sourceColumn pos - 1
 
 ----------------------------------------------------
 -- PARSER ----------------------------------------------------
@@ -138,14 +152,16 @@ symbolId = do
 -- everything is a function
 lambda :: Parser Expr
 lambda = do
-    var@(Var _ tp) <- variable -- identifier
+    var@(Var name tp) <- variable -- identifier
     reservedOp "="
     preds <- try predicates <|> pure []
     args <- (reservedOp "\\" *> many1 variable )
     setCurrentArity (length args)
+    setCurrentLambdaName $ L.pack name
     body <- try (reservedOp "." *> expr) <|> pure EMPTY
     let ex = Lam args body tp preds
     setCurrentArity 0
+    setCurrentLambdaName ""
     return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
 
 anonConstructor :: Parser Expr
@@ -179,13 +195,19 @@ typeclass = do
 -- pattern match inside a function    
 lambdaPatternMatch :: Parser Expr
 lambdaPatternMatch = do
+    pos <- getPosition
     h <- argumentsOnly
     a <- getCurrentArity
     reservedOp "->"
     t <- expr
-    if ( (length h) /= a ) 
-        then fail ("function has arity " ++ show a ++ " but pattern match has " ++ show (length h) ++ " arguments")             
-        else return $ PatternMatch h t
+    if ( (length h) == a ) 
+        then return $ PatternMatch h t
+        else do
+            nm <- getCurrentLambdaName
+            lift $ logError $ SourceInfo (sourceLine pos) 
+                                         (sourceColumn pos) 
+                                         (L.pack ("function " ++ L.unpack nm ++  " has arity " ++ show a ++ " but pattern match has " ++ show (length h) ++ " arguments"))
+            return $ PatternMatch h t
 
 argumentsOnly :: Parser [Expr]
 argumentsOnly = do

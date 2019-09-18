@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Lambda.Lexer where
 
 -- import Text.Parsec.String (Parser)
@@ -9,23 +10,33 @@ import Text.Parsec.Token as Tok
 
 import State
 
-import Data.Text
+import Data.Text as L
 
 -- our parser's user state - remember that parser is ParsecT s u m a
 -- and Parsec is ParsecT s u Identity, so we are making u = ParserState
 data ParserState = ParserState {
     -- count :: Int,
     parserLog :: [String],
-    currentArity :: !Int -- when we are parsing a function, store current arity here - needed for error messages while parsing, e.g. with pattern match mismatch etc.
+    -- when we are parsing a function, store current arity here - needed for error messages while parsing, e.g. with pattern match mismatch etc.
+    currentArity :: !Int,
+    currentLambdaName :: Text
 } deriving Show
 
 initialParserState = ParserState {
     -- count = 0,
     parserLog = [],
-    currentArity = 0
+    currentArity = 0,
+    currentLambdaName = ""
 }
 
 -- helper functions to manipulate state
+setCurrentLambdaName :: Text -> Parser ()
+setCurrentLambdaName a = modifyState (\s -> s {currentLambdaName = a})
+
+getCurrentLambdaName :: Parser Text
+getCurrentLambdaName = getState >>= pure . currentLambdaName
+
+
 setCurrentArity :: Int -> Parser ()
 setCurrentArity a = modifyState (\s -> s {currentArity = a})
 

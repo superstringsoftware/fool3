@@ -121,13 +121,14 @@ loadFileNew nm = do
     st <- get
     put $ st { currentSource = fileText }
     case res of
-        Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (print err)
+        Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (putStrLn $ showSyntaxError fileText err)
         -- desugaring on the first pass
         Right exprs -> do
                 -- liftIO (mapM_ (putStrLn . show) exprs) 
                 liftIO (putStrLn "... successfully loaded.")
                 liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
                 afterparserPass
+                showAllErrors
                 -- mod <- get >>= \s -> pure (parsedModule s)
                 -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 

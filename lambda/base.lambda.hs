@@ -35,9 +35,10 @@ Monoid Int = {
 };
 
 -- pattern match syntax for functions - match ONLY arguments!!!
+-- errors in wrong number of arguments are caught!
 map = \f ls:(List a) . {
     Nil -> Nil;
-    f (Cons x xs) -> Cons (f x) (map f xs)
+    4 f (Cons x xs) -> Cons (f x) (map f xs)
 };
 
 length:Int = \ ls:(List a) . {
