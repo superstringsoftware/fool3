@@ -29,6 +29,7 @@ dependencies:
 - haskeline
 - directory
 - text
+- unordered-containers
 
 library:
   source-dirs: src

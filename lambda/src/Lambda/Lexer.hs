@@ -19,27 +19,32 @@ data ParserState = ParserState {
     parserLog :: [String],
     -- when we are parsing a function, store current arity here - needed for error messages while parsing, e.g. with pattern match mismatch etc.
     currentArity :: !Int,
-    currentLambdaName :: Text
+    currentLambdaName :: Text,
+    insideTypeclass :: Bool -- shows if we are parsing inside typeclass - needed for some error messaging again
 } deriving Show
 
 initialParserState = ParserState {
     -- count = 0,
     parserLog = [],
     currentArity = 0,
-    currentLambdaName = ""
+    currentLambdaName = "",
+    insideTypeclass = False
 }
 
 -- helper functions to manipulate state
+setInsideTypeclass :: Bool -> Parser ()
+setInsideTypeclass a = modifyState (\s -> s {insideTypeclass = a})
+getInsideTypeclass :: Parser Bool
+getInsideTypeclass = getState >>= pure . insideTypeclass
+
+
 setCurrentLambdaName :: Text -> Parser ()
 setCurrentLambdaName a = modifyState (\s -> s {currentLambdaName = a})
-
 getCurrentLambdaName :: Parser Text
 getCurrentLambdaName = getState >>= pure . currentLambdaName
 
-
 setCurrentArity :: Int -> Parser ()
 setCurrentArity a = modifyState (\s -> s {currentArity = a})
-
 getCurrentArity :: Parser Int
 getCurrentArity = getState >>= pure . currentArity
 

@@ -12,6 +12,7 @@ import Control.Monad.Trans.State.Strict
 import Data.Text as L
 
 import Lambda.Syntax
+import Lambda.Environment
 
 type IntState = StateT InterpreterState IO
 
@@ -31,7 +32,8 @@ data InterpreterState = InterpreterState {
     currentFlags :: CurrentFlags,
     -- this is being filled by the parser as we go, so last line in the file will be first here!
     parsedModule :: LTProgram,
-    currentSource :: Text
+    currentSource :: Text,
+    currentEnvironment :: Environment
 } deriving Show
 
 data CurrentFlags = CurrentFlags {
@@ -46,7 +48,8 @@ initializeInterpreter = return $ InterpreterState {
     errors = [],
     currentFlags = CurrentFlags False True False,
     parsedModule = [],
-    currentSource = ""
+    currentSource = "",
+    currentEnvironment = initialEnvironment
 }
 
 showAllErrors :: IntState ()

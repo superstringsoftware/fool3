@@ -32,6 +32,10 @@ data Type
   -- Type checking etc will fix this.
   deriving (Show, Eq)
 
+isTConOrTApp (TCon _)   = True
+isTConOrTApp (TApp _ _) = True
+isTConOrTApp _          = False
+
 data Expr = 
     VarId Name
   | Lit Literal
@@ -43,6 +47,8 @@ data Expr =
   | Lam [Var] Expr Type [Pred] 
   | App Expr [Expr] -- tuple application mechanism (since even haskell eventually gets there!!!): Expr1 (Expr1,...,Exprn)
   -- polymorphic tuple representing values - DATA CONSTRUCTORS return it, also used in TYPECLASSES
+  -- "Normal" functions have something else as their expression
+  -- Typeclasses should have Class in their type, even if we use subtyping <: lingo eventually
   | Tuple ConsTag [Expr] Type 
   | Let [Binding] Expr -- bindings "in" Expr; top level function definitions go here as well with EMPTY "in"
   -- 1 occurence of pattern match
@@ -56,6 +62,11 @@ data Expr =
   | EMPTY
   deriving (Show, Eq)
 
+-- checks if an expression was probably supposed to be a data constructor  
+isTupleOrEmpty (Tuple _ _ _) = True
+isTupleOrEmpty EMPTY         = True
+isTupleOrEmpty _             = False
+
 data Literal = LInt !Int | LFloat !Double | LChar !Char |
                LString !String | LList [Expr] | LVec [Expr]
                deriving (Eq, Show)
@@ -63,8 +74,8 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
 
 -- the very first pass that we run right after parsing the source file               
 afterparse :: Expr -> Expr
-afterparse (BinaryOp n e1 e2) = App (VarId n) (e1:e2:[])
-afterparse (UnaryOp n e) = App (VarId n) (e:[])
+afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):[])
+afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
 -- top level binding: this is a DATA CONSTRUCTOR (unnamed tuple, bound to typed var) - crazy pattern, need to simplify
 -- we are naming the tuple and assigning it's type to var type, since that's how types are being created
 afterparse (Let (( v@(Var n typ) , (Tuple "" args ToDerive) ):[]) EMPTY ) = Let [(v, Tuple n (map afterparse args) typ )] EMPTY 
@@ -75,7 +86,7 @@ afterparse (App ex exs) = App (afterparse ex) (map afterparse exs)
 afterparse (Tuple cons exs typ) = Tuple cons (map afterparse exs) typ
 afterparse (Let bnds ex) = Let (map ( \(v,e)-> (v,afterparse e) ) bnds ) (afterparse ex)
 afterparse (PatternMatch args e2) = PatternMatch (map afterparse args) (afterparse e2)
-
+afterparse (Patterns exs) = Patterns (map afterparse exs)
 afterparse e = e
 
 -- check if tuple is anonymous, need it for some passes

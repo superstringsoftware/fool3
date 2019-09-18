@@ -150,30 +150,38 @@ symbolId = do
     return $ VarId s
 
 -- everything is a function
+-- this is a huge and entangled method doing a lot, needs REFACTORING and SIMPLIFICATION!!!
 lambda :: Parser Expr
 lambda = do
+    pos <- getPosition
     var@(Var name tp) <- variable -- identifier
     reservedOp "="
     preds <- try predicates <|> pure []
-    args <- (reservedOp "\\" *> many1 variable )
+    args <- try (reservedOp "\\" *> many1 variable ) <|> (reservedOp "\\" *> many1 anonVariable)
     setCurrentArity (length args)
     setCurrentLambdaName $ L.pack name
-    body <- try (reservedOp "." *> expr) <|> pure EMPTY
-    let ex = Lam args body tp preds
+    body' <- try (reservedOp "." *> expr) <|> pure EMPTY
     setCurrentArity 0
     setCurrentLambdaName ""
-    return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
-
-anonConstructor :: Parser Expr
-anonConstructor = do
-    var@(Var _ tp) <- variable -- identifier
-    reservedOp "="
-    preds <- try predicates <|> pure []
-    args <- (reservedOp "\\" *> many1 anonVariable)
-    body <- try (reservedOp "." *> expr) <|> pure EMPTY
+    incl <- getInsideTypeclass
+    -- if we are not inside typeclass and body is empty - this must be a data constructor,
+    -- so changing empty to the tuple of the correct size
+    let body = if ((body' == EMPTY) && (not incl)) then Tuple name (map (\a -> VarId "_") args) tp else body'
     let ex = Lam args body tp preds
-    return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
-    
+    -- checking whether it's a data constructor and then whether it has type specified:
+    -- this may change if we change the syntaxis for type definition!!!
+    case body of
+        Tuple _ _ _ -> 
+            if (isTConOrTApp tp) then return $ Let [(var, ex)] EMPTY
+            else do
+                lift $ logError $ SourceInfo 
+                        (sourceLine pos) 
+                        (sourceColumn pos) 
+                        (L.pack ("data constructor " ++ name ++  " has type " ++ ppr tp 
+                                ++ " but it can only be a concrete type or type application."))
+                return $ Let [(var, ex)] EMPTY
+        _           -> return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
+
 predicate :: Parser Pred
 predicate = do
     tcon <- (TCon <$> uIdentifier) <?> "type class name" 
@@ -189,7 +197,9 @@ predicates = do
 
 typeclass :: Parser Expr    
 typeclass = do
+    setInsideTypeclass True
     s <- braces (sepBy1 defn (reservedOp ";")) <?> "error while parsing typeclass"
+    setInsideTypeclass False
     return $ Tuple "" s ToDerive
 
 -- pattern match inside a function    
@@ -208,6 +218,22 @@ lambdaPatternMatch = do
                                          (sourceColumn pos) 
                                          (L.pack ("function " ++ L.unpack nm ++  " has arity " ++ show a ++ " but pattern match has " ++ show (length h) ++ " arguments"))
             return $ PatternMatch h t
+
+-- Tuple that data constructors return, can only contain names or "_" symbols    
+consTuple :: Parser Expr
+consTuple = do
+    pos <- getPosition
+    a <- getCurrentArity
+    args <- braces (many symbolId) 
+    if ( (length args) == a ) then return (Tuple "" args ToDerive)
+    else do
+        nm <- getCurrentLambdaName
+        lift $ logError $ SourceInfo (sourceLine pos) 
+                    (sourceColumn pos) 
+                    (L.pack ("constructor " ++ L.unpack nm ++  " has arity " ++ show a 
+                             ++ " but it's tuple has " ++ show (length args) ++ " arguments"))
+        return (Tuple "" args ToDerive)
+
 
 argumentsOnly :: Parser [Expr]
 argumentsOnly = do
@@ -243,10 +269,6 @@ binding = do
     var@(Var _ tp) <- variable -- identifier
     body <- (reservedOp "=" *> expr)
     return $ Let [(var, body)] EMPTY -- top level function, no "in" for LET
-
--- Tuple that data constructors return, can only contain names or "_" symbols    
-consTuple :: Parser Expr
-consTuple = braces (many symbolId) >>= \args -> return (Tuple "" args ToDerive)
 
 
 argument :: Parser Expr
@@ -288,7 +310,7 @@ factor = try patternsInsideLambda <|> try typeclass <|> try consTuple <|> argume
 defn :: Parser Expr
 defn =  do
     expr <- try lambda
-            <|> try anonConstructor
+            -- <|> try anonConstructor
             <|> try binding
             <|> patternMatch
             -- <|> expr

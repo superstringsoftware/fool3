@@ -1,6 +1,27 @@
 {-# LANGUAGE RankNTypes, TypeSynonymInstances, FlexibleInstances, OverloadedStrings #-}
 
--- Main Compiler pipeline
+{-|
+Main Compiler pipeline
+
+Rough order:
+- Parsing, with parse errors and some obvious things we can catch while parsing 
+    (e.g., # of pattern match arguments mismatch etc).
+- First "desugaring" pass - converting operator calls to function applications, initial rewriting of types from vars
+    to tuples WITHOUT any checks, reversing the lines from the parsed order (as it reverses the file since we use a list)
+
+- Then, we need to construct our typing and functional environment before doing type checks. This includes:
+
+    * Reconstructing types from data constructor lambdas, converting constructor tags to ints from Strings etc
+    * Setting functions environment with Maps from names to lambdas
+    * Reconstructing typeclass hierarchy for efficient handling of instances
+    * Processing typeclass instances, generating specialized functions in compile environment, so that we can emit
+        specific functions based on type in compiled code (unlike GHC which uses a dictionary at runtime as well)
+    * Reconstructing subtyping for Record types (not in the initial version?)
+
+- Then comes The Typechecker
+- If the program typechecks, we run various optimizations
+- Then we generate code
+-}
 
 module Lambda.Pipeline where
 
@@ -9,7 +30,9 @@ import Lambda.Syntax
 
 import Control.Monad.Trans.State.Strict
 
--- this needs to be run right after parsing
+-- this needs to be run right after parsing:
+-- desugaring (changing op calls to App calls etc)
+-- reversing the order
 afterparserPass :: IntState ()
 afterparserPass = do
     s <- get
