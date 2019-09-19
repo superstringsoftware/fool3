@@ -13,6 +13,7 @@ Nil : (List a) = {};
 -- if a function OUTSIDE of typeclass has NO body (; right after last argument) -- it's a DATA CONSTRUCTOR
 -- "Normal" functions MUST be defined right away.
 Cons : (List a) = \ :a :(List a); -- . {head tail};
+UnitList : (List Unit) = \ n:Int;
 
 Eq : Class = \a:Type . {
     (==):Bool = \x:a y:a. not (x /= y);

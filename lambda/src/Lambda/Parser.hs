@@ -174,10 +174,11 @@ lambda = do
         Tuple _ _ _ -> 
             if (isTConOrTApp tp) then return $ Let [(var, ex)] EMPTY
             else do
+                let s = if (tp == ToDerive) then " has no type" else " has type " ++ ppr tp 
                 lift $ logError $ SourceInfo 
                         (sourceLine pos) 
                         (sourceColumn pos) 
-                        (L.pack ("data constructor " ++ name ++  " has type " ++ ppr tp 
+                        (L.pack ("data constructor " ++ name ++ s
                                 ++ " but it can only be a concrete type or type application."))
                 return $ Let [(var, ex)] EMPTY
         _           -> return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET

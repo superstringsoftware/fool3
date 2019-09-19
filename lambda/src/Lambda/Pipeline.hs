@@ -27,11 +27,18 @@ module Lambda.Pipeline where
 
 import State
 import Lambda.Syntax    
+import Lambda.Environment    
 
 import Control.Monad.Trans.State.Strict
+import Control.Monad.IO.Class (liftIO)
+import Data.Text as T
 
+--------------------------------------------------------------------------------
+-- PASS 0: initial desugaring etc after parsing
+--------------------------------------------------------------------------------
 -- this needs to be run right after parsing:
 -- desugaring (changing op calls to App calls etc)
+-- fixing remaining tags for Tuples in data constructors (what wasn't fixed during parsing)
 -- reversing the order
 afterparserPass :: IntState ()
 afterparserPass = do
@@ -47,3 +54,26 @@ runExprPassAndReverse f l = rev f l []
     where rev f [] a = a
           rev f ((ex, srci):xs) a = rev f xs ( (f ex, srci):a )
 
+--------------------------------------------------------------------------------
+-- PASS 1: building initial typing etc environment
+--------------------------------------------------------------------------------
+-- addDataConstructor :: Expr -> Environment -> Either Error Environment
+-- monadic
+addDataConstructorM :: Expr -> SourceInfo -> IntState()
+addDataConstructorM e si = do
+    s <- get
+    let env = currentEnvironment s
+    let res = addDataConstructor e env
+    liftIO $ putStrLn ("Processing " ++ ppr e)
+    either (\err -> logError si{notes=T.pack err}) (\env' -> put s{currentEnvironment = env'}) res
+
+-- Let [(Var,Expr)] Expr    
+typeEnvPass :: IntState ()
+typeEnvPass = do
+    s <- get
+    let mod = parsedModule s
+    let env = currentEnvironment s
+    mapM_ fn mod
+    where fn ( Let ( (_, e@(Lam vars (Tuple constag exs typ) typlam preds) ) :[]) _ ,si) = addDataConstructorM e si
+          fn ( Let ( (_, e@(Tuple constag exs typ) ) :[]) _ ,si) = addDataConstructorM e si
+          fn _ = return ()

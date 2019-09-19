@@ -18,6 +18,7 @@ import qualified Data.Text as T
 import Lambda.Syntax
 import Lambda.Parser
 import Lambda.Pipeline
+import Lambda.Environment
 
 
 -- need this 3-monad stack to make sure Haskeline works with our state monad
@@ -78,6 +79,10 @@ processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )    
 
+processCommand (":types":_) = do
+    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
+    liftIO $ mapM_ (putStrLn . ppr) types
+
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
 processCommand (":a":"-d":_) = processCommand [":all","-d"]
@@ -128,6 +133,8 @@ loadFileNew nm = do
                 liftIO (putStrLn "... successfully loaded.")
                 liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
                 afterparserPass
+                showAllErrors
+                typeEnvPass
                 showAllErrors
                 -- mod <- get >>= \s -> pure (parsedModule s)
                 -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
