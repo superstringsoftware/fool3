@@ -83,6 +83,10 @@ processCommand (":types":_) = do
     types <- get >>= \s -> pure ( (types . currentEnvironment) s)
     liftIO $ mapM_ (putStrLn . ppr) types
 
+processCommand (":functions":_) = do
+    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
+    liftIO $ mapM_ (putStrLn . ppr) res
+
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
 processCommand (":a":"-d":_) = processCommand [":all","-d"]

@@ -55,25 +55,15 @@ runExprPassAndReverse f l = rev f l []
           rev f ((ex, srci):xs) a = rev f xs ( (f ex, srci):a )
 
 --------------------------------------------------------------------------------
--- PASS 1: building initial typing etc environment
+-- PASS 1: building initial typing and top-level lambdas environment
 --------------------------------------------------------------------------------
--- addDataConstructor :: Expr -> Environment -> Either Error Environment
--- monadic
-addDataConstructorM :: Expr -> SourceInfo -> IntState()
-addDataConstructorM e si = do
-    s <- get
-    let env = currentEnvironment s
-    let res = addDataConstructor e env
-    liftIO $ putStrLn ("Processing " ++ ppr e)
-    either (\err -> logError si{notes=T.pack err}) (\env' -> put s{currentEnvironment = env'}) res
+buildEnvironmentM :: (Expr, SourceInfo) -> IntState ()
+buildEnvironmentM x@(e,si) = get >>= \s->
+    either (\err -> logError si{notes=T.pack err})
+           (\env' -> put s{currentEnvironment = env'})
+           (processOneBinding x (currentEnvironment s))
 
 -- Let [(Var,Expr)] Expr    
 typeEnvPass :: IntState ()
-typeEnvPass = do
-    s <- get
-    let mod = parsedModule s
-    let env = currentEnvironment s
-    mapM_ fn mod
-    where fn ( Let ( (_, e@(Lam vars (Tuple constag exs typ) typlam preds) ) :[]) _ ,si) = addDataConstructorM e si
-          fn ( Let ( (_, e@(Tuple constag exs typ) ) :[]) _ ,si) = addDataConstructorM e si
-          fn _ = return ()
+typeEnvPass = get >>= pure . parsedModule >>= mapM_ buildEnvironmentM
+    

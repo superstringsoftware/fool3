@@ -16,13 +16,6 @@ import Lambda.Environment
 
 type IntState = StateT InterpreterState IO
 
--- some info for debugging to attach to initially parsed module expressions
-data SourceInfo = SourceInfo {
-    lineNum :: !Int, colNum :: !Int, notes :: Text
-} 
-
-type LTProgram = [(Expr, SourceInfo)]
-
 --type HashTable k v = H.BasicHashTable k v
 --type ExpressionTable = HashTable Name Expr
 

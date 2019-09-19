@@ -13,6 +13,7 @@ Nil : (List a) = {};
 -- if a function OUTSIDE of typeclass has NO body (; right after last argument) -- it's a DATA CONSTRUCTOR
 -- "Normal" functions MUST be defined right away.
 Cons : (List a) = \ :a :(List a); -- . {head tail};
+-- testing GADTs - typing env gets them in automatically and looks like correctly
 UnitList : (List Unit) = \ n:Int;
 
 Eq : Class = \a:Type . {
@@ -54,6 +55,11 @@ length:Int = \ ls:(List a) . {
     (Cons _ xs) -> 1 + length xs
 };
 
+fact:Int = \n:Int . {
+    0 -> 1;
+    n -> n * fact(n-1)
+};
+
 s = "hello";
 
 g = <1, 27.4, 14>;
@@ -61,3 +67,7 @@ g = <1, 27.4, 14>;
 square n = n * n;
 
 (*) x y = x *# y;
+
+Person : Person = \ name:String age:Int salary:Int;
+
+f = map g;

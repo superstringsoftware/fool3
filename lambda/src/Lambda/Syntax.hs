@@ -11,6 +11,9 @@ type ConsTag = String
 data Var = Var Name Type deriving (Show, Eq)
 type Binding = (Var, Expr) -- binding of Expr to a Variable Var
 
+varName v = fst v
+varType v = snd v
+
 data Pred
   = Exists Type -- TApp (TCon name) (TVar name) - e.g., Num a --> TApp (TCon "Num") (TVar "a")
   | Unconstrained -- variables can be anything
@@ -54,9 +57,9 @@ data Expr =
   -- 1 occurence of pattern match
   -- since we are NOT repeating function name on the left side of the pattern match but put ONLY arguments there,
   -- first [Expr] here is simply a list of expressions to which lambda bound variables need to be evaluated!!!
-  -- second expression is the normal function as usual
+  -- second expression is the normal expression as usual
   | PatternMatch [Expr] Expr 
-  | Patterns [Expr] -- only PatternMatch should be used inside here, used inside lambda with patterns!!!
+  | Patterns [Expr] -- only PatternMatch should be used inside here, it's only used inside lambda with patterns!!!
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | EMPTY
@@ -146,6 +149,9 @@ instance Printer Expr where
   ppr (PatternMatch args e2) = (showListPlain ppr args) ++ " = " ++ ppr e2
   ppr e = show e
   -- λ  
+
+instance Printer Binding where
+  ppr (v, ex) = ppr v ++ " = " ++ ppr ex
 
 -- function that generically outputs a list of values   
 showListWFormat :: (a -> String) -> String -> String -> String -> String -> [a] -> String

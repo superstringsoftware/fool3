@@ -33,6 +33,7 @@ import qualified Data.Vector.Unboxed as U
 import State
 import Lambda.Lexer
 import Lambda.Syntax
+import Lambda.Environment
 
 -- used to show syntax errors together with source (first argument)
 showSyntaxError :: L.Text -> ParseError -> String
@@ -179,7 +180,8 @@ lambda = do
                         (sourceLine pos) 
                         (sourceColumn pos) 
                         (L.pack ("data constructor " ++ name ++ s
-                                ++ " but it can only be a concrete type or type application."))
+                                ++ " but it can only be a concrete type or type application." 
+                                ++ "\nIf you intend to define a type class - you should write " ++ name ++ " : Class = \\ ..."))
                 return $ Let [(var, ex)] EMPTY
         _           -> return $ Let [(var, ex)] EMPTY -- top level function, no "in" for LET
 

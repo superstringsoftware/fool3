@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 -- typing etc environment when compiling - can be built from several modules
 
 module Lambda.Environment
@@ -7,9 +7,18 @@ where
 import Data.HashMap.Strict as Map
 
 import Lambda.Syntax
+import Data.Text
 
 type NameMap = HashMap Name
 type Error = String
+
+-- some info for debugging to attach to initially parsed module expressions
+data SourceInfo = SourceInfo {
+    lineNum :: !Int, colNum :: !Int, notes :: Text
+} 
+
+type LTProgram = [(Expr, SourceInfo)]
+
 
 data TypeRep = LiftedTypeRep {
     name        :: Name, -- name of the type
@@ -22,13 +31,26 @@ data TypeRep = LiftedTypeRep {
 
 -- structure keeping our current environment
 data Environment = Environment {
-    types       :: NameMap TypeRep
+    -- Map that keeps all our TypeReps in the current environment
+    types       :: NameMap TypeRep,
+    lambdas     :: NameMap (Var, Expr) -- not only lambdas, but all top-level bindings, including expressions or thunks
 } deriving Show
 
 initialEnvironment = Environment {
-    types = Map.empty
+    types       = Map.empty,
+    lambdas     = Map.empty 
 }
 
+-- only processing Let bindings on the top level
+processOneBinding :: (Expr, SourceInfo) -> Environment -> Either Error Environment
+processOneBinding ( Let ((v, ex):[]) EMPTY , si) env = 
+    case ex of
+        e@(Lam vars (Tuple constag exs typ) typlam preds) 
+            -> either (Left) (\env1 -> addLambda v e env1) (addDataConstructor e env)
+        e@(Tuple constag exs typ)
+            -> either (Left) (\env1 -> addLambda v e env1) (addDataConstructor e env)
+        e   -> addLambda v e env
+processOneBinding (ex, si) _ = Left $ "Unsupported environment processing call"
 
 -- pure function that takes an expression and Environment and 
 -- then either constructs a new type from the data constructor or adds constructor to the existing type
@@ -49,6 +71,18 @@ maybeTypeName :: Type -> Maybe TypeRep
 maybeTypeName (TCon n)              = Just $ LiftedTypeRep n []   []
 maybeTypeName (TApp (TCon n) args)  = Just $ LiftedTypeRep n args []
 maybeTypeName _                     = Nothing
+
+-- adds a lambda or expression to the typing environment
+addLambda :: Var -> Expr -> Environment -> Either Error Environment
+addLambda v@(Var n _) e env = 
+    let func = Map.lookup n (lambdas env)
+    in  maybe (Right $ env { lambdas = Map.insert n (v,e) (lambdas env) }) 
+              -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
+              (const $ Left $ "Tried to add lambda or expression named " ++ n ++ " but it has already been defined before!") 
+              func
+            
+
+
 
 instance Printer TypeRep where 
     ppr (LiftedTypeRep n args cons) = "Type " ++ n ++ " " ++ (showListPlain ppr args) ++ (showListCuBr ppr cons)
