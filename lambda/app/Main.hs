@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Monad.Trans
 import System.Console.Haskeline
 import System.Directory
 import System.Exit
 import qualified TermColors as TC
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
 import Data.Functor.Identity
 import State

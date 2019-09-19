@@ -25,7 +25,6 @@ dependencies:
 - hashtables
 - parsec
 - vector
-- mtl
 - haskeline
 - directory
 - text
