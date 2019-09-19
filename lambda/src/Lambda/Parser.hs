@@ -34,7 +34,9 @@ import State
 import Lambda.Lexer
 import Lambda.Syntax
 import Lambda.Environment
+import Lambda.Logs
 import Util.PrettyPrinting
+
 
 -- used to show syntax errors together with source (first argument)
 showSyntaxError :: L.Text -> ParseError -> String
@@ -177,10 +179,10 @@ lambda = do
             if (isTConOrTApp tp) then return $ Let [(var, ex)] EMPTY
             else do
                 let s = if (tp == ToDerive) then " has no type" else " has type " ++ ppr tp 
-                lift $ logError $ SourceInfo 
+                lift $ logError $ LogPayload 
                         (sourceLine pos) 
-                        (sourceColumn pos) 
-                        (L.pack ("data constructor " ++ name ++ s
+                        (sourceColumn pos)  ""
+                        (("data constructor " ++ name ++ s
                                 ++ " but it can only be a concrete type or type application." 
                                 ++ "\nIf you intend to define a type class - you should write " ++ name ++ " : Class = \\ ..."))
                 return $ Let [(var, ex)] EMPTY
@@ -218,9 +220,9 @@ lambdaPatternMatch = do
         then return $ PatternMatch h t
         else do
             nm <- getCurrentLambdaName
-            lift $ logError $ SourceInfo (sourceLine pos) 
-                                         (sourceColumn pos) 
-                                         (L.pack ("function " ++ L.unpack nm ++  " has arity " ++ show a ++ " but pattern match has " ++ show (length h) ++ " arguments"))
+            lift $ logError $ LogPayload (sourceLine pos) 
+                                         (sourceColumn pos) "" 
+                                         (("function " ++ L.unpack nm ++  " has arity " ++ show a ++ " but pattern match has " ++ show (length h) ++ " arguments"))
             return $ PatternMatch h t
 
 -- Tuple that data constructors return, can only contain names or "_" symbols    
@@ -232,9 +234,9 @@ consTuple = do
     if ( (length args) == a ) then return (Tuple "" args ToDerive)
     else do
         nm <- getCurrentLambdaName
-        lift $ logError $ SourceInfo (sourceLine pos) 
-                    (sourceColumn pos) 
-                    (L.pack ("constructor " ++ L.unpack nm ++  " has arity " ++ show a 
+        lift $ logError $ LogPayload (sourceLine pos) 
+                    (sourceColumn pos) "" 
+                    (("constructor " ++ L.unpack nm ++  " has arity " ++ show a 
                              ++ " but it's tuple has " ++ show (length args) ++ " arguments"))
         return (Tuple "" args ToDerive)
 

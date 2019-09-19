@@ -18,7 +18,9 @@ import Lambda.Syntax
 import Lambda.Parser
 import Lambda.Pipeline
 import Lambda.Environment
+-- import Lambda.Logs
 import Util.PrettyPrinting as TC
+
 
 
 -- need this 4-monad stack to make sure Haskeline works with our state monad
@@ -138,12 +140,12 @@ loadFileNew nm = do
                 liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
                 liftIO (putStrLn $ "Executing pass 0: " ++ TC.as [TC.bold, TC.underlined] "after parser desugaring")
                 afterparserPass
-                showAllErrors
-                clearErrors
+                showAllLogsWSource
+                -- clearErrors
                 liftIO (putStrLn $ "Executing pass 1: " ++ TC.as [TC.bold, TC.underlined] "initial top level environment building")
                 buildEnvPass
-                showAllErrors
-                clearErrors
+                showAllLogsWSource
+                -- clearErrors
                 -- mod <- get >>= \s -> pure (parsedModule s)
                 -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 

@@ -1,29 +1,37 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards, MultiParamTypeClasses #-}
 
 
-module Util.Logger where
+module Util.Logger 
+(
+    LogMessage(..),
+    LogLevel,
+    LoggerMonadT,
+
+    initLogState,
+    setCurrentLevel,
+    getCurrentLevel,
+    logMessage,
+    getAllLogs
+)
+where
 
 import Control.Monad.State.Class
 import Control.Monad.State.Strict
-import Data.Sequence
+import Data.Sequence as S
+
+import Control.Monad.Trans.Class (lift)
 
 data LogMessage e = LogError {
-    message :: String,
     payload :: e
 } | LogWarning {
-    message :: String,
     payload :: e
 } | LogInfo {
-    message :: String,
     payload :: e
 } | LogVerbose {
-    message :: String,
     payload :: e
 } | LogDebug {
-    message :: String,
     payload :: e
 } | LogTrace {
-    message :: String,
     payload :: e
 } deriving (Show, Eq, Ord)
 
@@ -32,16 +40,15 @@ data LogState e = LogState {
     logs :: Seq (LogMessage e)
 }
 
+initLogState = LogState {
+    logLevel = 6,
+    logs = S.empty
+}
+
 type LogLevel = Int
 
 -- monad transformer for our logger monad, allows embedding IO inside etc
 type LoggerMonadT e m = StateT (LogState e) m
-
-class Monad m => LogMonad m where
-    getLogState :: m (LogState e)
-    putLogState :: (LogState e) -> m ()
-    modifyLogState :: (LogState e -> LogState e) -> m ()
-    modifyLogState mf = getLogState >>= \s -> putLogState (mf s)
 
 checkMessageLevel :: LogMessage e -> LogLevel
 checkMessageLevel LogError{..}   = 0
@@ -65,10 +72,18 @@ setNone    = setCurrentLevel 0
 getCurrentLevel :: LoggerMonad e LogLevel
 getCurrentLevel = logLevel <$> get
 
+canLogMessage :: LogMessage e -> LoggerMonad e Bool
+canLogMessage m = getCurrentLevel >>= \cl -> pure $ if (checkMessageLevel m) < cl then True else False
+
 -- | logs the message if it's level is lower than currently set
--- logMessage :: LogMessage e -> LoggerMonad e ()
+logMessage :: LogMessage e -> LoggerMonad e ()
+logMessage msg = getCurrentLevel >>= \cl -> if clm msg cl 
+    then logs <$> get >>= \lg -> modify' $ \s -> s { logs = lg |> msg }
+    else pure ()
+    where clm m cl = if (checkMessageLevel m) < cl then True else False
 
-
+getAllLogs :: LoggerMonad e (Seq (LogMessage e))
+getAllLogs = logs <$> get
 
 -- this was a very useful excersize in defining Functor -> Applicative -> Monad for a custom data type
 -- but now we are simply using monad transformers to be able to stack with IO etc

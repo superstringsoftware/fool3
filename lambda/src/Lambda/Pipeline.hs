@@ -27,10 +27,14 @@ module Lambda.Pipeline where
 
 import State
 import Lambda.Syntax    
+import Lambda.Logs    
 import Lambda.Environment    
+
+-- import Util.IOLogger
 
 import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class
 import Data.Text as T
 
 --------------------------------------------------------------------------------
@@ -59,7 +63,7 @@ runExprPassAndReverse f l = rev f l []
 --------------------------------------------------------------------------------
 buildEnvironmentM :: (Expr, SourceInfo) -> IntState ()
 buildEnvironmentM x@(e,si) = get >>= \s->
-    either (\err -> logError si{notes=T.pack err})
+    either (\err -> logWarning err { linePos = (lineNum si), colPos = (colNum si) } )
            (\env' -> put s{currentEnvironment = env'})
            (processOneBinding x (currentEnvironment s))
 
