@@ -45,6 +45,9 @@ initializeInterpreter = return $ InterpreterState {
     currentEnvironment = initialEnvironment
 }
 
+clearErrors :: IntState ()
+clearErrors = modify' (\s-> s { errors = []})
+
 showAllErrors :: IntState ()
 showAllErrors = do
     s <- get
@@ -56,7 +59,7 @@ showErrorWithSource :: L.Text -> SourceInfo -> String
 showErrorWithSource s err = L.unpack $ L.unlines [
       "  ",
       "  " <> lineContents,
-      "  " <> ((L.replicate col " ") <> "^"),
+      "  " <> ((L.replicate col " ") <> "^^^"),
       (L.pack $ show err)
     ]
   where

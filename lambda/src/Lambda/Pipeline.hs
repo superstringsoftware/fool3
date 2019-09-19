@@ -64,6 +64,6 @@ buildEnvironmentM x@(e,si) = get >>= \s->
            (processOneBinding x (currentEnvironment s))
 
 -- Let [(Var,Expr)] Expr    
-typeEnvPass :: IntState ()
-typeEnvPass = get >>= pure . parsedModule >>= mapM_ buildEnvironmentM
+buildEnvPass :: IntState ()
+buildEnvPass = get >>= pure . parsedModule >>= mapM_ buildEnvironmentM
     

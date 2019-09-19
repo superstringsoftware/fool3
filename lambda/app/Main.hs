@@ -136,10 +136,14 @@ loadFileNew nm = do
                 -- liftIO (mapM_ (putStrLn . show) exprs) 
                 liftIO (putStrLn "... successfully loaded.")
                 liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
+                liftIO (putStrLn $ "Executing pass 0: " ++ TC.as [TC.bold, TC.underlined] "after parser desugaring")
                 afterparserPass
                 showAllErrors
-                typeEnvPass
+                clearErrors
+                liftIO (putStrLn $ "Executing pass 1: " ++ TC.as [TC.bold, TC.underlined] "initial top level environment building")
+                buildEnvPass
                 showAllErrors
+                clearErrors
                 -- mod <- get >>= \s -> pure (parsedModule s)
                 -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 
