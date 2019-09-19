@@ -29,6 +29,8 @@ dependencies:
 - directory
 - text
 - unordered-containers
+- mtl
+- containers
 
 library:
   source-dirs: src

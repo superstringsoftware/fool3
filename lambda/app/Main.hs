@@ -21,8 +21,8 @@ import Lambda.Environment
 import Util.PrettyPrinting as TC
 
 
--- need this 3-monad stack to make sure Haskeline works with our state monad
-type InputTState a = InputT (StateT InterpreterState IO) a
+-- need this 4-monad stack to make sure Haskeline works with our state monad
+type InputTState = InputT IntState
 
 -- needs to go to settings!!!
 -- baseLibPath = "prog1.fool.hs" -- "base.fool.hs"
@@ -173,7 +173,7 @@ main = do
     greetings
     -- setting up Haskeline loop
     -- getting to the right monad in our crazy monad stack
-    initializeInterpreter >>= evalStateT (runInputT defaultSettings {historyFile=Just "./.fool_history"} runInterpreter)
+    initializeInterpreter >>= (runIntState (runInputT defaultSettings {historyFile=Just "./.fool_history"} runInterpreter))
 
 greetings = do
     putStrLn "Welcome to Tea-Lambda Language!"

@@ -11,16 +11,32 @@ import Control.Monad.Trans.State.Strict
 
 import Data.Text as L
 
+import Data.Sequence as S
+
 import Lambda.Syntax
 import Lambda.Environment
 
-type IntState = StateT InterpreterState IO
+import Util.Logger
 
+type LogPayload = Text
+
+-- lambda logger monad is a state monad that lies on top of IO
+type LambdaLoggerMonad = LoggerMonadT LogPayload IO
+-- scary, building a stack - stacking IO inside logger monad
+-- type IntState = StateT InterpreterState IO
+type IntState = StateT InterpreterState LambdaLoggerMonad
+
+initLogState = LogState {
+    logLevel = 6,
+    logs = S.empty
+}
+
+-- function to run IntState monad on top of Logger state monad
+runIntState act s = evalStateT (evalStateT act s) initLogState
 --type HashTable k v = H.BasicHashTable k v
 --type ExpressionTable = HashTable Name Expr
 
 data InterpreterState = InterpreterState {
-    logs     :: [String],
     errors   :: [SourceInfo],
     currentFlags :: CurrentFlags,
     -- this is being filled by the parser as we go, so last line in the file will be first here!
@@ -37,7 +53,6 @@ data CurrentFlags = CurrentFlags {
 
 initializeInterpreter :: IO InterpreterState
 initializeInterpreter = return $ InterpreterState {
-    logs = [],
     errors = [],
     currentFlags = CurrentFlags False True False,
     parsedModule = [],
