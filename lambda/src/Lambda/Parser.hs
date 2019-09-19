@@ -34,6 +34,7 @@ import State
 import Lambda.Lexer
 import Lambda.Syntax
 import Lambda.Environment
+import Util.PrettyPrinting
 
 -- used to show syntax errors together with source (first argument)
 showSyntaxError :: L.Text -> ParseError -> String

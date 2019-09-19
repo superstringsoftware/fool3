@@ -4,7 +4,6 @@ module Main where
 import System.Console.Haskeline
 import System.Directory
 import System.Exit
-import qualified TermColors as TC
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict -- trying state monad transformer to maintain state
@@ -19,6 +18,7 @@ import Lambda.Syntax
 import Lambda.Parser
 import Lambda.Pipeline
 import Lambda.Environment
+import Util.PrettyPrinting as TC
 
 
 -- need this 3-monad stack to make sure Haskeline works with our state monad

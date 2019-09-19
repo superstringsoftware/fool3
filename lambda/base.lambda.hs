@@ -55,7 +55,7 @@ length:Int = \ ls:(List a) . {
     (Cons _ xs) -> 1 + length xs
 };
 
-fact:Int = \n:Int . {
+Fact:Int = \n:Int . {
     0 -> 1;
     n -> n * fact(n-1)
 };

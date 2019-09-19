@@ -1,14 +1,19 @@
 module Util.Logger where
 
 
-data LogMessages = LogError {
-    message :: String
+data LogMessage a = LogError {
+    message :: String,
+    payload :: a
 } | LogWarning {
-    message :: String
+    message :: String,
+    payload :: a
 } | LogInfo {
-    message :: String
+    message :: String,
+    payload :: a
 } | LogDebug {
-    message :: String
+    message :: String,
+    payload :: a
 } | LogTrace {
-    message :: String
+    message :: String,
+    payload :: a
 } deriving (Show, Eq, Ord)

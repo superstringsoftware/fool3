@@ -5,6 +5,8 @@
 module Lambda.Syntax
 where
 
+import Util.PrettyPrinting
+
 type Name = String
 type ConsTag = String
 
@@ -65,6 +67,7 @@ data Expr =
   | EMPTY
   deriving (Show, Eq)
 
+
 -- checks if an expression was probably supposed to be a data constructor  
 isTupleOrEmpty (Tuple _ _ _) = True
 isTupleOrEmpty EMPTY         = True
@@ -96,28 +99,22 @@ afterparse e = e
 isAnonymousTuple (Tuple "" _ _) = True
 isAnonymousTuple _ = False
 
-class Printer a where
-  ppr :: a -> String
 
-{-
-instance Printer a => Printer [a] where
-  ppr = showListWFormat ppr "[" "]" ", " "[]"
--}
 
-instance Printer Pred where
+instance PrettyPrint Pred where
   ppr Unconstrained = ""
-  ppr (Exists typ) = "∃" ++ ppr typ
+  ppr (Exists typ) = (as [bold,green] "∃") ++ (ppr typ)
   
 
-instance Printer [Pred] where
+instance PrettyPrint [Pred] where
   ppr [] = ""
   ppr preds = (showListRoBr ppr preds) ++ " => "
   
-instance Printer Literal where
-  ppr (LInt i) = show i
-  ppr (LFloat i) = show i
-  ppr (LChar i) = show i
-  ppr (LString i) = show i
+instance PrettyPrint Literal where
+  ppr (LInt i) = as [lmagenta] $ show i
+  ppr (LFloat i) = as [lmagenta] $ show i
+  ppr (LChar i) = as [lyellow] $ show i
+  ppr (LString i) = as [lyellow] $ show i
   ppr (LList []) = "[]" 
   ppr (LList (x:xs)) = foldl fn ("[" ++ ppr x) xs ++ "]"
       where fn acc e = acc ++ ", " ++ ppr e
@@ -125,42 +122,31 @@ instance Printer Literal where
   ppr (LVec (x:xs)) = foldl fn ("<" ++ ppr x) xs ++ ">"
       where fn acc e = acc ++ ", " ++ ppr e
 
-instance Printer Type where
+instance PrettyPrint Type where
   ppr ToDerive = "(?)"
   ppr (TCon n) = n
   ppr (TApp con args) = "(" ++ ppr con ++ " " ++ (showListPlain ppr args) ++ ")"
   ppr (TVar n) = n
   ppr e = show e
 
-instance Printer Var where
+instance PrettyPrint Var where
   ppr (Var n t) = n ++ ":" ++ ppr t      
 
-instance Printer Expr where
+instance PrettyPrint Expr where
   ppr (Lit l) = ppr l
   ppr (VarId v) = v
   ppr (Let ((v,e):[]) _ ) = ppr v ++ " = " ++ ppr e
-  ppr (Lam vars expr tp preds) = ppr preds ++ "λ " ++ (showListPlain ppr vars) ++ " . " ++ ppr expr
+  ppr (Lam vars expr tp preds) = ppr preds ++ (as [bold,lgray] "λ ") ++ (showListPlain ppr vars) ++ " . " ++ ppr expr
   ppr (BinaryOp n e1 e2) = ppr e1 ++ " " ++ n ++ " " ++ ppr e2
   ppr (UnaryOp n e) = n ++ ppr e
   ppr (Tuple cons exprs typ) = cons ++ (showListCuBr ppr exprs) ++ " : " ++ ppr typ
-  ppr (App f args) = ppr f ++ " " ++ (showListRoBrPlain ppr args)
+  ppr (App f args) = (ppr f) ++ " " ++ (showListRoBrPlain ppr args)
   ppr (Patterns ps) = showListCuBr ppr1 ps
       where ppr1 (PatternMatch args e2) = (showListPlain ppr args) ++ " -> " ++ ppr e2
   ppr (PatternMatch args e2) = (showListPlain ppr args) ++ " = " ++ ppr e2
   ppr e = show e
   -- λ  
 
-instance Printer Binding where
+instance PrettyPrint Binding where
   ppr (v, ex) = ppr v ++ " = " ++ ppr ex
 
--- function that generically outputs a list of values   
-showListWFormat :: (a -> String) -> String -> String -> String -> String -> [a] -> String
-showListWFormat showF beginWith endWith sep empty [] = empty
-showListWFormat showF beginWith endWith sep empty (x:xs) = foldl fn (beginWith ++ showF x) xs ++ endWith
-    where fn acc e = acc ++ sep ++ showF e
-
-showListSqBr fun = showListWFormat fun "[" "]" ", " "[]"
-showListRoBr fun = showListWFormat fun "(" ")" ", " "()"     
-showListCuBr fun = showListWFormat fun "{" "}" ", " "{}"     
-showListPlain fun = showListWFormat fun "" "" " " ""
-showListRoBrPlain fun = showListWFormat fun "(" ")" " " ""

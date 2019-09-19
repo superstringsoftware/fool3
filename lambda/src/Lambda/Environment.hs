@@ -9,6 +9,8 @@ import Data.HashMap.Strict as Map
 import Lambda.Syntax
 import Data.Text
 
+import Util.PrettyPrinting
+
 type NameMap = HashMap Name
 type Error = String
 
@@ -84,5 +86,5 @@ addLambda v@(Var n _) e env =
 
 
 
-instance Printer TypeRep where 
+instance PrettyPrint TypeRep where 
     ppr (LiftedTypeRep n args cons) = "Type " ++ n ++ " " ++ (showListPlain ppr args) ++ (showListCuBr ppr cons)
