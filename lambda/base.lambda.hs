@@ -55,7 +55,7 @@ length:Int = \ ls:(List a) . {
     (Cons _ xs) -> 1 + length xs
 };
 
-Fact:Int = \n:Int . {
+fact:Int = \n:Int . {
     0 -> 1;
     n -> n * fact(n-1)
 };
@@ -64,10 +64,13 @@ s = "hello";
 
 g = <1, 27.4, 14>;
 
-square n = n * n;
+
 
 (*) x y = x *# y;
 
 Person : Person = \ name:String age:Int salary:Int;
 
 f = map g;
+
+sq = \n. n * n;
+h = \x. x + 2;

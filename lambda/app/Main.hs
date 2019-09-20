@@ -18,7 +18,8 @@ import Lambda.Syntax
 import Lambda.Parser
 import Lambda.Pipeline
 import Lambda.Environment
--- import Lambda.Logs
+import Lambda.Interpreter
+import Lambda.Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
 
 
@@ -37,7 +38,12 @@ processNew line = do
         Right ex -> do
             -- processing parsed input
             liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
-            liftIO $ print ex -- show what was parsed first
+            liftIO $ putStrLn (show ex) -- show what was parsed first
+            let ex' = afterparse ex
+            liftIO $ putStrLn (show ex')
+            buildEnvironmentM (ex', SourceInfo 0 0 "")
+            showAllLogs
+            clearAllLogs
             -- processSurfaceExpr ex -- processing expressions one by one
         Left err -> do
             -- it's not a top level expression, trying interactive expression
@@ -46,7 +52,12 @@ processNew line = do
                 Left err1 -> liftIO (print err) >> liftIO (print err1)
                 Right ex1 -> do
                     liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received interactive expression: " -- ++ (show $ length ex)
-                    liftIO $ print ex1 -- show what was parsed first
+                    liftIO $ putStrLn (show ex1) -- show what was parsed first
+                    let ex2 = afterparse ex1
+                    liftIO $ putStrLn (show ex2)                    
+                    showAllLogs
+                    clearAllLogs
+                    interpretExpr ex2
                     
 
 
@@ -74,9 +85,7 @@ processCommand (":env":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
 
-processCommand (":all":"-d":_) = do
-    mod <- get >>= \s -> pure (parsedModule s)
-    liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
+processCommand (":all":"-d":_) = processCommand ([":types"]) >> processCommand ([":functions"])
 processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )    
@@ -141,11 +150,11 @@ loadFileNew nm = do
                 liftIO (putStrLn $ "Executing pass 0: " ++ TC.as [TC.bold, TC.underlined] "after parser desugaring")
                 afterparserPass
                 showAllLogsWSource
-                -- clearErrors
+                clearAllLogs
                 liftIO (putStrLn $ "Executing pass 1: " ++ TC.as [TC.bold, TC.underlined] "initial top level environment building")
                 buildEnvPass
                 showAllLogsWSource
-                -- clearErrors
+                clearAllLogs
                 -- mod <- get >>= \s -> pure (parsedModule s)
                 -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 

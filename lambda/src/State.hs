@@ -18,6 +18,7 @@ import Lambda.Syntax
 import Lambda.Environment
 
 import Util.IOLogger as Log
+import Util.PrettyPrinting
 import Lambda.Logs as Logs
 
 -- scary, building a stack - stacking IO inside logger monad
@@ -70,3 +71,11 @@ showAllLogsWSource = do
     src <- currentSource <$> get
     lift (Logs.showAllLogsWSource src)
 
+clearAllLogs :: IntState ()
+clearAllLogs = lift Log.clearAllLogs    
+
+getAllLogs :: IntState (Seq (LogMessage LogPayload))
+getAllLogs = lift Log.getAllLogs
+
+showAllLogs :: IntState ()
+showAllLogs = State.getAllLogs >>= \logs -> liftIO (mapM_ (putStrLn . ppr) logs)

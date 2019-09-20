@@ -26,7 +26,8 @@ module Util.IOLogger
     logTrace,
     
     getCurrentLevel,
-    getAllLogs
+    getAllLogs,
+    clearAllLogs
 )
 where
 
@@ -104,6 +105,9 @@ logMessage lev msg' = do
 
 getAllLogs :: LoggerMonadIO e (Seq (LogMessage e))
 getAllLogs = logs <$> get
+
+clearAllLogs :: LoggerMonadIO e ()
+clearAllLogs = modify' $ \s -> s {logs = S.empty}
 
 instance PrettyPrint LogLevel where
     ppr LogNone = "[NONE] THIS REALLY SHOULDNT BE HAPPENING"

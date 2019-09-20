@@ -95,6 +95,32 @@ afterparse (PatternMatch args e2) = PatternMatch (map afterparse args) (afterpar
 afterparse (Patterns exs) = Patterns (map afterparse exs)
 afterparse e = e
 
+-- traversing AST with modifying function f
+traverseModify :: (Expr -> Expr) -> Expr -> Expr
+traverseModify f (Lam v ex t p)        = Lam v (traverseModify f ex) t p
+traverseModify f (App ex exs)          = App (traverseModify f ex) (map (traverseModify f) exs)
+traverseModify f (Tuple c exs t)       = Tuple c (map (traverseModify f) exs) t
+traverseModify f (PatternMatch exs ex) = PatternMatch (map (traverseModify f) exs) (traverseModify f ex)
+traverseModify f (Patterns exs)        = Patterns (map (traverseModify f) exs)
+traverseModify f (BinaryOp n e1 e2)    = BinaryOp n (traverseModify f e1) (traverseModify f e2)
+traverseModify f (UnaryOp n e1)        = UnaryOp n (traverseModify f e1)
+traverseModify f (Let bnds ex)         = Let (map (fn f) bnds) (traverseModify f ex)
+    where fn g (v, ex) = (v, traverseModify g ex)
+traverseModify f e = f e
+
+traverseModify' :: (Expr -> Expr) -> Expr -> Expr
+traverseModify' f (Lam v ex t p)        = f $ Lam v (traverseModify f ex) t p
+traverseModify' f (App ex exs)          = f $ App (traverseModify f ex) (map (traverseModify f) exs)
+traverseModify' f (Tuple c exs t)       = f $ Tuple c (map (traverseModify f) exs) t
+traverseModify' f (PatternMatch exs ex) = f $ PatternMatch (map (traverseModify f) exs) (traverseModify f ex)
+traverseModify' f (Patterns exs)        = f $ Patterns (map (traverseModify f) exs)
+traverseModify' f (BinaryOp n e1 e2)    = f $ BinaryOp n (traverseModify f e1) (traverseModify f e2)
+traverseModify' f (UnaryOp n e1)        = f $ UnaryOp n (traverseModify f e1)
+traverseModify' f (Let bnds ex)         = f $ Let (map (fn f) bnds) (traverseModify f ex)
+    where fn g (v, ex) = (v, traverseModify g ex)
+traverseModify' f e = f e
+
+
 -- check if tuple is anonymous, need it for some passes
 isAnonymousTuple (Tuple "" _ _) = True
 isAnonymousTuple _ = False
