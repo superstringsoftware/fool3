@@ -24,7 +24,8 @@ import Data.HashMap.Strict as Map
 -}
 
 interpretExpr :: Expr -> IntState Expr
-interpretExpr e@(Lit l) = liftIO $ putStrLn (ppr l) >> pure e
+interpretExpr e@(Lit l) = trace (ppr l) >> pure e
+interpretExpr e@(ERROR _) = trace (ppr e) >> pure e
 interpretExpr ex@(VarId n) = do
     env <- currentEnvironment <$> get
     maybe ((trace $ "Expression named '" ++ n ++ "' not found.") >> pure ex)
@@ -83,7 +84,12 @@ runLitPrimOp _ _ PDiv = LString "Type error while applying primitive /"
 -- beta reducing lambda application to arguments
 betaReduce :: Expr -> [Expr] -> Expr
 -- data constructor application - can only be fully saturated
-betaReduce (Lam vars (Tuple cons expr typ ) t p) args = Tuple cons args typ
+betaReduce (Lam vars (Tuple cons expr typ ) t p) args = 
+    if (lv == la) then Tuple cons args typ
+    else if (lv > la) then ERROR "Constructor applications can only be fully saturated."
+         else ERROR "Too many arguments in constructor application."
+    where lv = length vars
+          la = length args
 betaReduce (Lam []   expr t p) []       = expr -- normal value    
 betaReduce (Lam []   expr t p) args     = App expr args -- thunk
 betaReduce (Lam vars expr t p) []       = Lam vars expr t p -- function value

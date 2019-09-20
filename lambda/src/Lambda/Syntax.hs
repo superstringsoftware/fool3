@@ -66,6 +66,7 @@ data Expr =
   | UnaryOp Name Expr
   | Prim PrimOp -- used mostly in App, to handle interpreter and potentially beyond
   | EMPTY
+  | ERROR String -- used only in Interpreter
   deriving (Show, Eq)
 
 
@@ -179,6 +180,7 @@ instance PrettyPrint Expr where
       where ppr1 (PatternMatch args e2) = (showListPlain ppr args) ++ " -> " ++ ppr e2
   ppr (PatternMatch args e2) = (showListPlain ppr args) ++ " = " ++ ppr e2
   ppr (Prim op) = ppr op
+  ppr (ERROR err) = as [bold,yellow] err
   ppr e = show e
   -- λ  
 
