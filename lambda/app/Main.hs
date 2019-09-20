@@ -51,13 +51,15 @@ processNew line = do
             case res1 of
                 Left err1 -> liftIO (print err) >> liftIO (print err1)
                 Right ex1 -> do
-                    liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received interactive expression: " -- ++ (show $ length ex)
-                    liftIO $ putStrLn (show ex1) -- show what was parsed first
+                    trace $ TC.as [TC.bold, TC.underlined] "Received interactive expression: " -- ++ (show $ length ex)
+                    trace (show ex1) -- show what was parsed first
                     let ex2 = afterparse ex1
-                    liftIO $ putStrLn (show ex2)                    
+                    trace (show ex2)                    
                     showAllLogs
                     clearAllLogs
-                    interpretExpr ex2
+                    res <- interpretExpr ex2
+                    liftIO $ putStrLn (ppr res)                    
+
                     
 
 
@@ -68,7 +70,7 @@ showHelp = do
     putStrLn ":q[uit]           -- quit"
     putStrLn ":a[ll]            -- list everything, -d - in core format"
     putStrLn ":l[oad] <name>    -- load and interpret file <name>"
-    putStrLn ":s[et] <command>  -- set environment flags (:s strict or :s lazy)"
+    putStrLn ":s[et] <command>  -- set environment flags (:s strict, :s lazy, :s trace on/off)"
     putStrLn ":e[nv]            -- show current environment"
     putStrLn ":functions        -- list all global functions"
     putStrLn ":types            -- list all types"
@@ -126,8 +128,14 @@ processSet "show" _ = do
     modify (\st -> st { currentFlags = (currentFlags st) { pretty = False} } )
     liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "pretty printing off"
 
-
-
+processSet "trace" ("on":_) = do
+    modify (\st -> st { currentFlags = (currentFlags st) { tracing = True} } )
+    liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "tracing on"
+    
+processSet "trace" ("off":_) = do
+    modify (\st -> st { currentFlags = (currentFlags st) { tracing = False} } )
+    liftIO $ putStrLn $ "Set " ++ TC.as [TC.bold] "tracing off"
+    
 
 
 processSet _ _ = liftIO $ putStrLn "Unknown :set command. Type :h[elp] to show available list."

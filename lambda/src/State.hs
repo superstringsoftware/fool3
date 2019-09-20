@@ -52,6 +52,12 @@ initializeInterpreter = return $ InterpreterState {
     currentEnvironment = initialEnvironment
 }
 
+-- outputs a message only if tracing is on
+trace :: String -> IntState ()
+trace msg = do
+    tr <- currentFlags <$> get >>= pure . tracing
+    if tr then liftIO (putStrLn msg) else pure ()
+
 -- lifted versions of the IOLogger monad functions
 logError :: LogPayload -> IntState ()
 logError    = lift . Log.logError

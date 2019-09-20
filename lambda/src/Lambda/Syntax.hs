@@ -64,6 +64,7 @@ data Expr =
   | Patterns [Expr] -- only PatternMatch should be used inside here, it's only used inside lambda with patterns!!!
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
+  | Prim PrimOp -- used mostly in App, to handle interpreter and potentially beyond
   | EMPTY
   deriving (Show, Eq)
 
@@ -77,6 +78,8 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
                LString !String | LList [Expr] | LVec [Expr]
                deriving (Eq, Show)
 
+
+data PrimOp = PPlus | PMinus | PMul | PDiv deriving (Show, Eq)
 
 -- the very first pass that we run right after parsing the source file               
 afterparse :: Expr -> Expr
@@ -131,6 +134,11 @@ instance PrettyPrint Pred where
   ppr Unconstrained = ""
   ppr (Exists typ) = (as [bold,green] "∃") ++ (ppr typ)
   
+instance PrettyPrint PrimOp where
+  ppr PPlus = "+#"
+  ppr PMinus = "-#"
+  ppr PMul = "*#"
+  ppr PDiv = "/#"
 
 instance PrettyPrint [Pred] where
   ppr [] = ""
@@ -170,6 +178,7 @@ instance PrettyPrint Expr where
   ppr (Patterns ps) = showListCuBr ppr1 ps
       where ppr1 (PatternMatch args e2) = (showListPlain ppr args) ++ " -> " ++ ppr e2
   ppr (PatternMatch args e2) = (showListPlain ppr args) ++ " = " ++ ppr e2
+  ppr (Prim op) = ppr op
   ppr e = show e
   -- λ  
 
