@@ -12,6 +12,7 @@ l = [1,2,3,4,5]
 
 -- main = putStrLn $ show $ map (*2) l
 main = putStrLn "Hello World"
+y = 5 + 7
 -- END TEST PROGRAM WITH PRELUDE
 
 {-
