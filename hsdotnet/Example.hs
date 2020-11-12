@@ -1,18 +1,27 @@
-{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim, UnboxedTuples, NoImplicitPrelude #-} -- , NoImplicitPrelude
+{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim, UnboxedTuples #-} -- , NoImplicitPrelude
 
 module Example where
 
 -- import GHC.Prim
-import Prelude
+-- import Prelude
 -- import GHC.Float
 -- import Foreign.C.String
 
 -- BEGIN TEST PROGRAM WITH PRELUDE
-l = [1,2,3,4,5]
+-- l = [1,2,3,4,5]
 
 -- main = putStrLn $ show $ map (*2) l
-main = putStrLn "Hello World"
-y = 5 + 7
+
+fib :: Int -> Int
+fib n = go 0 1 0 where
+            go acc0 acc1 i
+                | i == n = acc0
+                | otherwise = go acc1 (acc0 + acc1) (i + 1)
+
+foreign import ccall unsafe "print_int" print_int :: Int -> IO ()
+
+main :: IO ()
+main = print_int $ fib 10
 -- END TEST PROGRAM WITH PRELUDE
 
 {-

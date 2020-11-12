@@ -68,7 +68,10 @@ g = <1, 27.4, 14>;
 
 (*) x y = x *# y;
 
-Person : Person = \ name:String age:Int salary:Int;
+Person : Person = \ 
+    name:String 
+    age:Int 
+    salary:Int;
 
 f = map g;
 
