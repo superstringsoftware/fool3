@@ -13,10 +13,56 @@
 
 - Write once, run anywhere -> 'Realms' support with shared Type Universe: JS, .Net, barebone...
 - Graph logic for "realworld" data - modeled via relations between records
+- FRP for UI
+- Seemless interop with Realm languages (.Net, js)
 
-# High-level compilation pipeline logic
+## High-level compilation pipeline logic
 
-## Implementation thoughts
+- Parse surface language file, setting up initial structure of functions and types
+- Desugar into Core Representation
+- Setup "function factories" for functions dependent on types (typeclasses at least, maybe something else)
+- Typecheck & dialog with the user on building the types
+
+## Core implementation thoughts
+
+- "Program" is a list of top-level bindings, just like GHC.
+- Everything is a lambda, data is tuples (also see below)
+- Polymorphic functions are mostly handled at compile time via "function factories":
+  - Typeclass definition creates a factory
+  - Typeclass application to a certain type creates an entry in the factory table corresponding to the parameters given, e.g.:
+
+```Haskell
+class Semigroup a where 
+    (+) :: a -> a -> a
+-- creates something like:
+Semigroup.plus = λ a:U . {...} : a -> a -> a
+-- then instantiation creates an entry in the table:
+instance Semigroup Int where 
+    (+) = primop_plus
+-- we are adding an entry to
+Semigroup.plus.add (a = Int, primop_plus)
+-- then if we have 
+4 + 5
+-- we lookup "Semigroup.plus" instead of '+' in the global function lookup table (hashtable in implementation?), and then find a specific function once we can be sure of the type of parameters.
+```
+
+The above hints that we don't even need actual `typeclasses` anywhere during compilation and especially runtime, it's more for human readability - nice to have the hierarchy etc; also gives better error messages.
+
+**!NB** How to handle general functions dependent on type? Shall we allow such functions *outside* of typeclasses?
+
+```haskell
+fmap = λ f:U->U g:a->b x:a . {} : f b
+fmap:(f b) f:U->U g:a->b x:a = ...
+fmap : f:(U->U) -> g:(a->b) -> x:a -> b
+fmap f:(U->U) g:(a->b) x:(f a) -> b 
+-- then
+fmap Maybe _ Nothing  = Nothing
+fmap Maybe f (Just a) = Just (f a)
+-- however, Maybe can be inferred from the arguments anyway?
+-- Still, typeclasses give a much better hierarchy for the human mind
+```
+
+## Low level implementation thoughts
 
 We want to store all data as Tuples:
 

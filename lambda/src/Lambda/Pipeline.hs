@@ -70,13 +70,17 @@ buildEnvironmentM x@(e,si) = get >>= \s->
 -- Let [(Var,Expr)] Expr    
 buildEnvPass :: IntState ()
 buildEnvPass = buildPrimitivePass >> get >>= pure . parsedModule >>= mapM_ buildEnvironmentM
-    
+
+-- killing primitive bindings for now to test iterative compilation
+primBindings = []    
+{-
 primBindings = [
         Let [(Var "+" ToDerive, Prim PPlus)] EMPTY,
         Let [(Var "-" ToDerive, Prim PMinus)] EMPTY,
         Let [(Var "*" ToDerive, Prim PMul)] EMPTY,
         Let [(Var "/" ToDerive, Prim PDiv)] EMPTY
     ]
+-}
 
 buildPrimitivePass :: IntState ()
 buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) primBindings

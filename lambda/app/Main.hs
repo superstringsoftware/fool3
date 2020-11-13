@@ -22,6 +22,8 @@ import Lambda.Interpreter
 import Lambda.Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
 
+import Text.Pretty.Simple (pPrint)
+
 
 
 -- need this 4-monad stack to make sure Haskeline works with our state monad
@@ -89,7 +91,7 @@ processCommand (":env":_) = do
 
 processCommand (":all":"-d":_) = do 
     mod <- get >>= \s -> pure (parsedModule s)
-    liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
+    liftIO (mapM_ (\(ex,_) -> pPrint ex ) mod )
     --processCommand ([":types"]) >> processCommand ([":functions"])
 processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
@@ -97,14 +99,14 @@ processCommand (":all":_) = do
 
 processCommand (":types":"-d":_) = do
     types <- get >>= \s -> pure ( (types . currentEnvironment) s)
-    liftIO $ mapM_ (putStrLn . show) types
+    liftIO $ mapM_ pPrint types
 processCommand (":types":_) = do
     types <- get >>= \s -> pure ( (types . currentEnvironment) s)
     liftIO $ mapM_ (putStrLn . ppr) types
 
 processCommand (":functions":"-d":_) = do
     res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
-    liftIO $ mapM_ (putStrLn . show) res
+    liftIO $ mapM_ pPrint res
 processCommand (":functions":_) = do
     res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
     liftIO $ mapM_ (putStrLn . ppr) res
