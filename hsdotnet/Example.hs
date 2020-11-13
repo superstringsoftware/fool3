@@ -11,17 +11,32 @@ module Example where
 -- l = [1,2,3,4,5]
 
 -- main = putStrLn $ show $ map (*2) l
-
+{-
 fib :: Int -> Int
 fib n = go 0 1 0 where
             go acc0 acc1 i
                 | i == n = acc0
                 | otherwise = go acc1 (acc0 + acc1) (i + 1)
 
-foreign import ccall unsafe "print_int" print_int :: Int -> IO ()
+-}
 
-main :: IO ()
-main = print_int $ fib 10
+data Widget = Box Int Int | Circle Int
+
+area (Box x y) = x * y
+area (Circle r) = r * r 
+
+data Person = Person {
+    name :: String,
+    age :: Int
+}
+
+-- plus2 x = x + 2
+
+-- foreign import ccall unsafe "print_int" print_int :: Int -> IO ()
+
+
+-- main :: IO ()
+-- main = print_int $ plus2 10
 -- END TEST PROGRAM WITH PRELUDE
 
 {-

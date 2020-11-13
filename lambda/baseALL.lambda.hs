@@ -4,7 +4,7 @@
 --I# : Int    = \x:Int#.    {_};
 
 False : Bool = {};
-True  : Bool = {};
+True : Bool = {};
 
 Nothing : (Maybe a) = {};
 Just : (Maybe a) = \ x:a. {_};

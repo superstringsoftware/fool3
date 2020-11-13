@@ -87,15 +87,24 @@ processCommand (":env":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
 
-processCommand (":all":"-d":_) = processCommand ([":types"]) >> processCommand ([":functions"])
+processCommand (":all":"-d":_) = do 
+    mod <- get >>= \s -> pure (parsedModule s)
+    liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
+    --processCommand ([":types"]) >> processCommand ([":functions"])
 processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )    
 
+processCommand (":types":"-d":_) = do
+    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
+    liftIO $ mapM_ (putStrLn . show) types
 processCommand (":types":_) = do
     types <- get >>= \s -> pure ( (types . currentEnvironment) s)
     liftIO $ mapM_ (putStrLn . ppr) types
 
+processCommand (":functions":"-d":_) = do
+    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
+    liftIO $ mapM_ (putStrLn . show) res
 processCommand (":functions":_) = do
     res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
     liftIO $ mapM_ (putStrLn . ppr) res
