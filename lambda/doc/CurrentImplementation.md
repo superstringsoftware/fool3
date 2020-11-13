@@ -57,6 +57,10 @@ data Expr a where
     I   :: Int  -> Expr Int
     B   :: Bool -> Expr Bool
 
+data Maybe a where
+    Nothing :: Maybe a
+    Just    :: a -> Maybe a
+
 -- Expr = \a:*. { \x:Int. I {x} : Expr Int, \x:Bool. B {x} : Expr Bool  }
 ```
 

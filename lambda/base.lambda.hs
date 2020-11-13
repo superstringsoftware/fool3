@@ -1,7 +1,7 @@
 -- we can't parse pattern matches with operators using operator syntax on the left side, need to use function syntax!
 -- but lambda syntax is preferred anyway
 
-I# : Int    = \x:Int#.    {_};
+--I# : Int    = \x:Int#.    {_};
 
 False : Bool = {};
 True : Bool = {};
@@ -30,17 +30,15 @@ Semigroup : Class = \a:Type . {
 };
 
 Monoid : Class = ∃ Semigroup a => \a. {
-    Z0:a
+    E0:a
 };
 
 Semigroup Int = {
     -- (+) (I# x) (I# y) = I# (x +# y) - pattern matched option, works, but lambda should be preferred (why?):
-    (+) = \x1 y1 . {
-        (I# x) (I# y) -> I# (x +# y)
-    }
+    (+) = primplus_int
 };
 Monoid Int = {
-    Z0 = 0
+    E0 = 0
 };
 
 -- pattern match syntax for functions - match ONLY arguments!!!

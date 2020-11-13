@@ -1,1 +1,0 @@
-GADT in JavaScript
