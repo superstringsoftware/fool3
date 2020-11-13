@@ -24,6 +24,8 @@ import Util.PrettyPrinting as TC
 
 import Text.Pretty.Simple (pPrint)
 
+import Data.HashMap.Strict as Map
+
 
 
 -- need this 4-monad stack to make sure Haskeline works with our state monad
@@ -88,6 +90,17 @@ processCommand (":set":s:xs) = processSet s xs
 processCommand (":env":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
+    liftIO $ putStrLn "\n--------------- TYPES ----------------"
+    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
+    let tkeys = Map.keys types
+    liftIO $ mapM_ (fenv1 types) tkeys
+    liftIO $ putStrLn "\n--------------- LAMBDAS ----------------"
+    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
+    let fkeys = Map.keys res
+    liftIO $ mapM_ (fenv1 res) fkeys
+    where fenv1 ts tk = do 
+                        let (Just tt) = Map.lookup tk ts
+                        putStrLn $ tk ++ " -> " ++ (ppr tt)
 
 processCommand (":all":"-d":_) = do 
     mod <- get >>= \s -> pure (parsedModule s)
@@ -103,6 +116,7 @@ processCommand (":types":"-d":_) = do
 processCommand (":types":_) = do
     types <- get >>= \s -> pure ( (types . currentEnvironment) s)
     liftIO $ mapM_ (putStrLn . ppr) types
+    -- liftIO $ mapM_ print (Map.keys types)
 
 processCommand (":functions":"-d":_) = do
     res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
