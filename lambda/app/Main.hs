@@ -100,7 +100,7 @@ processCommand (":env":_) = do
     liftIO $ mapM_ (fenv1 res) fkeys
     where fenv1 ts tk = do 
                         let (Just tt) = Map.lookup tk ts
-                        putStrLn $ tk ++ " -> " ++ (ppr tt)
+                        putStrLn $ (TC.as [bold,green] (tk ++ ":")) ++ "\n  " ++ (ppr tt)
 
 processCommand (":all":"-d":_) = do 
     mod <- get >>= \s -> pure (parsedModule s)
