@@ -1,5 +1,21 @@
 # lambda
 
+- Strong math foundation
+- Int, Float, Double, Byte, Ref and their Arrays primitive types - 'basis'
+- String both constructed in our language as well as relies on JS / .Net etc libraries
+- Dependent types
+- Type families, generalizing typeclasses
+- Good records
+- Events as first class language constructs (FRP out of box?)
+- Mutability etc via 'Effects' (??? - a lot of experimentation needed yet)
+
+### High level features
+
+- Write once, run anywhere -> 'Realms' support with shared Type Universe: JS, .Net, barebone...
+- Graph logic for "realworld" data - modeled via relations between records
+
+# High-level compilation pipeline logic
+
 ## Implementation thoughts
 
 We want to store all data as Tuples:
