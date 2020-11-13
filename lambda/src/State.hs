@@ -14,12 +14,12 @@ import Data.Text as L
 
 import Data.Sequence as S
 
-import Lambda.Syntax
-import Lambda.Environment
+import Core.Syntax
+import Environment
 
 import Util.IOLogger as Log
 import Util.PrettyPrinting
-import Lambda.Logs as Logs
+import Logs as Logs
 
 -- scary, building a stack - stacking IO inside logger monad
 -- type IntState = StateT InterpreterState IO

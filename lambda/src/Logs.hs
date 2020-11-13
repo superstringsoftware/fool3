@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- error handling 
 
-module Lambda.Logs where
+module Logs where
 
 import Data.Text as L
 import Util.IOLogger  

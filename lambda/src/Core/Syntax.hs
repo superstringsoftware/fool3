@@ -2,7 +2,7 @@
 
 -- Surface language syntax, Expr is generated directly from the Parser
 
-module Lambda.Syntax
+module Core.Syntax
 where
 
 import Util.PrettyPrinting

@@ -23,12 +23,12 @@ Rough order:
 - Then we generate code
 -}
 
-module Lambda.Pipeline where
+module Core.Pipeline where
 
 import State
-import Lambda.Syntax    
-import Lambda.Logs    
-import Lambda.Environment    
+import Core.Syntax    
+import Logs    
+import Environment    
 
 -- import Util.IOLogger
 

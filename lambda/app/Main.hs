@@ -14,12 +14,12 @@ import Control.Monad (zipWithM_, void, when)
 import qualified Data.Text.IO as T (readFile)
 import qualified Data.Text as T
 
-import Lambda.Syntax
-import Lambda.Parser
-import Lambda.Pipeline
-import Lambda.Environment
-import Lambda.Interpreter
-import Lambda.Logs (SourceInfo(..) )
+import Core.Syntax
+import SurfaceLanguage.Lambda.Parser
+import Core.Pipeline
+import Environment
+import Core.Interpreter
+import Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
 
 import Text.Pretty.Simple (pPrint)

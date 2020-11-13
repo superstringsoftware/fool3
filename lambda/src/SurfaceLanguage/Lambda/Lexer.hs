@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Lambda.Lexer where
+module SurfaceLanguage.Lambda.Lexer where
 
 -- import Text.Parsec.String (Parser)
 -- import Text.Parsec.Language (emptyDef)

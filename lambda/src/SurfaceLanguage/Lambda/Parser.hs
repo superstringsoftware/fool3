@@ -10,7 +10,7 @@
 --
 --------------------------------------------------------------------
 
-module Lambda.Parser where
+module SurfaceLanguage.Lambda.Parser where
 
 import Text.Parsec
 import Text.Parsec.Prim (many)
@@ -31,10 +31,10 @@ import qualified Data.Text as L
 import qualified Data.Vector.Unboxed as U
 
 import State
-import Lambda.Lexer
-import Lambda.Syntax
-import Lambda.Environment
-import Lambda.Logs
+import SurfaceLanguage.Lambda.Lexer
+import Core.Syntax
+import Environment
+import Logs
 import Util.PrettyPrinting
 
 

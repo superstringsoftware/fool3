@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 -- typing etc environment when compiling - can be built from several modules
 
-module Lambda.Environment
+module Environment
 where
 
 import Data.HashMap.Strict as Map
 
-import Lambda.Syntax
+import Core.Syntax
 import Data.Text
 
 import Util.PrettyPrinting
-import Lambda.Logs
+import Logs
 
 type NameMap = HashMap Name
 

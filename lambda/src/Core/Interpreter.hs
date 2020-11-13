@@ -1,11 +1,11 @@
 -- this is a very straightforward interpreter directly on Expr AST, without any bytecodes etc
 -- no typechecks for now, simple lambda machinery
 
-module Lambda.Interpreter where
+module Core.Interpreter where
 
-import Lambda.Environment
-import Lambda.Syntax
-import Lambda.Logs
+import Environment
+import Core.Syntax
+import Logs
 import State
 
 import Util.PrettyPrinting
