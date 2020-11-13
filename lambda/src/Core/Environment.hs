@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 -- typing etc environment when compiling - can be built from several modules
 
-module Environment
+module Core.Environment
 where
 
 import Data.HashMap.Strict as Map

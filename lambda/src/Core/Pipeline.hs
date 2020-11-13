@@ -28,7 +28,7 @@ module Core.Pipeline where
 import State
 import Core.Syntax    
 import Logs    
-import Environment    
+import Core.Environment    
 
 -- import Util.IOLogger
 

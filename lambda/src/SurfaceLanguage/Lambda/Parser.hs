@@ -33,7 +33,7 @@ import qualified Data.Vector.Unboxed as U
 import State
 import SurfaceLanguage.Lambda.Lexer
 import Core.Syntax
-import Environment
+import Core.Environment
 import Logs
 import Util.PrettyPrinting
 

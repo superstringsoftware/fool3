@@ -15,7 +15,7 @@ import Data.Text as L
 import Data.Sequence as S
 
 import Core.Syntax
-import Environment
+import Core.Environment
 
 import Util.IOLogger as Log
 import Util.PrettyPrinting

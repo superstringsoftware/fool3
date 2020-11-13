@@ -3,7 +3,7 @@
 
 module Core.Interpreter where
 
-import Environment
+import Core.Environment
 import Core.Syntax
 import Logs
 import State

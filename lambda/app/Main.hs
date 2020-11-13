@@ -17,7 +17,7 @@ import qualified Data.Text as T
 import Core.Syntax
 import SurfaceLanguage.Lambda.Parser
 import Core.Pipeline
-import Environment
+import Core.Environment
 import Core.Interpreter
 import Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
