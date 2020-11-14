@@ -84,6 +84,12 @@ data PrimOp = PPlus | PMinus | PMul | PDiv deriving (Show, Eq)
 
 -- the very first pass that we run right after parsing the source file               
 afterparse :: Expr -> Expr
+-- this is a hack for 'built in' operators, needs to go once Classes are supported!!!
+afterparse e@(BinaryOp "+" _ _) = e
+afterparse e@(BinaryOp "-" _ _) = e
+afterparse e@(BinaryOp "*" _ _) = e
+afterparse e@(BinaryOp "/" _ _) = e
+-- end of the hack
 afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):[])
 afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
 -- top level binding: this is a DATA CONSTRUCTOR (unnamed tuple, bound to typed var) - crazy pattern, need to simplify

@@ -37,6 +37,12 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
 import Data.Text as T
 
+import Util.PrettyPrinting as TC
+
+import Data.HashMap.Strict as Map
+
+import Realms.JS.Compiler as CompilerJS
+
 --------------------------------------------------------------------------------
 -- PASS 0: initial desugaring etc after parsing
 --------------------------------------------------------------------------------
@@ -84,3 +90,24 @@ primBindings = [
 
 buildPrimitivePass :: IntState ()
 buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) primBindings
+
+--------------------------------------------------------------------------------
+-- PASS n: compilation passes
+--------------------------------------------------------------------------------
+
+compile2JSpass :: IntState ()
+compile2JSpass = do
+    env <- get >>= \s -> pure (currentEnvironment s)
+    -- env { lambdas = Map.insert n (v,e) (lambdas env) }
+    let res = lambdas env -- <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
+    let fkeys = Map.keys res
+    mapM_ fenv1 fkeys
+    where fenv1 tk = do 
+                        env <- get >>= \s -> pure (currentEnvironment s)
+                        let (Just tt) = Map.lookup tk (lambdas env)
+                        let str = CompilerJS.binding2text tt
+                        let env' = env { jsProgram = Map.insert tk str (jsProgram env)}
+                        modify' (\s -> s {currentEnvironment = env'})
+
+                        
+                        

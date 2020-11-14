@@ -87,6 +87,26 @@ processCommand (":help":_) = liftIO showHelp
 processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
 processCommand (":load":xs) = loadFileNew (head xs)
 processCommand (":set":s:xs) = processSet s xs
+processCommand (":compile":_) = compile2JSpass
+processCommand (":env":"-d":_) = do
+    fl <- gets currentFlags
+    liftIO $ print fl
+    liftIO $ putStrLn "\n--------------- TYPES ----------------"
+    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
+    let tkeys = Map.keys types
+    liftIO $ mapM_ (fenv1 types) tkeys
+    liftIO $ putStrLn "\n--------------- LAMBDAS ----------------"
+    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
+    let fkeys = Map.keys res
+    liftIO $ mapM_ (fenv1 res) fkeys
+    liftIO $ putStrLn "\n--------------- JS REALM ----------------"
+    jsp <- get >>= \s -> pure ( (jsProgram . currentEnvironment) s)
+    liftIO $ mapM_ putStrLn jsp
+    where fenv1 ts tk = do 
+                        let (Just tt) = Map.lookup tk ts
+                        putStrLn $ "\n" ++ (TC.as [bold,green] (tk ++ ":"))
+                        pPrint tt
+
 processCommand (":env":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
@@ -98,6 +118,9 @@ processCommand (":env":_) = do
     res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
     let fkeys = Map.keys res
     liftIO $ mapM_ (fenv1 res) fkeys
+    liftIO $ putStrLn "\n--------------- JS REALM ----------------"
+    jsp <- get >>= \s -> pure ( (jsProgram . currentEnvironment) s)
+    liftIO $ mapM_ putStrLn jsp
     where fenv1 ts tk = do 
                         let (Just tt) = Map.lookup tk ts
                         putStrLn $ (TC.as [bold,green] (tk ++ ":")) ++ "\n  " ++ (ppr tt)

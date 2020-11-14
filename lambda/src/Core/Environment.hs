@@ -29,12 +29,14 @@ data TypeRep = LiftedTypeRep {
 data Environment = Environment {
     -- Map that keeps all our TypeReps in the current environment
     types       :: NameMap TypeRep,
-    lambdas     :: NameMap (Var, Expr) -- not only lambdas, but all top-level bindings, including expressions or thunks
+    lambdas     :: NameMap (Var, Expr), -- not only lambdas, but all top-level bindings, including expressions or thunks
+    jsProgram   :: NameMap String
 } deriving Show
 
 initialEnvironment = Environment {
     types       = Map.empty,
-    lambdas     = Map.empty 
+    lambdas     = Map.empty,
+    jsProgram   = Map.empty 
 }
 
 -- only processing Let bindings on the top level
