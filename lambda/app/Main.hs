@@ -211,6 +211,10 @@ loadFileNew nm = do
                 buildEnvPass
                 showAllLogsWSource
                 clearAllLogs
+                liftIO (putStrLn $ "Executing pass 2: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
+                compile2JSpass
+                showAllLogsWSource
+                clearAllLogs
                 -- mod <- get >>= \s -> pure (parsedModule s)
                 -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 

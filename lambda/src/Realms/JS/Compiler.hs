@@ -36,6 +36,21 @@ import Util.PrettyPrinting as TC
 -- basic straightforward to test the waters
 -- core2text :: Expr -> String
 
+data ExprJS = 
+    FuncDef {
+        fname :: String,
+        vars :: [String],
+        body :: String
+    }
+
+binding2expr :: Binding -> ExprJS
+binding2expr (Var nm _, (Lam vs ex _ _)) = 
+    FuncDef {
+        fname = nm,
+        vars = map (\(Var nm _)->nm) vs,
+        body = ppr ex
+    }
+
 binding2text :: Binding -> String
 binding2text (Var nm _, ex) = "function " ++ nm ++ (core2text ex)
 
@@ -43,6 +58,7 @@ core2text :: Expr -> String
 core2text (Lam vs ex t p)        = "(" ++ (vs2txt "" vs) ++ ") {\n" 
     ++ (core2text ex) ++ "\n}"
     where vs2txt acc [] = acc
+          vs2txt acc ((Var nm tp):[]) = acc ++ nm
           vs2txt acc ((Var nm tp):xs) = acc ++ nm ++ ", " 
 --core2text f (App ex exs)          = f $ App (traverseModify f ex) (map (traverseModify f) exs)
 --core2text f (Tuple c exs t)       = f $ Tuple c (map (traverseModify f) exs) t
