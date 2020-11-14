@@ -8,9 +8,12 @@ import Data.HashMap.Strict as Map
 
 import Core.Syntax
 import Data.Text
+import Data.Text.Lazy as TL
 
 import Util.PrettyPrinting
 import Logs
+
+import Text.Pretty.Simple (pShow)
 
 type NameMap = HashMap Name
 
@@ -50,7 +53,10 @@ processOneBinding ( Let ((v, ex):[]) EMPTY , si) env =
         e   -> addLambda v e env
 processOneBinding (ex, si) _ = Left $ LogPayload 
         (lineNum si) (colNum si) ""
-        "Unsupported environment processing call"
+        ("Cannot add the following expression to the Environment during initial Environment Building pass:\n" 
+            ++ (ppr ex) ++ "\n" 
+            ++ (TL.unpack (pShow ex))
+            ++ "\nThe expression is parsed and stored in LTProgram, but is not in the Environment.")
 
 -- pure function that takes an expression and Environment and 
 -- then either constructs a new type from the data constructor or adds constructor to the existing type

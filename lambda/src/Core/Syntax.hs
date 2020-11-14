@@ -31,11 +31,15 @@ data Type
   | TExpr Expr -- since we will support dependent types, type constructors can be applied to quite complicated expressions
   -- | TForall [Pred] [TVar] Type
   | ToDerive -- added it to handle initial parsing
+  | Universe Int -- for types, following the Martin-Lof theory - "Universe 0" is "small types", so regular types etc.
   -- | TClass Name -- for initial typeclass parsing, might change this
   -- | InsType Expr -- this is probably a workaround - when we are beta-reducing Type lambdas for variables like \a. x:a
   -- "a" needs to be able to become any kind of expression (since we are applying lambdas to expressions).
   -- Type checking etc will fix this.
   deriving (Show, Eq)
+
+-- Record is the representation of any record or tuple (with names being absent) - a list of typed field names, nothing more
+type Record = [(Name,Type)]
 
 isTConOrTApp (TCon _)   = True
 isTConOrTApp (TApp _ _) = True
@@ -85,10 +89,12 @@ data PrimOp = PPlus | PMinus | PMul | PDiv deriving (Show, Eq)
 -- the very first pass that we run right after parsing the source file               
 afterparse :: Expr -> Expr
 -- this is a hack for 'built in' operators, needs to go once Classes are supported!!!
+{-
 afterparse e@(BinaryOp "+" _ _) = e
 afterparse e@(BinaryOp "-" _ _) = e
 afterparse e@(BinaryOp "*" _ _) = e
 afterparse e@(BinaryOp "/" _ _) = e
+-}
 -- end of the hack
 afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):[])
 afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
@@ -168,6 +174,7 @@ instance PrettyPrint Type where
   ppr (TCon n) = n
   ppr (TApp con args) = "(" ++ ppr con ++ " " ++ (showListPlain ppr args) ++ ")"
   ppr (TVar n) = n
+  ppr (Universe n) = as [bold,lyellow] $ "U" ++ (show n)
   ppr e = show e
 
 instance PrettyPrint Var where

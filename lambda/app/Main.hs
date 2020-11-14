@@ -193,8 +193,9 @@ loadFileNew nm = do
     liftIO $ putStrLn $ "Loading file: " ++ nm
     fileText <- liftIO (T.readFile nm)
     res <- parseWholeFile fileText nm
-    -- liftIO $ print res
+    --liftIO $ print res
     st <- get
+    --liftIO $ print (parsedModule st)
     put $ st { currentSource = fileText }
     case res of
         Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (putStrLn $ showSyntaxError fileText err)
