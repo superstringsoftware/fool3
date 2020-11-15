@@ -15,7 +15,6 @@ import qualified Data.Text.IO as T (readFile)
 import qualified Data.Text as T
 
 import Core.Syntax
-import SurfaceLanguage.Lambda.Parser
 import Core.Pipeline
 import Core.Environment
 import Core.Interpreter
@@ -25,6 +24,10 @@ import Util.PrettyPrinting as TC
 import Text.Pretty.Simple (pPrint)
 
 import Data.HashMap.Strict as Map
+
+-- depending on which parser we keep, that language will get compiled.
+import SurfaceLanguage.Lambda.Parser as Lambda
+import qualified SurfaceLanguage.Thask.Parser as Thask
 
 
 

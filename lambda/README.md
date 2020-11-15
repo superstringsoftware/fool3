@@ -22,6 +22,8 @@ Compiler architecture for typed (supporting dependent types up to Calculus of Co
 
 # Reference Surface Language summary
 
+**!NB** Thask surface language uses the same concepts described below, but with a syntax much closer to Haskell / Idris combo.
+
 **lambda** comes with a reference surface language implemented. You can use it as is or use it as a basis for implementing your own surface languages that will utilize powerful lambda Core and Realms infrastructure. Below is a summary of all lambda features compared to Haskell and "C-land" to get you started real quick.
 
 **lambda** syntax is based on two very simple, but very powerful concepts:

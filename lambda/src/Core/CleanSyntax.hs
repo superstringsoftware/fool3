@@ -46,6 +46,7 @@ data Type
   | THasFields [Field] -- special "constraint" type, for situations such as "print r.name + " " + show r.age" - then deduced type will be HasFields (name:String, age:exists Show a)
   | ToDerive -- added it to handle initial parsing
   | Universe Int -- for types, following the Martin-Lof theory - "Universe 0" is "small types", so regular types etc.
+  | TClass -- typeclass or type family
   deriving (Show, Eq)
 
 -- Record is the representation of any record or tuple (with names being absent) - a list of typed field names, nothing more
@@ -67,7 +68,7 @@ data Expr =
   | Lam {
       boundVars  :: Record, -- list of the bound variables, possibly with default values
       lambdaBody :: Expr,   -- body of the function, whatever it is bound to - either App, or LetIns
-      lambdaType :: Type,
+      lambdaType :: Type,   -- type signature of the lambda
       predicates :: [Pred]
     } 
   | Cons {
