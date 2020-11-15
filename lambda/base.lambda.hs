@@ -25,3 +25,4 @@ Nothing : (Maybe a) = {};
 Just : (Maybe a) = \ x:a. {_};
 
 MInt = Maybe Int;
+

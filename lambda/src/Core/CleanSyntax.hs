@@ -125,5 +125,9 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
     Then instance definition adds a corresponding record to a factory!
     When we are adding - CHECK THE LAWS! (randomization etc)
     (+) x:a y:a -> z:a
-    4:int + 3:int -- instantiating a to int, how do we ask the factory for the correct function? -> it has to find the type from the type of the arguments. 
+    4:int + 3:int -- instantiating a to int, how do we ask the factory for the correct function? -> it has to find the type from the type of the arguments.
+    How? By the full signature maybe??
+    3.4:float + 3.2:float
+
+    length ls:List a -> Int 
 -}

@@ -283,6 +283,47 @@ v4 = v2 + v3; -- ok, both vectors are of type `VectorN Int 2`
 v5 = v1 + v2; -- FAILS! won't typecheck, as the first is `VectorN Int 3` while the second is VectorN Int 2
 ```
 
+### Objects
+Let's say we want to model virtual inheritance as in C# / C++ or Java. Let's redefine our Shapes type for this purpose and turn it from the Sum Type to extensible product type.
+
+```Haskell
+Shape : Type = exists Num a => \a:Type . {
+    x, y : a;
+    area : a = 0;
+} 
+```
+
+Here we have a new concept, we are making a member `area` of type `a` part of our record - it's like a type-level constant. However, we can overload `area` in subclasses like this:
+
+```Haskell
+Box : Type = Shape * { w,h : a};
+Box.area = w*h;
+-- alternative function overloading syntax:
+Box : Type = Shape {
+    area = w * h;
+} * {w, h : a}
+
+Circle : Type = Shape * {r : a};
+Circle.area = r * r * pi / 2;
+```
+Here we have extended our Shape type with width and height, and then overloaded the `area` function with another expression. Not only that, but as you can see that when a function is a part of a record type, it can access other fields of this same record without the need to pass them in directly - so they behave very similar to "classic" methods in the c-land!
+
+Now we can mimic the "virtual inheritance" functionality as follows:
+
+```Haskell
+s = Shape 0 0;
+b = Box s 10 20;
+c = Circle 10 10 10;
+
+print s.area; -- 0, s is a Shape
+print b.area; -- 10*20 = 200, b is a Box
+print c.area; -- 10*10*pi/2, c is a Circle
+```
+
+Once we add Mutability to the mix, we can fully support OO paradigms.
+
+As a side note, the above effect can be just as easily reached via typeclasses - by defining `Areable : Class = \a:Type { area:(exists Num b => b) = \s:a; }`. Whether we want to support dynamic typing and so downcasts, as well as accessing parent methods etc - the usual stuff in the C-land - remains to be seen.
+
 ### Mutability
 Mutability is implemented via `Effects`.
 ### Realms
