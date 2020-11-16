@@ -2,7 +2,7 @@
 
 -- Surface language syntax, Expr is generated directly from the Parser
 
-module Core.CleanSyntax
+module CoreLambda.Syntax
 where
 
 import Util.PrettyPrinting
@@ -69,7 +69,7 @@ data Expr =
       boundVars  :: Record, -- list of the bound variables, possibly with default values
       lambdaBody :: Expr,   -- body of the function, whatever it is bound to - either App, or LetIns
       lambdaType :: Type,   -- type signature of the lambda
-      predicates :: [Pred]
+      lamPredicates :: [Pred]
     } 
   | Cons {
       consBoundVars :: Record, -- list of the bound variables that is simultaneously a returning Record!
@@ -82,9 +82,10 @@ data Expr =
       valueType    :: Type -- type of the record
     }
   | RecordAccess Expr [Name] -- Accessing fields of a record. r.address.city will be recorded as RecordAccess (VarId "r") ["address", "city"]
+  | Tuple ConsTag [Expr] Type 
   | Let Field -- simple binding x = g 4 -> (Name="x", Type = ToDerive, Value = App "g" 4)
   | LetIns [Field] Expr -- bindings "in" Expr; top level function definitions go here as well with EMPTY "in"
-  | App Expr Record -- tuple application mechanism (since even haskell eventually gets there!!!): Expr1 (Expr1,...,Exprn)
+  | App Expr [Expr] -- tuple application mechanism (since even haskell eventually gets there!!!): Expr1 (Expr1,...,Exprn)
   -- 1 occurence of pattern match
   -- since we are NOT repeating function name on the left side of the pattern match but put ONLY arguments there,
   -- first [Expr] here is simply a list of expressions to which lambda bound variables need to be evaluated!!!
