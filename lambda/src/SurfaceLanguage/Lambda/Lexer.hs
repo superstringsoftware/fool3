@@ -29,7 +29,7 @@ initialParserState = ParserState {
     currentArity = 0,
     currentLambdaName = "",
     insideTypeclass = False
-}
+} 
 
 -- helper functions to manipulate state
 setInsideTypeclass :: Bool -> Parser ()

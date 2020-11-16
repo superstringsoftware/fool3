@@ -45,6 +45,7 @@ data Type
   -- | TForall [Pred] [TVar] Type
   | THasFields [Field] -- special "constraint" type, for situations such as "print r.name + " " + show r.age" - then deduced type will be HasFields (name:String, age:exists Show a)
   | ToDerive -- added it to handle initial parsing
+  | SmallType -- synonim for Universe 0, since that's the most common type we'll use
   | Universe Int -- for types, following the Martin-Lof theory - "Universe 0" is "small types", so regular types etc.
   | TClass -- typeclass or type family
   deriving (Show, Eq)

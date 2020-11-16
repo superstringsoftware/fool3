@@ -39,6 +39,14 @@ data InterpreterState = InterpreterState {
     currentEnvironment :: Environment
 } deriving Show
 
+emptyIntState = InterpreterState {
+    currentFlags = CurrentFlags False True False,
+    parsedModule = [],
+    newParsedModule = [],
+    currentSource = "",
+    currentEnvironment = initialEnvironment
+}
+
 data CurrentFlags = CurrentFlags {
     strict    :: Bool -- true if strict, false if lazy
   , pretty    :: Bool -- pretty print or raw output

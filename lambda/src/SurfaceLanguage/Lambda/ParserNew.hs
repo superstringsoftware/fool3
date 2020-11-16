@@ -116,10 +116,11 @@ strictTypeSignature =
 typeSignature = try strictTypeSignature <|> pure ToDerive
 
 -- simply a name of type variable on the right of regular variable
+-- we are putting the type to SmallType (so, any regular type), but in the presence of predicates it will need to change
 typeVar :: Parser Type
 typeVar = do
   name <- lIdentifier
-  return $ TVar $ Var name ToDerive
+  return $ TVar $ Var name SmallType
 
 -- variable with type (or any identified for that matter, including function definitions)
 -- including operators
