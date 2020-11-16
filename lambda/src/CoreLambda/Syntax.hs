@@ -58,6 +58,16 @@ data Field = Field {
 type Record      = [Field]
 type TypedRecord = (Record, Type) -- record is the list of Fields and a Type of the record itself
 
+var2field :: Var -> Field
+var2field (Var n t) = Field n t EMPTY
+
+vars2record :: [Var] -> Record
+vars2record vs = map var2field vs
+
+isTConOrTApp (TCon _)   = True
+isTConOrTApp (TApp _ _) = True
+isTConOrTApp _          = False
+
 data Expr = 
     VarId Name
   | Lit Literal

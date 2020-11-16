@@ -7,6 +7,7 @@ where
 import Data.HashMap.Strict as Map
 
 import Core.Syntax
+import qualified CoreLambda.Syntax as CL
 import Data.Text
 import Data.Text.Lazy as TL
 
@@ -18,6 +19,7 @@ import Text.Pretty.Simple (pShow)
 type NameMap = HashMap Name
 
 type LTProgram = [(Expr, SourceInfo)]
+type CLProgram = [(CL.Expr, SourceInfo)]
 
 data TypeRep = LiftedTypeRep {
     name        :: Name, -- name of the type
