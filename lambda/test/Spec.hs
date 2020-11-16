@@ -61,8 +61,73 @@ lambdaParsingCases = [
                     ] ToDerive
                 } 
             )
-
+        ),
+        ("Parametric SumType (Maybe a)", "Maybe : Type = \\a . { Nothing, Just :a }", 
+            Let 
+            ( Field 
+                { fieldName = "Bool" 
+                , fieldType = SmallType 
+                , fieldValue = Tuple "" 
+                    [ Cons [] "True" ToDerive
+                    , Cons [] "False" ToDerive 
+                    ] ToDerive
+                } 
+            )
+        ),
+        ("Parametric SumType (Maybe a) defined as a pattern match", "Maybe a = { Nothing, Just :a }", 
+            Let 
+            ( Field 
+                { fieldName = "Bool" 
+                , fieldType = SmallType 
+                , fieldValue = Tuple "" 
+                    [ Cons [] "True" ToDerive
+                    , Cons [] "False" ToDerive 
+                    ] ToDerive
+                } 
+            )
+        ),
+        ("Type signature 0", "Bool : Type", VarDefinition ( Var "Bool" SmallType )),
+        ("Type signature 1", "Maybe : Type -> Type", VarDefinition ( Var "Maybe" ( TArr SmallType SmallType ))),
+        ("Type signature 2", "plus : Int -> Float -> Maybe a", 
+          VarDefinition 
+            ( Var "plus" 
+                ( TArr ( TCon "Int" ) 
+                    ( TArr ( TCon "Float" ) 
+                        ( TApp ( TCon "Maybe" ) 
+                            [ TVar ( Var "a" ToDerive ) ]
+                        )
+                    )
+                )
+            )
+        ),
+        ("Type signature 3", "length : List a -> Int", VarDefinition 
+            ( Var "length" 
+                ( TArr 
+                    ( TApp ( TCon "List" ) 
+                        [ TVar ( Var "a" ToDerive ) ]
+                    ) ( TCon "Int" )
+                )
+            )
+        ),
+        ("Type signature 4", "Pair : Type -> Type -> Type", VarDefinition 
+            ( Var "Pair" 
+                ( TArr SmallType ( TArr SmallType SmallType ) )
+            )
+        ),
+        ("Type signature 5", "Weird : Int -> Pair a b -> Type", VarDefinition 
+            ( Var "Weird" 
+                ( TArr ( TCon "Int" ) 
+                    ( TArr 
+                        ( TApp ( TCon "Pair" ) 
+                            [ TVar ( Var "a" ToDerive )
+                            , TVar ( Var "b" ToDerive )
+                            ] 
+                        ) SmallType
+                    )
+                )
+            )
         )
+
     ]
 
 runAllLPC = mapM_ runPTC lambdaParsingCases

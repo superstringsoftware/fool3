@@ -87,7 +87,7 @@ expr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.
 -- concrete type or type application
 typeAp :: Parser Type
 typeAp = do
-  tcon <- try (TCon <$> uIdentifier) <|> (TVar <$> variable)
+  tcon <- try concreteType <|> (TVar <$> variable)
   vars <- many $ try (TCon <$> uIdentifier) <|> try ( TVar <$> variable ) 
                  <|> try (parens typeAp) <|> (TExpr <$> argument)
   if null vars then return tcon -- concrete type
@@ -101,15 +101,19 @@ tArr = do
 
 -- concrete type only
 concreteType :: Parser Type
-concreteType = TCon <$> uIdentifier
+concreteType = do
+    nm <- uIdentifier
+    return $ if (nm == "Type") then SmallType else TCon nm 
 
 allTypes :: Parser Type
 allTypes = try typeAp <|> try concreteType <|> typeVar
 
 strictTypeSignature :: Parser Type
 strictTypeSignature =
+        try (reservedOp ":" *> tArr) <|>
         try (reservedOp ":" *> parens tArr) <|>
         try (reservedOp ":" *> parens typeAp) <|>
+        -- try (reservedOp ":" *> spaces *> string "Type" *> spaces *> return SmallType) <|> -- built in "Type" parsing as SmallType right away
         try (reservedOp ":" *> concreteType) <|>
         try (reservedOp ":" *> typeVar)
        
@@ -276,7 +280,9 @@ patternMatch = do
 binding :: Parser Expr
 binding = do
     var@(Var name tp) <- variable -- identifier
-    body <- (reservedOp "=" *> expr)
+    reservedOp "="
+    let bodyAction = if (tp /= SmallType) then expr else expr
+    body <- bodyAction
     return $ Let $ Field name tp body -- top level function, no "in" for LET
 
 
@@ -321,8 +327,8 @@ defn =  do
     expr <- try lambda
             -- <|> try anonConstructor
             <|> try binding
-            <|> patternMatch
-            -- <|> expr
+            <|> try patternMatch
+            <|> (VarDefinition <$> variable)
             <?> "lambda, binding, pattern match or expression"
     return expr
         
