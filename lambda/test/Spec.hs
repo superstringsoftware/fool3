@@ -126,7 +126,9 @@ lambdaParsingCases = [
                     )
                 )
             )
-        )
+        ),
+        ("Type signature 6", "map : (a->b) -> List a -> List b", EMPTY),
+        ("New function definition format", "map:(List b) { func:a->b, ls:List a } ", EMPTY)
 
     ]
 

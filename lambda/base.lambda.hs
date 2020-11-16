@@ -5,6 +5,35 @@ File to test all possible Syntaxis in parsing!
 -- Testing currently:
 Bool : Type = { True, False };
 
+-- map : (a->b) -> List a -> List b
+-- map func:(a->b) ls:(List a) -> List b
+#doc map = "function that takes a function from type a to b - func - and applies it to all ls list members"
+     func = ""
+#end
+map:(List b) { func:a->b, ls:List a } = {
+    _ [] -> [],
+    f (x::xs) -> (f x)::(map f xs)
+}
+plus2:Int { x:Int } = x + 2;
+Maybe:Type { a:Type } = { Nothing, Just :a }
+Semigroup:Class { a:Type } = {
+    (+):a { x, y : a },
+    associativity = x + (y + z) == (x + y) + z 
+}
+Person:Type = {
+    Person {
+        fname, lname : String,
+        age : Int,
+        dob : Date
+    }
+}
+Nil :(List a)
+Cons:(List a) { :a, :List a }
+Person:Person {
+    fname, lname : String,
+    age : Int,
+    dob : Date
+}
 
 {-
 
