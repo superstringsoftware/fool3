@@ -30,6 +30,63 @@ Compiler architecture for typed (supporting dependent types up to Calculus of Co
 - Everything is a tuple - or a typed record - represented as `{x1:t1, ... , xn:tn} : t`. This allows us to model algebraic data types, type functions, dependent types, type families etc - all using very similar syntax
 - Everything is a lambda abstraction - without any free variables in case of a constant
 
+## Formal(-ish) syntax description
+
+We will follow a unified approach to defining most of the language constracts, with the `tuple` mentioned above being the key element. This approach semi-formally can be described as follows.
+
+```Haskell
+-- The above is a top-level identifier for functions, types, data constructor functions, type classes etc. 
+<name>:<type> { name1:type1, ... , namen:typen }
+-- alternatively, we can combine several fields of the same type inside of a tuple:
+{ n1,n2,n3:t1, n4:t2, n5,n6:t3 } 
+
+-- Examples:
+-- function header:
+length:Int { ls:List a };
+-- function with body of pattern matches - also a Tuple! :
+map:(List b) { func:a->b, ls:List a } = {
+    _ [] -> [],
+    f (x::xs) -> (f x)::(map f xs)
+};
+-- when there's only one function body:
+plus2:Int { x:Int } = x + 2; 
+-- sum types:
+Bool:Type {} = { True, False };
+Maybe:Type { a:Type } = { Nothing, Just :a };
+List:Type { a:Type } = { ([]), (::) :a :(List a) };
+Either:Type { a, b : Type } = { Left :a, Right :b };
+Pair:Type { a, b : Type } = { Pair :a :b };
+-- records:
+-- simplified (one-constructor type)
+Person:Person {
+    fname, lname : String,
+    age : Int,
+    dob : Date
+}
+-- full definition for the same type:
+Person:Type = {
+    Person {
+        fname, lname : String,
+        age : Int,
+        dob : Date
+    }
+}
+-- constructor functions "gadt-style":
+Nil :(List a)
+Cons:(List a) { :a, :List a }
+-- typeclasses
+Semigroup:Class { a:Type } = {
+    (+):a { x, y : a },
+    associativity = x + (y + z) == (x + y) + z 
+}
+-- predicates go in the first place always:
+∃ Semigroup a => Monoid:Class { a } = {
+    E0:a
+};
+
+```
+
+## Various language constructs examples
 This approach gives rise to a very powerful language expressed via very simple concepts. Let's jump in!
 
 ### Algebraic datatypes
