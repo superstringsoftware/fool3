@@ -28,6 +28,35 @@ lambdaParsingCases = [
                     )
                 ) 
         ),
+        ("", "map:(a->b) -> List a -> List b", EMPTY),
+        ("", "map:(List b) {func:(a->b), ls:(List a)}", Binding 
+            ( Var "map" 
+                ( TApp ( TCon "List" ) 
+                    [ TVar ( Var "b" ToDerive ) ]
+                )
+            ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "func" 
+                        , fieldType = TArr 
+                            ( TVar ( Var "a" ToDerive ) ) 
+                            ( TVar ( Var "b" ToDerive ) )
+                        , fieldValue = EMPTY
+                        } 
+                    , Field 
+                        { fieldName = "ls" 
+                        , fieldType = TApp ( TCon "List" ) 
+                            [ TVar ( Var "a" ToDerive ) ]
+                        , fieldValue = EMPTY
+                        } 
+                    ] 
+                , body = EMPTY
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
         ("Untyped pattern match with 2 variables", "map _ [] = []", PatternMatch 
             [ App ( VarId "map" ) 
                 [ VarId "_" 
