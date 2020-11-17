@@ -241,6 +241,7 @@ instance PrettyPrint Type where
   ppr (TApp con args) = "(" ++ ppr con ++ " " ++ (showListPlain ppr args) ++ ")"
   ppr (TVar n) = ppr n
   ppr (Universe n) = as [bold,lyellow] $ "U" ++ (show n)
+  ppr (TArr t1 t2) = ppr t1 ++ "->" ++ ppr t2
   ppr SmallType = as [bold,lyellow] "Type"
   ppr e = show e
 

@@ -213,7 +213,191 @@ lambdaParsingCases = [
                 } 
             )
         ),
-        ("", "func : Int -> List a -> Type", EMPTY)
+        ("", "func : Int -> List a -> Type", VarDefinition 
+            ( Var "func" 
+                ( TArr ( TCon "Int" ) 
+                    ( TArr 
+                        ( TApp ( TCon "List" ) 
+                            [ TVar ( Var "a" ToDerive ) ]
+                        ) SmallType
+                    )
+                )
+            )
+        ),
+        ("", "Semigroup : Class { a } = { (+):a { :a, :a } }", Binding 
+            ( Var "Semigroup" ( TCon "Class" ) ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "+" 
+                        , fieldType = TVar ( Var "a" ToDerive )
+                        , fieldValue = Lam 
+                            ( Lambda 
+                                { params = 
+                                    [ Field 
+                                        { fieldName = "" 
+                                        , fieldType = TVar ( Var "a" ToDerive )
+                                        , fieldValue = EMPTY
+                                        } 
+                                    , Field 
+                                        { fieldName = "" 
+                                        , fieldType = TVar ( Var "a" ToDerive )
+                                        , fieldValue = EMPTY
+                                        } 
+                                    ] 
+                                , body = EMPTY
+                                , sig = ToDerive
+                                , preds = []
+                                } 
+                            )
+                        } 
+                    ]
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("", "Semigroup : Class { a } = { (+):a->a->a }", Binding 
+            ( Var "Semigroup" ( TCon "Class" ) ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "+" 
+                        , fieldType = TArr 
+                            ( TVar ( Var "a" ToDerive ) ) 
+                            ( TArr 
+                                ( TVar ( Var "a" ToDerive ) ) 
+                                ( TVar ( Var "a" ToDerive ) )
+                            )
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("", "∃ Semigroup a => Monoid : Class { a } = { E0:a } ", Binding 
+            ( Var "Monoid" ( TCon "Class" ) ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "E0" 
+                        , fieldType = TVar ( Var "a" ToDerive )
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , sig = ToDerive
+                , preds = 
+                    [ Exists 
+                        ( TApp ( TCon "Semigroup" ) 
+                            [ TVar ( Var "a" ToDerive ) ]
+                        )
+                    ]
+                } 
+            )
+        ),
+        ("", "∃ Semigroup a => Monoid {a} = { E0:a } ", Binding ( Var "Monoid" ToDerive ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "E0" 
+                        , fieldType = TVar ( Var "a" ToDerive )
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , sig = ToDerive
+                , preds = 
+                    [ Exists 
+                        ( TApp ( TCon "Semigroup" ) 
+                            [ TVar ( Var "a" ToDerive ) ]
+                        )
+                    ]
+                } 
+            )
+        ),
+        ("Dependent type", "VectorN:Type {a:Type, n:Int} = { VectorN { data:(Array a n), size = n } } ", Binding ( Var "VectorN" SmallType ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = SmallType
+                        , fieldValue = EMPTY
+                        } 
+                    , Field 
+                        { fieldName = "n" 
+                        , fieldType = TCon "Int" 
+                        , fieldValue = EMPTY
+                        } 
+                    ] 
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "VectorN" 
+                        , fieldType = ToDerive
+                        , fieldValue = Lam 
+                            ( Lambda 
+                                { params = 
+                                    [ Field 
+                                        { fieldName = "data" 
+                                        , fieldType = TApp ( TCon "Array" ) 
+                                            [ TVar ( Var "a" ToDerive )
+                                            , TVar ( Var "n" ToDerive )
+                                            ] 
+                                        , fieldValue = EMPTY
+                                        } 
+                                    , Field 
+                                        { fieldName = "size" 
+                                        , fieldType = ToDerive
+                                        , fieldValue = Lam 
+                                            ( Lambda 
+                                                { params = []
+                                                , body = VarId "n" 
+                                                , sig = ToDerive
+                                                , preds = []
+                                                } 
+                                            )
+                                        } 
+                                    ] 
+                                , body = EMPTY
+                                , sig = ToDerive
+                                , preds = []
+                                } 
+                            )
+                        } 
+                    ]
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        )
     ] 
 
 
