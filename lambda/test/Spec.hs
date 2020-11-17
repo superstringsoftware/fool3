@@ -28,7 +28,42 @@ lambdaParsingCases = [
                     )
                 ) 
         ),
-        ("", "map:(a->b) -> List a -> List b", EMPTY),
+        ("", "map: a->b -> List a -> List b", VarDefinition 
+            ( Var "map" 
+                ( TArr 
+                    ( TVar ( Var "a" ToDerive ) ) 
+                    ( TArr 
+                        ( TVar ( Var "b" ToDerive ) ) 
+                        ( TArr 
+                            ( TApp ( TCon "List" ) 
+                                [ TVar ( Var "a" ToDerive ) ]
+                            ) 
+                            ( TApp ( TCon "List" ) 
+                                [ TVar ( Var "b" ToDerive ) ]
+                            )
+                        )
+                    )
+                )
+            )
+        ),
+        ("", "map: (a->b) -> List a -> List b", VarDefinition 
+            ( Var "map" 
+                ( TArr 
+                    ( TVar ( Var "a" ToDerive ) ) 
+                    ( TArr 
+                        ( TVar ( Var "b" ToDerive ) ) 
+                        ( TArr 
+                            ( TApp ( TCon "List" ) 
+                                [ TVar ( Var "a" ToDerive ) ]
+                            ) 
+                            ( TApp ( TCon "List" ) 
+                                [ TVar ( Var "b" ToDerive ) ]
+                            )
+                        )
+                    )
+                )
+            )
+        ),
         ("", "map:(List b) {func:(a->b), ls:(List a)}", Binding 
             ( Var "map" 
                 ( TApp ( TCon "List" ) 
@@ -421,6 +456,70 @@ lambdaParsingCases = [
                                 } 
                             )
                         } 
+                    ]
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("","l = [1,3,4]", Binding ( Var "l" ToDerive ) 
+            ( Lambda 
+                { params = []
+                , body = Lit 
+                    ( LList 
+                        [ Lit ( LInt 1 )
+                        , Lit ( LInt 3 )
+                        , Lit ( LInt 4 )
+                        ] 
+                    )
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("","l = <1,3,4>", Binding ( Var "l" ToDerive ) 
+            ( Lambda 
+                { params = []
+                , body = Lit 
+                    ( LVec 
+                        [ Lit ( LInt 1 )
+                        , Lit ( LInt 3 )
+                        , Lit ( LInt 4 )
+                        ] 
+                    )
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("Complex record expression", "rr = Test.(f x).name (pers.name.other + tt.name.nam2 arg arg2)", Binding ( Var "rr" ToDerive ) 
+            ( Lambda 
+                { params = []
+                , body = App 
+                    ( RecordAccess 
+                        [ VarId "Test" 
+                        , App ( VarId "f" ) [ VarId "x" ]
+                        , VarId "name" 
+                        ] 
+                    ) 
+                    [ BinaryOp "+" 
+                        ( RecordAccess 
+                            [ VarId "pers" 
+                            , VarId "name" 
+                            , VarId "other" 
+                            ] 
+                        ) 
+                        ( App 
+                            ( RecordAccess 
+                                [ VarId "tt" 
+                                , VarId "name" 
+                                , VarId "nam2" 
+                                ] 
+                            ) 
+                            [ VarId "arg" 
+                            , VarId "arg2" 
+                            ] 
+                        )
                     ]
                 , sig = ToDerive
                 , preds = []

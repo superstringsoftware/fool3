@@ -167,6 +167,7 @@ pContainers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
 
 pArg :: Parser Expr
 pArg = try pContainers
+    <|> try pRecordAccess
     <|> try (parens pExpr)
     -- <|> try typedId
     <|> try (Lit <$> floating)
@@ -181,6 +182,13 @@ pArgs = do
     --return $ foldl1 App args -- need to use left fold here because application is highest precedence
     let er = if (xs == []) then f else (App f xs)
     return er
+
+pRecordAccess :: Parser Expr
+pRecordAccess = do
+    arg <- try (parens pExpr) <|> (VarId <$> identifier)
+    char '.'
+    args <- sepBy1 (try (parens pExpr) <|> VarId <$> identifier) (char '.' )
+    return $ RecordAccess (arg:args)
 
 -- Building top level parsers
 pDef :: Parser Expr

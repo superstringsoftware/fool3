@@ -117,7 +117,7 @@ data Expr =
       valueType    :: Type -- type of the record
     }
   | VarDefinition Var -- for standalone type signatures for functions and other symbols, e.g. fact : Int -> Int etc
-  | RecordAccess Expr [Name] -- Accessing fields of a record. r.address.city will be recorded as RecordAccess (VarId "r") ["address", "city"]
+  | RecordAccess [Expr] -- Accessing fields of a record. r.address.city will be recorded as RecordAccess (VarId "r") ["address", "city"]
   | Tuple ConsTag [Expr] Type 
   | Let Field -- simple binding x = g 4 -> (Name="x", Type = ToDerive, Value = App "g" 4)
   | LetIns [Field] Expr -- bindings "in" Expr; top level function definitions go here as well with EMPTY "in"
