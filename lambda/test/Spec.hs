@@ -289,7 +289,7 @@ lambdaParsingCases = [
             )
         ),
         ("", "Semigroup : Class { a } = { (+):a { :a, :a } }", Binding 
-            ( Var "Semigroup" ( TCon "Class" ) ) 
+            ( Var "Semigroup" TClass ) 
             ( Lambda 
                 { params = 
                     [ Field 
@@ -329,7 +329,7 @@ lambdaParsingCases = [
             )
         ),
         ("", "Semigroup : Class { a } = { (+):a->a->a }", Binding 
-            ( Var "Semigroup" ( TCon "Class" ) ) 
+            ( Var "Semigroup" TClass ) 
             ( Lambda 
                 { params = 
                     [ Field 
@@ -356,7 +356,7 @@ lambdaParsingCases = [
             )
         ),
         ("", "∃ Semigroup a => Monoid : Class { a } = { E0:a } ", Binding 
-            ( Var "Monoid" ( TCon "Class" ) ) 
+            ( Var "Monoid" TClass ) 
             ( Lambda 
                 { params = 
                     [ Field 

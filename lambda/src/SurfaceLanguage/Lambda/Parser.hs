@@ -267,7 +267,8 @@ tArr = do
 concreteType :: Parser Type
 concreteType = do
     nm <- uIdentifier
-    return $ if (nm == "Type") then SmallType else TCon nm 
+    return $ if (nm == "Type") then SmallType 
+             else if (nm == "Class") then TClass else TCon nm 
 
 allTypes :: Parser Type
 allTypes = try typeAp <|> try concreteType <|> typeVar

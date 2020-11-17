@@ -55,6 +55,8 @@ lblue       = "\ESC[94m"
 lmagenta    = "\ESC[95m"
 lcyan       = "\ESC[96m"
 white       = "\ESC[97m"
+
+c256 n      = "\ESC[38;5;" ++ show n ++ "m"
         
 ansifyString :: [String] -> String -> String
 ansifyString params s = join params ++ s ++ reset

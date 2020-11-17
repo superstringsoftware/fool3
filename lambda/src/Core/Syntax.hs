@@ -216,7 +216,8 @@ instance PrettyPrint Type where
   ppr (TVar n) = ppr n
   ppr (Universe n) = as [bold,lyellow] $ "U" ++ (show n)
   ppr (TArr t1 t2) = ppr t1 ++ "->" ++ ppr t2
-  ppr SmallType = as [bold,lyellow] "Type"
+  ppr SmallType = as [bold,c256 202] "Type"
+  ppr TClass = as [bold,c256 204] "Class"
   ppr e = show e
 
 pprTypeOnly ToDerive = ""

@@ -43,7 +43,7 @@ Semigroup:Class { a:Type } = {
     associativity = x + (y + z) == (x + y) + z 
 };
 
-∃ Semigroup a => Monoid {a} = { E0:a };
+∃ Semigroup a => Monoid:Class {a} = { E0:a };
 
 Semigroup Int = {
     (+) = primPlusInt
