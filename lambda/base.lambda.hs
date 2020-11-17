@@ -9,6 +9,7 @@ id x = x;
 Bool     : Type = { True, False };
 Ordering : Type = { LT, EQ, GT  };
 Maybe    : Type { a:Type } = { Nothing, Just { :a } };
+List     : Type { a:Type } = { Nil, (::) { head:a, tail:(List a) } };
 
 not True  = False;
 not False = True;

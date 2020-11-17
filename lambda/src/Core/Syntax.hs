@@ -120,7 +120,9 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
 
 data PrimOp = PPlus | PMinus | PMul | PDiv deriving (Show, Eq)
 
--- the very first pass that we run right after parsing the source file               
+-- the very first pass that we run right after parsing the source file    
+-- beyond some desugaring it also reverses the order of statements and brings it to the correct one we need for 
+-- the environment building pass           
 afterparse :: Expr -> Expr
 -- this is a hack for 'built in' operators, needs to go once Classes are supported!!!
 {-
@@ -130,8 +132,6 @@ afterparse e@(BinaryOp "*" _ _) = e
 afterparse e@(BinaryOp "/" _ _) = e
 
 -- end of the hack
-afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):[])
-afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
 -- top level binding: this is a DATA CONSTRUCTOR (unnamed tuple, bound to typed var) - crazy pattern, need to simplify
 -- we are naming the tuple and assigning it's type to var type, since that's how types are being created
 afterparse (Let (( v@(Var n typ) , (Tuple "" args ToDerive) ):[]) EMPTY ) = Let [(v, Tuple n (map afterparse args) typ )] EMPTY 
@@ -144,6 +144,15 @@ afterparse (Let bnds ex) = Let (map ( \(v,e)-> (v,afterparse e) ) bnds ) (afterp
 afterparse (PatternMatch args e2) = PatternMatch (map afterparse args) (afterparse e2)
 afterparse (Patterns exs) = Patterns (map afterparse exs)
 -}
+afterparse (Binding v (Lambda p ex t pr) ) = (Binding v (Lambda p (afterparse ex) t pr) )
+afterparse (Lam (Lambda p ex t pr)) = Lam (Lambda p (afterparse ex) t pr)
+afterparse (Rec recr) = Rec (map fn recr) where fn f@(Field _ _ ex) = f {fieldValue = afterparse ex}
+afterparse (RecordAccess exs) = RecordAccess (map afterparse exs)
+afterparse (App ex exs) = App (afterparse ex) (map afterparse exs)
+afterparse (PatternMatch exs ex) = PatternMatch (map afterparse exs) (afterparse ex)
+afterparse (Patterns exs) = Patterns (map afterparse exs)
+afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):[])
+afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
 afterparse e = e
 
 {-
