@@ -63,7 +63,7 @@ data Lambda = Lambda {
     params :: Record -- {x1:t1 = v1, ..., xn:tn = vn} - supporting default values
   , body   :: Expr -- whatever our lambda is bound to
   , sig    :: Type -- full type signature
-  , pred   :: [Pred] -- rank-1 predicates (related to the whole type signature)
+  , preds  :: [Pred] -- rank-1 predicates (related to the whole type signature)
 } deriving (Show, Eq)
 
 
@@ -255,6 +255,7 @@ instance PrettyPrint Expr where
   ppr (VarId v) = v
   ppr (Binding v lam) = ppr v ++ " " ++ ppr lam
   ppr (Lam lam) = ppr lam
+  ppr (VarDefinition v) = ppr v
   ppr (Rec r) = ppr r
   -- ppr (Let ((v,e):[]) _ ) = ppr v ++ " = " ++ ppr e
   -- ppr (Lam vars expr tp preds) = ppr preds ++ (as [bold,lgray] "λ ") ++ (showListPlain ppr vars) ++ " . " ++ ppr expr

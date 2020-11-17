@@ -97,19 +97,24 @@ pVar = do
   typ <- typeSignature
   return $ Var name typ
 
+pAnonVar :: Parser Var
+pAnonVar = do
+    typ <- strictTypeSignature
+    return $ Var "" typ
+
 -- x:t [= <expr>] -- single field parser
 pField :: Parser Field
 pField = do
     bind <- try pTopLevelBinding <|> pure EMPTY
     if (bind == EMPTY) then do
-            (Var nm tp) <- pVar
+            (Var nm tp) <- (try pVar <|> pAnonVar)
             ex  <- try (reservedOp "=" *> pExpr) <|> pure EMPTY
             return $ Field nm tp ex
     else return $ binding2field bind
 
 -- parsing a record within {}
 pFields :: Parser Record
-pFields = braces (sepBy1 pField (reservedOp ",") )
+pFields = braces (sepBy pField (reservedOp ",") )
 
 
 -- Parser doing the top-level expression parsing for most of the definitions, excluding pattern match
@@ -156,13 +161,14 @@ pContainers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
             args <- brackets (commaSep expr)
             return $ Lit $ LList args
         <|> (try pFields >>= \args -> return (Rec args))
-        <|> try (braces (commaSep expr) >>= \args -> return $ Rec $ recordFromExprs args)
+        -- <|> try (braces (commaSep pAnonVar) >>= \args -> return $ Rec $ vars2record args)
+        <|> try (braces (commaSep pExpr) >>= \args -> return $ Rec $ recordFromExprs args)
         <|> (angles (commaSep factor)  >>= \args -> return (Lit $ LVec args))
 
 pArg :: Parser Expr
 pArg = try pContainers
     <|> try (parens pExpr)
-    <|> try typedId
+    -- <|> try typedId
     <|> try (Lit <$> floating)
     <|> try (Lit <$> int)
     <|> try (Lit <$> stringVal)

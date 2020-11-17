@@ -1,17 +1,17 @@
 import Util.PrettyPrinting as TC
-import SurfaceLanguage.Lambda.ParserNew
+import SurfaceLanguage.Lambda.Parser
 import Data.Text
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (liftIO)
 import State
-import CoreLambda.Syntax
+import Core.Syntax
 import Text.Pretty.Simple (pShow)
 
 import qualified Data.Text.Lazy as TL
 
 main :: IO ()
 main = do
-    putStrLn "\nRunning Lambda Parsing Test Cases\n\n"
+    putStrLn "\n\nRunning Lambda Parsing Test Cases\n"
     runAllLPC
 
 -------------------- NEW SYNTAXIS: TESTING LAMBDA PARSING --------------------
@@ -27,7 +27,193 @@ lambdaParsingCases = [
                     ]
                     )
                 ) 
-        )
+        ),
+        ("Untyped pattern match with 2 variables", "map _ [] = []", PatternMatch 
+            [ App ( VarId "map" ) 
+                [ VarId "_" 
+                , Lit ( LList [] )
+                ] 
+            ] 
+            ( Lit ( LList [] ) )),
+        -- ("Untyped pattern match with 2 variables", "map f x1 = (f x):::(map f xs)", EMPTY),
+        ("Untyped pattern match with 2 variables", "map f (x::xs) = (f x)::(map f xs)", PatternMatch 
+            [ App ( VarId "map" ) 
+                [ VarId "f" 
+                , BinaryOp "::" ( VarId "x" ) ( VarId "xs" )
+                ] 
+            ] 
+            ( BinaryOp "::" 
+                ( App ( VarId "f" ) [ VarId "x" ] ) 
+                ( App ( VarId "map" ) 
+                    [ VarId "f" 
+                    , VarId "xs" 
+                    ] 
+                )
+            )
+        ),
+        ("", "Bool:Type = {True, False}", Binding ( Var "Bool" SmallType ) 
+            ( Lambda 
+                { params = []
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "True" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    , Field 
+                        { fieldName = "False" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    ] 
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        -- ("", "Maybe:Type { a } = { Nothing, Just :a }", EMPTY),
+        ("", "Maybe:Type { a:Type } = { Nothing, Just { :a } }", Binding ( Var "Maybe" SmallType ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = SmallType
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "Nothing" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    , Field 
+                        { fieldName = "Just" 
+                        , fieldType = ToDerive
+                        , fieldValue = Lam 
+                            ( Lambda 
+                                { params = 
+                                    [ Field 
+                                        { fieldName = "" 
+                                        , fieldType = TVar ( Var "a" ToDerive )
+                                        , fieldValue = EMPTY
+                                        } 
+                                    ]
+                                , body = EMPTY
+                                , sig = ToDerive
+                                , preds = []
+                                } 
+                            )
+                        } 
+                    ] 
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("", "Maybe:Type { a } = { Nothing {}, Just { :a } }", Binding ( Var "Maybe" SmallType ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "Nothing" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    , Field 
+                        { fieldName = "Just" 
+                        , fieldType = ToDerive
+                        , fieldValue = Lam 
+                            ( Lambda 
+                                { params = 
+                                    [ Field 
+                                        { fieldName = "" 
+                                        , fieldType = TVar ( Var "a" ToDerive )
+                                        , fieldValue = EMPTY
+                                        } 
+                                    ]
+                                , body = EMPTY
+                                , sig = ToDerive
+                                , preds = []
+                                } 
+                            )
+                        } 
+                    ] 
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        -- ("", "Maybe:Type { a } = { Nothing:Maybe a, Just:(Maybe a) x:a }", EMPTY),
+        ("", "plus2:Int { x:Int } = x + 2", Binding 
+            ( Var "plus2" ( TCon "Int" ) ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "x" 
+                        , fieldType = TCon "Int" 
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = BinaryOp "+" ( VarId "x" ) 
+                    ( Lit ( LInt 2 ) )
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("", "List:Type { a } = { Nil, Just {:a, :(List a) } }", Binding ( Var "List" SmallType ) 
+            ( Lambda 
+                { params = 
+                    [ Field 
+                        { fieldName = "a" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    ]
+                , body = Rec 
+                    [ Field 
+                        { fieldName = "Nil" 
+                        , fieldType = ToDerive
+                        , fieldValue = EMPTY
+                        } 
+                    , Field 
+                        { fieldName = "Just" 
+                        , fieldType = ToDerive
+                        , fieldValue = Lam 
+                            ( Lambda 
+                                { params = 
+                                    [ Field 
+                                        { fieldName = "" 
+                                        , fieldType = TVar ( Var "a" ToDerive )
+                                        , fieldValue = EMPTY
+                                        } 
+                                    , Field 
+                                        { fieldName = "" 
+                                        , fieldType = TApp ( TCon "List" ) 
+                                            [ TVar ( Var "a" ToDerive ) ]
+                                        , fieldValue = EMPTY
+                                        } 
+                                    ] 
+                                , body = EMPTY
+                                , sig = ToDerive
+                                , preds = []
+                                } 
+                            )
+                        } 
+                    ] 
+                , sig = ToDerive
+                , preds = []
+                } 
+            )
+        ),
+        ("", "func : Int -> List a -> Type", EMPTY)
     ] 
 
 
@@ -43,8 +229,14 @@ assertParseError (Right e) e1 = if (e == e1) then (True, TC.as [green] ("OK"))
 
 -- run one test case
 runPTC (name, str, expr) = do
+    res <- parseLambda str
+    let (success, msg) = assertParseError res expr
+    if success then putStrLn $ TC.as [green] ("OK") ++ ": " ++ TC.as [dim] str
+               else putStrLn $ TC.as [red] ("FAILED: ") ++ str ++ "\n" ++ msg
+
+runPTClong (name, str, expr) = do
     let output = TC.as [bold] name
     res <- parseLambda str
     let (success, msg) = assertParseError res expr
-    if success then putStrLn $ output ++ ": " ++ TC.as [green] ("OK")
+    if success then putStrLn $ output ++ ": " ++ TC.as [green] ("OK") ++ TC.as [dim] (" (" ++ str ++ ")")
                else putStrLn $ output ++ ": " ++ TC.as [red] ("FAILED\n") ++ "Parsing expression:\n" ++ str ++ "\n" ++ msg

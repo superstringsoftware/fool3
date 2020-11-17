@@ -5,6 +5,18 @@ File to test all possible Syntaxis in parsing!
 
 
 -- map:(List b) func:(a->b) ls:(List a) = x;
+plus2:Int { x:Int } = x + 2;
+func : Int -> List a -> Type;
+
+{- 
+
+
+Semigroup:Class { a:Type } = {
+    (+):a { x, y : a },
+    associativity = x + (y + z) == (x + y) + z 
+};
+
+
 
 -- Testing currently:
 Bool : Type = { True, False };
@@ -19,10 +31,6 @@ fact n = n * fact (n - 1);
 
 Maybe:Type { a:Type } = { Nothing, Just :a };
 
-Semigroup:Class { a:Type } = {
-    (+):a { x, y : a },
-    associativity = x + (y + z) == (x + y) + z 
-};
 
 l = [1,3,4];
 v = <1,3,4>;

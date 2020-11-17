@@ -74,7 +74,7 @@ emptyDef    = Tok.LanguageDef
 lexer :: TokenParserIS ParserState
 lexer = Tok.makeTokenParser style
     where
-    ops = [";","=",",",".",":", "::", "->", "=>", "<",">", "|", "?", "<:", "\\"]
+    ops = [";","=",",",".",":", "->", "=>", "<",">", "|", "?", "<:", "\\"]
     names = ["instance","extern","if","then","else","in",
             "let", "class", "case", "of", "type", "where", "∃", "∀", "exists", "forall"]
     style = emptyDef {
