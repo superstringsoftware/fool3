@@ -31,7 +31,7 @@ interpretExpr ex@(VarId n) = do
     maybe ((trace $ "Expression named '" ++ n ++ "' not found.") >> pure ex)
           (\(_,e) -> trace (ppr e) >> pure e)
           (Map.lookup n (lambdas env))
-interpretExpr e@(Tuple _ _ _) = (trace $ (ppr e)) >> pure e
+-- interpretExpr e@(Tuple _ _ _) = (trace $ (ppr e)) >> pure e
 -- Application - the most interesting (or the only for that matter)
 interpretExpr ex@(App (VarId n) args) = do
     env <- currentEnvironment <$> get

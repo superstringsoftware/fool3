@@ -95,31 +95,9 @@ data Expr =
   -}
   | Binding Var Lambda
   | Lam Lambda
-  {-| 
-    Predicates here apply to the whole function, for rank-n need to use HighVar in Type
-    "normal" functions expression will be either 'Let' (with in non-EMPTY!) or 'App'
-  -}
-  | LamOld {
-      boundVars  :: Record, -- list of the bound variables, possibly with default values
-      lambdaBody :: Expr,   -- body of the function, whatever it is bound to - either App, or LetIns
-      lambdaType :: Type,   -- type signature of the lambda
-      lamPredicates :: [Pred]
-    } 
-  | Cons {
-      consBoundVars :: Record, -- list of the bound variables that is simultaneously a returning Record!
-      consTag  :: ConsTag, -- constructor tag
-      consType :: Type -- type this constructor belongs to
-    }
   | Rec Record
-  | Value {
-      valueRecord  :: Record, -- record of the value
-      valueConsTag :: ConsTag, -- constructor tag used to create the record
-      valueType    :: Type -- type of the record
-    }
   | VarDefinition Var -- for standalone type signatures for functions and other symbols, e.g. fact : Int -> Int etc
   | RecordAccess [Expr] -- Accessing fields of a record. r.address.city will be recorded as RecordAccess (VarId "r") ["address", "city"]
-  | Tuple ConsTag [Expr] Type 
-  | Let Field -- simple binding x = g 4 -> (Name="x", Type = ToDerive, Value = App "g" 4)
   | LetIns [Field] Expr -- bindings "in" Expr; top level function definitions go here as well with EMPTY "in"
   | App Expr [Expr] -- tuple application mechanism (since even haskell eventually gets there!!!): Expr1 (Expr1,...,Exprn)
   -- 1 occurence of pattern match
@@ -195,10 +173,6 @@ traverseModify' f (Let bnds ex)         = f $ Let (map (fn f) bnds) (traverseMod
 traverseModify' f e = f e
 -}
 
--- check if tuple is anonymous, need it for some passes
-isAnonymousTuple (Tuple "" _ _) = True
-isAnonymousTuple _ = False
-
 
 instance PrettyPrint Field where
   ppr (Field fn ft EMPTY) = fn ++ pprTypeOnly ft
@@ -262,7 +236,7 @@ instance PrettyPrint Expr where
   -- ppr (Lam vars expr tp preds) = ppr preds ++ (as [bold,lgray] "λ ") ++ (showListPlain ppr vars) ++ " . " ++ ppr expr
   ppr (BinaryOp n e1 e2) = ppr e1 ++ " " ++ n ++ " " ++ ppr e2
   ppr (UnaryOp n e) = n ++ ppr e
-  ppr (Tuple cons exprs typ) = cons ++ (showListCuBr ppr exprs) ++ " : " ++ ppr typ
+  -- ppr (Tuple cons exprs typ) = cons ++ (showListCuBr ppr exprs) ++ " : " ++ ppr typ
   ppr (App f args) = (ppr f) ++ " " ++ (showListRoBrPlain ppr args)
   ppr (Patterns ps) = showListCuBr ppr1 ps
       where ppr1 (PatternMatch args e2) = (showListPlain ppr args) ++ " -> " ++ ppr e2

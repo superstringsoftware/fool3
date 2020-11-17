@@ -65,7 +65,7 @@ processOneBinding (ex, si) _ = Left $ LogPayload
 -- at this point, data constructor is either Lam ... Tuple or just Tuple, in the latter case it must be empty.
 addDataConstructor :: Expr -> Environment -> Either LogPayload Environment
 -- addDataConstructor e@(Lam vars (Tuple constag exs typ) typlam preds) env = _addDataConstructor e typ env
-addDataConstructor e@(Tuple constag exs typ) env = _addDataConstructor e typ env
+-- addDataConstructor e@(Tuple constag exs typ) env = _addDataConstructor e typ env
 addDataConstructor e _ = Left $ LogPayload 
     0 0 ""
     ("Tried to add data constructor to the typing environment, but the expression is a " ++ ppr e)
