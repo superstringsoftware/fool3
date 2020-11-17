@@ -80,6 +80,10 @@ isTConOrTApp _          = False
 binding2field (Binding (Var nm tp) (Lambda [] EMPTY _ _)) = Field nm tp EMPTY
 binding2field (Binding (Var nm tp) lam) = Field nm tp (Lam lam)
 
+-- converts a list of expressions to a record - need it for parsing 
+recordFromExprs :: [Expr] -> Record
+recordFromExprs exs = map (\ex -> Field "" ToDerive ex) exs
+
 data Expr = 
     VarId Name
   | Lit Literal

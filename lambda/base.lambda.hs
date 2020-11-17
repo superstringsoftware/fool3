@@ -2,12 +2,19 @@
 File to test all possible Syntaxis in parsing!
 -}
 
+
+
+-- map:(List b) func:(a->b) ls:(List a) = x;
+
 -- Testing currently:
 Bool : Type = { True, False };
 
 plus2:Int { x:Int } = x + 2;
 square { x } = x * x;
 (+):a { x:a, y : a };
+
+fact 0 = 1;
+fact n = n * fact (n - 1);
 
 
 Maybe:Type { a:Type } = { Nothing, Just :a };
@@ -16,6 +23,18 @@ Semigroup:Class { a:Type } = {
     (+):a { x, y : a },
     associativity = x + (y + z) == (x + y) + z 
 };
+
+l = [1,3,4];
+v = <1,3,4>;
+f = {1,3,v, 2+2};
+
+Empty:Type;
+
+Z:Nat;
+S:Nat { v:Nat };
+
+Nat:Type = {Z, S = { x:Nat } };
+
 
 map:(List b) { func:a->b, ls:List a } = {
     _ [] -> [],

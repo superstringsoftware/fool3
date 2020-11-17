@@ -73,12 +73,15 @@ Parsing:
 That's it! Should be very clean.
 -}
 
+dbg msg = liftIO $ putStrLn msg
 -- Starting with Predicates parser:
 pPreds :: Parser [Pred]
 pPreds = do
+    --dbg "pPreds started"
     try (reserved "exists") <|> reserved "∃"
     preds <- try (parens (sepBy1 pPred (reservedOp ",") )) <|> (pPred >>= \p -> pure [p])
     reservedOp "=>"
+    -- dbg "pPreds finished"
     return preds
 
 pPred :: Parser Pred
@@ -109,21 +112,43 @@ pFields :: Parser Record
 pFields = braces (sepBy1 pField (reservedOp ",") )
 
 
--- Parser doing the top-level expression parsing, our MAIN workhorse
-pTopLevelBinding :: Parser Expr
-pTopLevelBinding = do
+-- Parser doing the top-level expression parsing for most of the definitions, excluding pattern match
+pBindingWithArgs :: Parser Expr
+pBindingWithArgs = do
+    -- dbg "pTopLevelBinding started"
     preds <- try pPreds <|> pure [] -- optional predicates
-    var <- pVar -- mandatory identificator
-    args <- try pFields <|> pure [] -- optional arguments record
-    ex  <- try (reservedOp "=" *> pExpr) <|> pure EMPTY -- trying to parse the body
+    var   <- pVar -- mandatory identificator
+    args  <- pFields -- arguments record
+    ex    <- try (reservedOp "=" *> pExpr) <|> pure EMPTY -- trying to parse the body
+    -- dbg "pTopLevelBinding ended"
     return $ Binding var (Lambda args ex ToDerive preds)
+
+pBindingNoArgs :: Parser Expr
+pBindingNoArgs = do
+    var   <- pVar -- mandatory identificator
+    ex    <- (reservedOp "=" *> pExpr) -- parse the body
+    return $ Binding var (Lambda [] ex ToDerive [])
+
+
+pTopLevelBinding :: Parser Expr
+pTopLevelBinding = try pBindingWithArgs <|> pBindingNoArgs 
+
+-- top-level pattern match, like in Haskell
+pTopLevelPatternMatch :: Parser Expr
+pTopLevelPatternMatch = do
+    --dbg "pPatternMatch started"
+    h <- pArgs <?> "pArgs in pattern match"
+    reservedOp "="
+    t <- expr
+    --dbg "pPatternMatch ended"
+    return $ PatternMatch [h] t
 
 -- Building expression parser
 pExpr :: Parser Expr
 pExpr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) pFactor
 
 pFactor :: Parser Expr
-pFactor = pArgs
+pFactor = try pArgs <?> "arguments in pFactor failed?"
 
 pContainers :: Parser Expr
 pContainers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
@@ -131,6 +156,7 @@ pContainers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
             args <- brackets (commaSep expr)
             return $ Lit $ LList args
         <|> (try pFields >>= \args -> return (Rec args))
+        <|> try (braces (commaSep expr) >>= \args -> return $ Rec $ recordFromExprs args)
         <|> (angles (commaSep factor)  >>= \args -> return (Lit $ LVec args))
 
 pArg :: Parser Expr
@@ -156,8 +182,8 @@ pDef =  do
     expr <- try pTopLevelBinding
             -- <|> try anonConstructor
             -- <|> try binding
-            -- <|> try patternMatch
-            -- <|> (VarDefinition <$> variable)
+            <|> try pTopLevelPatternMatch
+            <|> (VarDefinition <$> pVar)
             <?> "lambda, binding, pattern match or expression"
     return expr
         
@@ -178,6 +204,10 @@ parseToplevel s = runParserT (contents pDef) initialParserState "<stdin>" s
 
 -- give a text and then parse it - need to store source for error reporting
 parseWholeFile s fn = runParserT (contents pToplevel) initialParserState fn s
+
+-- testing parsers
+hlpp p s = runParserT (contents p) initialParserState "<stdin>" s
+testParser p str = liftIO $ runIntState (hlpp p (L.pack str)) emptyIntState
 
 ----------------------------------------------------
 -- PARSER ----------------------------------------------------

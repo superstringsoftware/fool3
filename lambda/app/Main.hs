@@ -32,7 +32,6 @@ import SurfaceLanguage.Lambda.Parser as Lambda
 import qualified SurfaceLanguage.Lambda.ParserNew as Thask
 
 
-
 -- need this 4-monad stack to make sure Haskeline works with our state monad
 type InputTState = InputT IntState
 
