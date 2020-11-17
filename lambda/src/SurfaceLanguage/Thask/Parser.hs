@@ -32,7 +32,7 @@ import qualified Data.Vector.Unboxed as U
 
 import State
 import SurfaceLanguage.Thask.Lexer
-import CoreLambda.Syntax
+import Core.Syntax
 import Core.Environment
 import Logs
 import Util.PrettyPrinting
@@ -219,8 +219,8 @@ toplevel = many $ do
     -- try newline
     --spaces
     ints <- lift get 
-    let pm = (def, SourceInfo (sourceLine pos) (sourceColumn pos) ""):(newParsedModule ints)
-    lift $ put ints {newParsedModule = pm}    
+    let pm = (def, SourceInfo (sourceLine pos) (sourceColumn pos) ""):(parsedModule ints)
+    lift $ put ints {parsedModule = pm}    
     return def
     
 -- parseExpr :: String -> Either ParseError Expr

@@ -34,7 +34,6 @@ data InterpreterState = InterpreterState {
     currentFlags :: CurrentFlags,
     -- this is being filled by the parser as we go, so last line in the file will be first here!
     parsedModule :: LTProgram,
-    newParsedModule :: CLProgram,
     currentSource :: Text,
     currentEnvironment :: Environment
 } deriving Show
@@ -42,7 +41,6 @@ data InterpreterState = InterpreterState {
 emptyIntState = InterpreterState {
     currentFlags = CurrentFlags False True False,
     parsedModule = [],
-    newParsedModule = [],
     currentSource = "",
     currentEnvironment = initialEnvironment
 }
@@ -57,7 +55,6 @@ initializeInterpreter :: IO InterpreterState
 initializeInterpreter = return $ InterpreterState {
     currentFlags = CurrentFlags False True False,
     parsedModule = [],
-    newParsedModule = [],
     currentSource = "",
     currentEnvironment = initialEnvironment
 }

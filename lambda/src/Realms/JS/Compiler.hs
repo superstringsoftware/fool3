@@ -43,6 +43,7 @@ data ExprJS =
         body :: String
     }
 
+{-
 binding2expr :: Binding -> ExprJS
 binding2expr (Var nm _, (Lam vs ex _ _)) = 
     FuncDef {
@@ -69,3 +70,4 @@ core2text (Lam vs ex t p)        = "(" ++ (vs2txt "" vs) ++ ") {\n"
 --core2text f (Let bnds ex)         = f $ Let (map (fn f) bnds) (traverseModify f ex)
   --  where fn g (v, ex) = (v, traverseModify g ex)
 core2text e = ppr e
+-}

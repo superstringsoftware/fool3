@@ -7,7 +7,6 @@ where
 import Data.HashMap.Strict as Map
 
 import Core.Syntax
-import qualified CoreLambda.Syntax as CL
 import Data.Text
 import Data.Text.Lazy as TL
 
@@ -19,7 +18,6 @@ import Text.Pretty.Simple (pShow)
 type NameMap = HashMap Name
 
 type LTProgram = [(Expr, SourceInfo)]
-type CLProgram = [(CL.Expr, SourceInfo)]
 
 data TypeRep = LiftedTypeRep {
     name        :: Name, -- name of the type
@@ -46,6 +44,7 @@ initialEnvironment = Environment {
 
 -- only processing Let bindings on the top level
 processOneBinding :: (Expr, SourceInfo) -> Environment -> Either LogPayload Environment
+{-
 processOneBinding ( Let ((v, ex):[]) EMPTY , si) env = 
     case ex of
         e@(Lam vars (Tuple constag exs typ) typlam preds) 
@@ -53,6 +52,7 @@ processOneBinding ( Let ((v, ex):[]) EMPTY , si) env =
         e@(Tuple constag exs typ)
             -> either (Left) (\env1 -> addLambda v e env1) (addDataConstructor e env)
         e   -> addLambda v e env
+-}
 processOneBinding (ex, si) _ = Left $ LogPayload 
         (lineNum si) (colNum si) ""
         ("Cannot add the following expression to the Environment during initial Environment Building pass:\n" 
@@ -64,7 +64,7 @@ processOneBinding (ex, si) _ = Left $ LogPayload
 -- then either constructs a new type from the data constructor or adds constructor to the existing type
 -- at this point, data constructor is either Lam ... Tuple or just Tuple, in the latter case it must be empty.
 addDataConstructor :: Expr -> Environment -> Either LogPayload Environment
-addDataConstructor e@(Lam vars (Tuple constag exs typ) typlam preds) env = _addDataConstructor e typ env
+-- addDataConstructor e@(Lam vars (Tuple constag exs typ) typlam preds) env = _addDataConstructor e typ env
 addDataConstructor e@(Tuple constag exs typ) env = _addDataConstructor e typ env
 addDataConstructor e _ = Left $ LogPayload 
     0 0 ""

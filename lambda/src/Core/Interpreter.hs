@@ -44,7 +44,7 @@ interpretExpr ex@(App (VarId n) args) = do
             trace $ ppr res
             -- liftIO $ putStrLn $ show res
             interpretExpr res
-
+{-
 -- primops are strict:
 interpretExpr (App (Prim op) ((Lit x):(Lit y):[]) ) = do
     let res = runLitPrimOp x y op
@@ -56,6 +56,7 @@ interpretExpr (App (Prim op) (x:y:[]) ) = do
     y' <- interpretExpr y
     trace $ ppr (App (Prim op) (x':y':[]) )
     interpretExpr (App (Prim op) [x',y'] ) 
+-}
 {-    
 interpretExpr (App (Prim op) (arg:(Lit y):[]) ) = 
     interpretExpr arg >>= \arg' -> interpretExpr (App (Prim op) [arg',(Lit y)] ) 

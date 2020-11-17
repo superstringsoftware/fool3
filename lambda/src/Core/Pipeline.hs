@@ -106,7 +106,7 @@ compile2JSpass = do
                         env <- get >>= \s -> pure (currentEnvironment s)
                         let (Just tt) = Map.lookup tk (lambdas env)
                         -- iterating over all bindings and converting them to js
-                        let str = CompilerJS.binding2text tt
+                        let str = "" -- CompilerJS.binding2text tt
                         let env' = env { jsProgram = Map.insert tk str (jsProgram env)}
                         modify' (\s -> s {currentEnvironment = env'})
 

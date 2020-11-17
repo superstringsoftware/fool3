@@ -14,8 +14,7 @@ main = do
     putStrLn "\nRunning Lambda Parsing Test Cases\n\n"
     runAllLPC
 
- 
--------------------- TESTING LAMBDA PARSING --------------------
+-------------------- NEW SYNTAXIS: TESTING LAMBDA PARSING --------------------
 lambdaParsingCases = [
         ("Simple untyped pattern match 1", "id x = x", PatternMatch [ App ( VarId "id" ) [ VarId "x" ] ] ( VarId "x" )),
         ("Simple untyped pattern match 2", "fact 0 = 1", PatternMatch [ App ( VarId "fact" ) [ Lit ( LInt 0 )  ] ] ( Lit ( LInt 1 )  )),
@@ -28,109 +27,9 @@ lambdaParsingCases = [
                     ]
                     )
                 ) 
-        ),
-        ("Simple untyped function as lambda", "id = \\x . x",
-            Let 
-                ( Field 
-                    { fieldName = "id" 
-                    , fieldType = ToDerive
-                    , fieldValue = Lam 
-                        { boundVars = 
-                            [ Field 
-                                { fieldName = "x" 
-                                , fieldType = ToDerive
-                                , fieldValue = EMPTY
-                                } 
-                            ]
-                        , lambdaBody = VarId "x" 
-                        , lambdaType = ToDerive
-                        , lamPredicates = []
-                        } 
-                    } 
-                )
-        ),
-        -- TYPES -------------------------------------------------------------------
-        ("Simple SumType (Bool)", "Bool : Type = { True, False }", 
-            Let 
-            ( Field 
-                { fieldName = "Bool" 
-                , fieldType = SmallType 
-                , fieldValue = Tuple "" 
-                    [ Cons [] "True" ToDerive
-                    , Cons [] "False" ToDerive 
-                    ] ToDerive
-                } 
-            )
-        ),
-        ("Parametric SumType (Maybe a)", "Maybe : Type = \\a . { Nothing, Just :a }", 
-            Let 
-            ( Field 
-                { fieldName = "Bool" 
-                , fieldType = SmallType 
-                , fieldValue = Tuple "" 
-                    [ Cons [] "True" ToDerive
-                    , Cons [] "False" ToDerive 
-                    ] ToDerive
-                } 
-            )
-        ),
-        ("Parametric SumType (Maybe a) defined as a pattern match", "Maybe a = { Nothing, Just :a }", 
-            Let 
-            ( Field 
-                { fieldName = "Bool" 
-                , fieldType = SmallType 
-                , fieldValue = Tuple "" 
-                    [ Cons [] "True" ToDerive
-                    , Cons [] "False" ToDerive 
-                    ] ToDerive
-                } 
-            )
-        ),
-        ("Type signature 0", "Bool : Type", VarDefinition ( Var "Bool" SmallType )),
-        ("Type signature 1", "Maybe : Type -> Type", VarDefinition ( Var "Maybe" ( TArr SmallType SmallType ))),
-        ("Type signature 2", "plus : Int -> Float -> Maybe a", 
-          VarDefinition 
-            ( Var "plus" 
-                ( TArr ( TCon "Int" ) 
-                    ( TArr ( TCon "Float" ) 
-                        ( TApp ( TCon "Maybe" ) 
-                            [ TVar ( Var "a" ToDerive ) ]
-                        )
-                    )
-                )
-            )
-        ),
-        ("Type signature 3", "length : List a -> Int", VarDefinition 
-            ( Var "length" 
-                ( TArr 
-                    ( TApp ( TCon "List" ) 
-                        [ TVar ( Var "a" ToDerive ) ]
-                    ) ( TCon "Int" )
-                )
-            )
-        ),
-        ("Type signature 4", "Pair : Type -> Type -> Type", VarDefinition 
-            ( Var "Pair" 
-                ( TArr SmallType ( TArr SmallType SmallType ) )
-            )
-        ),
-        ("Type signature 5", "Weird : Int -> Pair a b -> Type", VarDefinition 
-            ( Var "Weird" 
-                ( TArr ( TCon "Int" ) 
-                    ( TArr 
-                        ( TApp ( TCon "Pair" ) 
-                            [ TVar ( Var "a" ToDerive )
-                            , TVar ( Var "b" ToDerive )
-                            ] 
-                        ) SmallType
-                    )
-                )
-            )
-        ),
-        ("Type signature 6", "map : (a->b) -> List a -> List b", EMPTY),
-        ("New function definition format", "map:(List b) { func:a->b, ls:List a } ", EMPTY)
+        )
+    ] 
 
-    ]
 
 runAllLPC = mapM_ runPTC lambdaParsingCases
 
