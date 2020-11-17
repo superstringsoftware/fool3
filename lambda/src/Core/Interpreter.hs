@@ -85,6 +85,7 @@ runLitPrimOp _ _ PDiv = LString "Type error while applying primitive /"
 -- beta reducing lambda application to arguments
 betaReduce :: Expr -> [Expr] -> Expr
 -- data constructor application - can only be fully saturated
+{-
 betaReduce (Lam vars (Tuple cons expr typ ) t p) args = 
     if (lv == la) then Tuple cons args typ
     else if (lv > la) then ERROR "Constructor applications can only be fully saturated."
@@ -95,16 +96,24 @@ betaReduce (Lam []   expr t p) []       = expr -- normal value
 betaReduce (Lam []   expr t p) args     = App expr args -- thunk
 betaReduce (Lam vars expr t p) []       = Lam vars expr t p -- function value
 betaReduce f@(Lam vars expr t p) (a:as) = betaReduce (betaReduceSingle f a) as
+-}
 betaReduce e args = App e args
 
 betaReduceSingle :: Expr -> Expr -> Expr
+betaReduceSingle e1 e2 = e1 -- WRONG!!!
+{-
 betaReduceSingle (Lam vars expr t p) arg = 
     let (Var name _) = head vars
         vars' = tail vars
     in  Lam vars' (replaceVar name expr arg) t p
+-}
 
+-- TODO: THIS ONE WE NEED!!!
 -- takes a var with name and replaces all it's occurences with an expression    
 replaceVar :: Name -> Expr -> Expr -> Expr
+replaceVar _ _ _ = EMPTY
+{-
 replaceVar name expr arg = traverseModify' fn expr
     where fn v@(VarId nm) = if nm == name then arg else v
           fn e = e
+-}

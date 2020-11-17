@@ -29,8 +29,6 @@ import Data.HashMap.Strict as Map
 import SurfaceLanguage.Lambda.Parser as Lambda
 --import qualified SurfaceLanguage.Thask.Parser as Thask
 
-import qualified SurfaceLanguage.Lambda.ParserNew as Thask
-
 
 -- need this 4-monad stack to make sure Haskeline works with our state monad
 type InputTState = InputT IntState
@@ -133,15 +131,11 @@ processCommand (":env":_) = do
 processCommand (":all":"-d":_) = do 
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> pPrint ex ) mod )
-    mod1 <- get >>= \s -> pure (newParsedModule s)
-    liftIO (mapM_ (\(ex,_) -> pPrint ex ) mod1 )
     --processCommand ([":types"]) >> processCommand ([":functions"])
 processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )
-    mod1 <- get >>= \s -> pure (newParsedModule s)
-    liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod1 )    
-
+    
 processCommand (":types":"-d":_) = do
     types <- get >>= \s -> pure ( (types . currentEnvironment) s)
     liftIO $ mapM_ pPrint types
@@ -201,19 +195,19 @@ loadFileNew :: String -> IntState ()
 loadFileNew nm = do
     liftIO $ putStrLn $ "Loading file: " ++ nm
     fileText <- liftIO (T.readFile nm)
-    res <- Thask.parseWholeFile fileText nm
+    res <- parseWholeFile fileText nm
     -- liftIO $ putStrLn $ T.unpack fileText
     -- liftIO $ print res
     st <- get
     -- liftIO $ print (newParsedModule st)
     put $ st { currentSource = fileText }
     case res of
-        Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (putStrLn $ Thask.showSyntaxError fileText err)
+        Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (putStrLn $ showSyntaxError fileText err)
         -- desugaring on the first pass
         Right exprs -> do
                 -- liftIO (mapM_ (putStrLn . show) exprs) 
                 liftIO (putStrLn "... successfully loaded.")
-                liftIO (putStrLn $ "Received " ++ show (length (newParsedModule st)) ++ " statements.")
+                liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
                 liftIO (putStrLn $ "Executing pass 0: " ++ TC.as [TC.bold, TC.underlined] "after parser desugaring")
                 afterparserPass
                 showAllLogsWSource

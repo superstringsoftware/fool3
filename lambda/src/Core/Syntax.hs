@@ -139,6 +139,67 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
                LString !String | LList [Expr] | LVec [Expr]
                deriving (Eq, Show)
 
+
+data PrimOp = PPlus | PMinus | PMul | PDiv deriving (Show, Eq)
+
+-- the very first pass that we run right after parsing the source file               
+afterparse :: Expr -> Expr
+-- this is a hack for 'built in' operators, needs to go once Classes are supported!!!
+{-
+afterparse e@(BinaryOp "+" _ _) = e
+afterparse e@(BinaryOp "-" _ _) = e
+afterparse e@(BinaryOp "*" _ _) = e
+afterparse e@(BinaryOp "/" _ _) = e
+
+-- end of the hack
+afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):[])
+afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
+-- top level binding: this is a DATA CONSTRUCTOR (unnamed tuple, bound to typed var) - crazy pattern, need to simplify
+-- we are naming the tuple and assigning it's type to var type, since that's how types are being created
+afterparse (Let (( v@(Var n typ) , (Tuple "" args ToDerive) ):[]) EMPTY ) = Let [(v, Tuple n (map afterparse args) typ )] EMPTY 
+afterparse (Let (( v@(Var n typ) , (Lam vars (Tuple "" args ToDerive) typ1 preds )):[]) EMPTY ) = 
+  Let [(v, Lam vars (Tuple n (map afterparse args) typ) typ1 preds )] EMPTY 
+afterparse (Lam vars ex typ preds) = Lam vars (afterparse ex) typ preds
+afterparse (App ex exs) = App (afterparse ex) (map afterparse exs)
+afterparse (Tuple cons exs typ) = Tuple cons (map afterparse exs) typ
+afterparse (Let bnds ex) = Let (map ( \(v,e)-> (v,afterparse e) ) bnds ) (afterparse ex)
+afterparse (PatternMatch args e2) = PatternMatch (map afterparse args) (afterparse e2)
+afterparse (Patterns exs) = Patterns (map afterparse exs)
+-}
+afterparse e = e
+
+{-
+-- traversing AST with modifying function f
+traverseModify :: (Expr -> Expr) -> Expr -> Expr
+traverseModify f (Lam v ex t p)        = Lam v (traverseModify f ex) t p
+traverseModify f (App ex exs)          = App (traverseModify f ex) (map (traverseModify f) exs)
+traverseModify f (Tuple c exs t)       = Tuple c (map (traverseModify f) exs) t
+traverseModify f (PatternMatch exs ex) = PatternMatch (map (traverseModify f) exs) (traverseModify f ex)
+traverseModify f (Patterns exs)        = Patterns (map (traverseModify f) exs)
+traverseModify f (BinaryOp n e1 e2)    = BinaryOp n (traverseModify f e1) (traverseModify f e2)
+traverseModify f (UnaryOp n e1)        = UnaryOp n (traverseModify f e1)
+traverseModify f (Let bnds ex)         = Let (map (fn f) bnds) (traverseModify f ex)
+    where fn g (v, ex) = (v, traverseModify g ex)
+traverseModify f e = f e
+
+traverseModify' :: (Expr -> Expr) -> Expr -> Expr
+traverseModify' f (Lam v ex t p)        = f $ Lam v (traverseModify f ex) t p
+traverseModify' f (App ex exs)          = f $ App (traverseModify f ex) (map (traverseModify f) exs)
+traverseModify' f (Tuple c exs t)       = f $ Tuple c (map (traverseModify f) exs) t
+traverseModify' f (PatternMatch exs ex) = f $ PatternMatch (map (traverseModify f) exs) (traverseModify f ex)
+traverseModify' f (Patterns exs)        = f $ Patterns (map (traverseModify f) exs)
+traverseModify' f (BinaryOp n e1 e2)    = f $ BinaryOp n (traverseModify f e1) (traverseModify f e2)
+traverseModify' f (UnaryOp n e1)        = f $ UnaryOp n (traverseModify f e1)
+traverseModify' f (Let bnds ex)         = f $ Let (map (fn f) bnds) (traverseModify f ex)
+    where fn g (v, ex) = (v, traverseModify g ex)
+traverseModify' f e = f e
+-}
+
+-- check if tuple is anonymous, need it for some passes
+isAnonymousTuple (Tuple "" _ _) = True
+isAnonymousTuple _ = False
+
+
 instance PrettyPrint Field where
   ppr (Field fn ft EMPTY) = fn ++ pprTypeOnly ft
   ppr (Field fn ft (Lam lam)) = fn ++ pprTypeOnly ft ++ " " ++ ppr lam
@@ -154,6 +215,9 @@ instance PrettyPrint Lambda where
 instance PrettyPrint [Field] where
   ppr [] = ""
   ppr fs = (showListCuBrSpace ppr fs)
+
+instance PrettyPrint (Var, Expr) where 
+  ppr (v, e) = ppr v ++ " = " ++ (ppr e)
 
 instance PrettyPrint [Pred] where
   ppr [] = ""
