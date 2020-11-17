@@ -139,7 +139,9 @@ processCommand (":all":"-d":_) = do
     --processCommand ([":types"]) >> processCommand ([":functions"])
 processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
-    liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )    
+    liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )
+    mod1 <- get >>= \s -> pure (newParsedModule s)
+    liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod1 )    
 
 processCommand (":types":"-d":_) = do
     types <- get >>= \s -> pure ( (types . currentEnvironment) s)
@@ -201,10 +203,10 @@ loadFileNew nm = do
     liftIO $ putStrLn $ "Loading file: " ++ nm
     fileText <- liftIO (T.readFile nm)
     res <- Thask.parseWholeFile fileText nm
-    liftIO $ putStrLn $ T.unpack fileText
-    liftIO $ print res
+    -- liftIO $ putStrLn $ T.unpack fileText
+    -- liftIO $ print res
     st <- get
-    liftIO $ print (newParsedModule st)
+    -- liftIO $ print (newParsedModule st)
     put $ st { currentSource = fileText }
     case res of
         Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (putStrLn $ Thask.showSyntaxError fileText err)

@@ -24,7 +24,8 @@ showListWFormat showF beginWith endWith sep empty (x:xs) = Prelude.foldl fn (beg
 
 showListSqBr fun = showListWFormat fun "[" "]" ", " "[]"
 showListRoBr fun = showListWFormat fun "(" ")" ", " "()"     
-showListCuBr fun = showListWFormat fun "{" "}" ", " "{}"     
+showListCuBr fun = showListWFormat fun "{" "}" ", " "{}"
+showListCuBrSpace fun = showListWFormat fun "{ " " }" ", " "{}"     
 showListPlain fun = showListWFormat fun "" "" " " ""
 showListRoBrPlain fun = showListWFormat fun "(" ")" " " ""
 

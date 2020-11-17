@@ -5,12 +5,6 @@ File to test all possible Syntaxis in parsing!
 -- Testing currently:
 Bool : Type = { True, False };
 
-{-
-map:(List b) { func:a->b, ls:List a } = {
-    _ [] -> [],
-    f (x::xs) -> (f x)::(map f xs)
-}
--}
 plus2:Int { x:Int } = x + 2;
 square { x } = x * x;
 (+):a { x:a, y : a };
@@ -22,6 +16,11 @@ Semigroup:Class { a:Type } = {
     (+):a { x, y : a },
     associativity = x + (y + z) == (x + y) + z 
 };
+
+map:(List b) { func:a->b, ls:List a } = {
+    _ [] -> [],
+    f (x::xs) -> (f x)::(map f xs)
+}
 {-
 Person:Type = {
     Person {

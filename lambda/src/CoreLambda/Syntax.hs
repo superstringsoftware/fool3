@@ -66,6 +66,7 @@ data Lambda = Lambda {
   , pred   :: [Pred] -- rank-1 predicates (related to the whole type signature)
 } deriving (Show, Eq)
 
+
 var2field :: Var -> Field
 var2field (Var n t) = Field n t EMPTY
 
@@ -76,6 +77,7 @@ isTConOrTApp (TCon _)   = True
 isTConOrTApp (TApp _ _) = True
 isTConOrTApp _          = False
 
+binding2field (Binding (Var nm tp) (Lambda [] EMPTY _ _)) = Field nm tp EMPTY
 binding2field (Binding (Var nm tp) lam) = Field nm tp (Lam lam)
 
 data Expr = 
@@ -133,33 +135,68 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
                LString !String | LList [Expr] | LVec [Expr]
                deriving (Eq, Show)
 
-{-|
-    Ok, our Expr type needs to play nicely with all scenarious we can run into in different surface languages, which are reasonably typed and functional. 
-    So this section is needed for the sanity check.
-    
-    These are (let's just use Haskell for now):
-    
-    - Data declaration
-    data Maybe a = Nothing | Just a:
-    "Nothing" -> Cons [] "Nothing" `Maybe a` -- so, a function with no vars that returns an empty Tuple of type Maybe a
-    "Just"    -> Cons ["":a] "Just" `a -> Maybe a` [] -- type of the function can be easily deduced from its vars and a tuple type
-    
-    - Typeclasses are arguably the most interesting case at this point:
-    class Semigroup a where (+) :: a -> a -> a
-    instance Semigroup Int where (+) = +#
-    instance Semigroup Float where (+) = +f#
+instance PrettyPrint Field where
+  ppr (Field fn ft EMPTY) = fn ++ pprTypeOnly ft
+  ppr (Field fn ft (Lam lam)) = fn ++ pprTypeOnly ft ++ " " ++ ppr lam
+  ppr (Field fn ft fv) = fn ++ pprTypeOnly ft ++ " = " ++ (ppr fv)
 
-    So we have a definition of typeclass and 2 instances. How do we treat it?
-    Ok, Semigroup itself can be recorded as a Lambda that generates a Record of function headers and type definitions.
-    But then we need to create a Function Factory in our environment:
-    FFactory(+) = \a:U . {...} :: a -> a -> a -- which returns specific functions depending on the type given to it.
-    See Environment for this!
-    Then instance definition adds a corresponding record to a factory!
-    When we are adding - CHECK THE LAWS! (randomization etc)
-    (+) x:a y:a -> z:a
-    4:int + 3:int -- instantiating a to int, how do we ask the factory for the correct function? -> it has to find the type from the type of the arguments.
-    How? By the full signature maybe??
-    3.4:float + 3.2:float
+instance PrettyPrint Pred where
+  ppr Unconstrained = ""
+  ppr (Exists typ) = (as [bold,green] "∃" ++ (ppr typ))  
 
-    length ls:List a -> Int 
--}
+instance PrettyPrint Lambda where
+  ppr (Lambda params body sig pred) = ppr params ++ if (body == EMPTY) then "" else " = " ++ ppr body
+
+instance PrettyPrint [Field] where
+  ppr [] = ""
+  ppr fs = (showListCuBrSpace ppr fs)
+
+instance PrettyPrint [Pred] where
+  ppr [] = ""
+  ppr preds = (showListRoBr ppr preds) ++ " => "
+  
+instance PrettyPrint Literal where
+  ppr (LInt i) = as [lmagenta] $ show i
+  ppr (LFloat i) = as [lmagenta] $ show i
+  ppr (LChar i) = as [lyellow] $ show i
+  ppr (LString i) = as [lyellow] $ show i
+  ppr (LList []) = "[]" 
+  ppr (LList (x:xs)) = foldl fn ("[" ++ ppr x) xs ++ "]"
+      where fn acc e = acc ++ ", " ++ ppr e
+  ppr (LVec []) = "< >"
+  ppr (LVec (x:xs)) = foldl fn ("<" ++ ppr x) xs ++ ">"
+      where fn acc e = acc ++ ", " ++ ppr e
+
+instance PrettyPrint Type where
+  ppr ToDerive = "(?)"
+  ppr (TCon n) = as [bold,lyellow] n
+  ppr (TApp con args) = "(" ++ ppr con ++ " " ++ (showListPlain ppr args) ++ ")"
+  ppr (TVar n) = ppr n
+  ppr (Universe n) = as [bold,lyellow] $ "U" ++ (show n)
+  ppr SmallType = as [bold,lyellow] "Type"
+  ppr e = show e
+
+pprTypeOnly ToDerive = ""
+pprTypeOnly e = ":" ++ ppr e
+
+instance PrettyPrint Var where
+  ppr (Var n t) = as [bold] n ++ pprTypeOnly t      
+
+instance PrettyPrint Expr where
+  ppr (Lit l) = ppr l
+  ppr (VarId v) = v
+  ppr (Binding v lam) = ppr v ++ " " ++ ppr lam
+  ppr (Lam lam) = ppr lam
+  ppr (Rec r) = ppr r
+  -- ppr (Let ((v,e):[]) _ ) = ppr v ++ " = " ++ ppr e
+  -- ppr (Lam vars expr tp preds) = ppr preds ++ (as [bold,lgray] "λ ") ++ (showListPlain ppr vars) ++ " . " ++ ppr expr
+  ppr (BinaryOp n e1 e2) = ppr e1 ++ " " ++ n ++ " " ++ ppr e2
+  ppr (UnaryOp n e) = n ++ ppr e
+  ppr (Tuple cons exprs typ) = cons ++ (showListCuBr ppr exprs) ++ " : " ++ ppr typ
+  ppr (App f args) = (ppr f) ++ " " ++ (showListRoBrPlain ppr args)
+  ppr (Patterns ps) = showListCuBr ppr1 ps
+      where ppr1 (PatternMatch args e2) = (showListPlain ppr args) ++ " -> " ++ ppr e2
+  ppr (PatternMatch args e2) = (showListPlain ppr args) ++ " = " ++ ppr e2
+  ppr (ERROR err) = as [bold,yellow] err
+  ppr e = show e
+  -- λ  
