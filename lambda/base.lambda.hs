@@ -46,12 +46,26 @@ Semigroup:Class { a:Type } = {
 ∃ Semigroup a => Monoid {a} = { E0:a };
 
 Semigroup Int = {
-    (+) = primplus
+    (+) = primPlusInt
 };
 
 Monoid Int = {
-    (+) = primplus,
     E0 = 0
 };
+
+
+------------------ some list functions -----------------
+
+length : List a -> Int;
+length [] = 0;
+length (x::xs) = 1 + length xs;
+
+map : (List b) { func:(a->b), ls:(List a) };
+map _ [] = [];
+map f (x::xs) = (f x)::(map f xs);
+
+ls = [1,3,4,3];
+
+main = print# (map (+2) ls);
 
 
