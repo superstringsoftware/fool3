@@ -1,14 +1,41 @@
 {-
-File to test all possible Syntaxis in parsing!
+Minimal baselib
 -}
 
 
+id : a -> a;
+id x = x;
 
--- map:(List b) func:(a->b) ls:(List a) = x;
-plus2:Int { x:Int } = x + 2;
-func : Int -> List a -> Type;
+Bool     : Type = { True, False };
+Ordering : Type = { LT, EQ, GT  };
+Maybe    : Type { a:Type } = { Nothing, Just { :a } };
 
-{- 
+not True  = False;
+not False = True;
+
+Eq : Class { a } = {
+    (==):Bool { x:a, y:a } = not (x /= y)
+  , (/=):Bool { x:a, y:a } = not (x == y) 
+  , (≠) = (/=)
+  , required = (==) || (/=)
+};
+
+{-
+-- Don't need type signature for a below since it is given in the superclass definition
+Ord : Class = ∃ Eq a => \a . {
+    compare : Ordering { x ,y : a } = 
+        if x == y then EQ else
+            if x <= y then LT else GT; 
+    (<)  : Bool = \x,y:a . (x <= y) && (x /= y);
+    (<=) : Bool = \x,y:a . let r = compare x y in 
+        if (r == LT) || (r == EQ) then True else False;
+    (>)  : Bool = \x,y:a . y < x;
+    (>=) : Bool = \x,y:a . y <= x;
+    max : a = \x,y:a . if x >= y then x else y;
+    min : a = \x,y:a . if x <= y then x else y;
+    required = (<=) || compare
+}
+-}
 
 
 Semigroup:Class { a:Type } = {
@@ -16,109 +43,15 @@ Semigroup:Class { a:Type } = {
     associativity = x + (y + z) == (x + y) + z 
 };
 
+∃ Semigroup a => Monoid {a} = { E0:a };
 
-
--- Testing currently:
-Bool : Type = { True, False };
-
-plus2:Int { x:Int } = x + 2;
-square { x } = x * x;
-(+):a { x:a, y : a };
-
-fact 0 = 1;
-fact n = n * fact (n - 1);
-
-
-Maybe:Type { a:Type } = { Nothing, Just :a };
-
-
-l = [1,3,4];
-v = <1,3,4>;
-f = {1,3,v, 2+2};
-
-Empty:Type;
-
-Z:Nat;
-S:Nat { v:Nat };
-
-Nat:Type = {Z, S = { x:Nat } };
-
-
-map:(List b) { func:a->b, ls:List a } = {
-    _ [] -> [],
-    f (x::xs) -> (f x)::(map f xs)
-}
-{-
-Person:Type = {
-    Person {
-        fname, lname : String,
-        age : Int,
-        dob : Date
-    }
-};
-Nil :(List a);
--- Cons:(List a) { :a, :List a };
-Person:Person {
-    fname, lname : String,
-    age : Int,
-    dob : Date
-};
-l = [1,3,4];
-v = <1,3,4>;
-f = {1,3,v, 2+2};
-
-
-
-l = [1,3,4];
-v = <1,3,4>;
-f = {1,3,v, 2+2};
-
--- Function with explicit type signatures: OK
-id : a = \x:a . x;
--- Function without type signatures: OK 
-mul = \x . x * 4;
--- same as a pattern match:
-mul x = x * 4;
-
--- Function defined as lambda: OK, but see note
-fact = \n . {
-    0 -> 1; -- semicolon here and a colon in type definition, need to be consistent, colons everywhere?
-    n -> n * fact(n-1)
-};
--- Function defined as pattern match: OK
-fact 0 = 1;
-fact n = n * fact(n-1);
--- 2-var function defined as pattern match: OK
-map _ [] = [];
-map f (x:-xs) = (f x):-(map f xs);
--- Complex constructor pattern match: OK
-complexFunc (Cons (Var 4 name)) f = f name;
-
--------------------- TYPES ----------------------
--- Simplest sum type: OK? Returns Tuple, we may want to change that.
-Bool : Type = { True, False };
--- Sum type with one field anonymous tuple: OK?
-Maybe : Type = \a . { Nothing, Just :a };
--- with 2 - FAILS
--- List : Type = \a . {Nil, Cons :a :(List a)};
-
--- Every constructor separately - OK, so GADTs should work fine.
-Nil : (List a) = {};
--- if a function OUTSIDE of typeclass has NO body (; right after last argument) -- it's a DATA CONSTRUCTOR
--- "Normal" functions MUST be defined right away.
-Cons : (List a) = \ :a :(List a); -- . {head tail};
-
--- Typeclasses - OK
-Eq : Class = \a:Type . {
-    (==):Bool = \x:a y:a. not (x /= y);
-    (/=):Bool = \x:a y:a. not (x == y); 
-    (≠) = (/=)
+Semigroup Int = {
+    (+) = primplus
 };
 
-Semigroup : Class = \a:Type . {
-    -- "normal" function has no body - it's ok because it's a typeclass definition!
-    (+):a = \x:a y:a;
-    -- constraint (law), associativity (basically a function with a predicate, constraint simply says it's a constraint)
-    associativity = x + (y + z) == (x + y) + z 
+Monoid Int = {
+    (+) = primplus,
+    E0 = 0
 };
--}
+
+

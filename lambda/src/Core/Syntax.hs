@@ -207,7 +207,7 @@ instance PrettyPrint Field where
 
 instance PrettyPrint Pred where
   ppr Unconstrained = ""
-  ppr (Exists typ) = (as [bold,green] "∃" ++ (ppr typ))  
+  ppr (Exists typ) = "∃" ++ (ppr typ)  
 
 instance PrettyPrint Lambda where
   ppr (Lambda params body sig pred) = ppr params ++ if (body == EMPTY) then "" else " = " ++ ppr body
@@ -254,7 +254,7 @@ instance PrettyPrint Var where
 instance PrettyPrint Expr where
   ppr (Lit l) = ppr l
   ppr (VarId v) = v
-  ppr (Binding v lam) = ppr v ++ " " ++ ppr lam
+  ppr (Binding v lam) = ppr (preds lam) ++ ppr v ++ " " ++ ppr lam
   ppr (Lam lam) = ppr lam
   ppr (VarDefinition v) = ppr v
   ppr (Rec r) = ppr r

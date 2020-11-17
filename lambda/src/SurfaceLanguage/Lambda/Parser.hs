@@ -158,7 +158,7 @@ pFactor = try pArgs <?> "arguments in pFactor failed?"
 pContainers :: Parser Expr
 pContainers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
         try  $ do
-            args <- brackets (commaSep expr)
+            args <- brackets (commaSep pExpr)
             return $ Lit $ LList args
         <|> (try pFields >>= \args -> return (Rec args))
         -- <|> try (braces (commaSep pAnonVar) >>= \args -> return $ Rec $ vars2record args)
