@@ -58,6 +58,13 @@ data Field = Field {
 } deriving (Show, Eq)
 type Record      = [Field]
 type TypedRecord = (Record, Type) -- record is the list of Fields and a Type of the record itself
+-- Since everything is either a lambda or a Record in our land, we need a separate type for Lambda as well:
+data Lambda = Lambda {
+    params :: Record -- {x1:t1 = v1, ..., xn:tn = vn} - supporting default values
+  , body   :: Expr -- whatever our lambda is bound to
+  , sig    :: Type -- full type signature
+  , pred   :: [Pred] -- rank-1 predicates (related to the whole type signature)
+} deriving (Show, Eq)
 
 var2field :: Var -> Field
 var2field (Var n t) = Field n t EMPTY
@@ -69,14 +76,24 @@ isTConOrTApp (TCon _)   = True
 isTConOrTApp (TApp _ _) = True
 isTConOrTApp _          = False
 
+binding2field (Binding (Var nm tp) lam) = Field nm tp (Lam lam)
+
 data Expr = 
     VarId Name
   | Lit Literal
+  {-
+  Supporting the new logic described in the Parser in CoreLambda.
+
+  Binding - binding of a typed identifier with arguments to an expression. Used to model ALL functions, types, typeclasses, constants etc at the top level.
+  KEY type for us as it can represent pretty much anything.
+  -}
+  | Binding Var Lambda
+  | Lam Lambda
   {-| 
     Predicates here apply to the whole function, for rank-n need to use HighVar in Type
     "normal" functions expression will be either 'Let' (with in non-EMPTY!) or 'App'
   -}
-  | Lam {
+  | LamOld {
       boundVars  :: Record, -- list of the bound variables, possibly with default values
       lambdaBody :: Expr,   -- body of the function, whatever it is bound to - either App, or LetIns
       lambdaType :: Type,   -- type signature of the lambda
@@ -87,6 +104,7 @@ data Expr =
       consTag  :: ConsTag, -- constructor tag
       consType :: Type -- type this constructor belongs to
     }
+  | Rec Record
   | Value {
       valueRecord  :: Record, -- record of the value
       valueConsTag :: ConsTag, -- constructor tag used to create the record

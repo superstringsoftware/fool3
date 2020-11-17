@@ -40,20 +40,144 @@ import Util.PrettyPrinting
 import Text.Pretty.Simple (pShow)
 import qualified Data.Text.Lazy as TL
 
+{-
+Ok, so in the new concept we only need to parse the following syntaxis:
+[<predicate> => ] <name>:<type> { name1:type1 [= <expr>], ... , namen:typen [=<expr>] }
 
--- used to show syntax errors together with source (first argument)
-showSyntaxError :: L.Text -> ParseError -> String
-showSyntaxError s err = L.unpack $ L.unlines [
-      "  ",
-      "  " <> lineContents,
-      "  " <> ((L.replicate col " ") <> "^"),
-      (L.pack $ show err)
-    ]
-  where
-    lineContents = (L.lines s) !! line
-    pos  = errorPos err
-    line = sourceLine pos - 1
-    col  = fromIntegral $ sourceColumn pos - 1
+alternatively, we can combine several fields of the same type inside of a tuple:
+{ n1,n2,n3:t1, n4:t2, n5,n6:t3 } 
+
+Will we be able to distinguish between that and pattern matched format though?
+map _ Nil = Nil
+map f (x::xs) = (f x)::(map f xs)
+and:
+map { func, ls } = {
+    _ Nil -> Nil,
+    f (x::xs) -> (f x)::(map f xs)
+}
+How do we say that above is a function definition instead of a pattern match on a record with fields func and ls? Only because of constructor functions?
+
+REQUIRE type signatures when writing out functions in this full format? alternatively, 
+REQUIRE pattern matches only within the Tuple?
+------------------------
+
+This leads to the following logic for the top-level:
+- Expression: id:type arguments:record body:expr or record
+- Expr: constant (literal), list, vector, App, operator App, Record of Expr
+Parsing:
+- optional predicate
+- identifier with optional type signature
+- optional arguments record:
+    - identifier[[:type] = expr] - split with ","
+- = <expr> - optional.
+That's it! Should be very clean.
+-}
+
+-- Starting with Predicates parser:
+pPreds :: Parser [Pred]
+pPreds = do
+    try (reserved "exists") <|> reserved "∃"
+    preds <- try (parens (sepBy1 pPred (reservedOp ",") )) <|> (pPred >>= \p -> pure [p])
+    reservedOp "=>"
+    return preds
+
+pPred :: Parser Pred
+pPred = do
+    tcon <- (TCon <$> uIdentifier) <?> "type class name (should start from the upper case)." 
+    vars <- many1 $ (TVar <$> variable)                
+    return $ Exists $ TApp tcon vars -- foldl TApp tcon vars -- type application
+
+-- Next, top level identifier: name and optional type signature
+pVar :: Parser Var
+pVar = do
+  name <- try (parens op) <|> identifier --emptyStringParser -- added unnamed variables for easier record parsing
+  typ <- typeSignature
+  return $ Var name typ
+
+-- x:t [= <expr>] -- single field parser
+pField :: Parser Field
+pField = do
+    bind <- try pTopLevelBinding <|> pure EMPTY
+    if (bind == EMPTY) then do
+            (Var nm tp) <- pVar
+            ex  <- try (reservedOp "=" *> pExpr) <|> pure EMPTY
+            return $ Field nm tp ex
+    else return $ binding2field bind
+
+-- parsing a record within {}
+pFields :: Parser Record
+pFields = braces (sepBy1 pField (reservedOp ",") )
+
+
+-- Parser doing the top-level expression parsing, our MAIN workhorse
+pTopLevelBinding :: Parser Expr
+pTopLevelBinding = do
+    preds <- try pPreds <|> pure [] -- optional predicates
+    var <- pVar -- mandatory identificator
+    args <- try pFields <|> pure [] -- optional arguments record
+    ex  <- try (reservedOp "=" *> pExpr) <|> pure EMPTY -- trying to parse the body
+    return $ Binding var (Lambda args ex ToDerive preds)
+
+-- Building expression parser
+pExpr :: Parser Expr
+pExpr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) pFactor
+
+pFactor :: Parser Expr
+pFactor = pArgs
+
+pContainers :: Parser Expr
+pContainers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
+        try  $ do
+            args <- brackets (commaSep expr)
+            return $ Lit $ LList args
+        <|> (try pFields >>= \args -> return (Rec args))
+        <|> (angles (commaSep factor)  >>= \args -> return (Lit $ LVec args))
+
+pArg :: Parser Expr
+pArg = try pContainers
+    <|> try (parens pExpr)
+    <|> try typedId
+    <|> try (Lit <$> floating)
+    <|> try (Lit <$> int)
+    <|> try (Lit <$> stringVal)
+    <|> symbolId
+    <?> "container, literal, symbol id or parenthesized expression"
+
+pArgs :: Parser Expr
+pArgs = do
+    args@(f:xs) <- many1 pArg
+    --return $ foldl1 App args -- need to use left fold here because application is highest precedence
+    let er = if (xs == []) then f else (App f xs)
+    return er
+
+-- Building top level parsers
+pDef :: Parser Expr
+pDef =  do
+    expr <- try pTopLevelBinding
+            -- <|> try anonConstructor
+            -- <|> try binding
+            -- <|> try patternMatch
+            -- <|> (VarDefinition <$> variable)
+            <?> "lambda, binding, pattern match or expression"
+    return expr
+        
+        
+
+pToplevel :: Parser [Expr]
+pToplevel = many $ do
+    pos <- getPosition
+    def <- pDef
+    reservedOp ";"
+    ints <- lift get 
+    let pm = (def, SourceInfo (sourceLine pos) (sourceColumn pos) ""):(newParsedModule ints)
+    lift $ put ints {newParsedModule = pm}    
+    return def
+    
+--parseToplevel :: String -> Either ParseError [Expr]
+parseToplevel s = runParserT (contents pDef) initialParserState "<stdin>" s
+
+-- give a text and then parse it - need to store source for error reporting
+parseWholeFile s fn = runParserT (contents pToplevel) initialParserState fn s
 
 ----------------------------------------------------
 -- PARSER ----------------------------------------------------
@@ -89,7 +213,7 @@ typeAp :: Parser Type
 typeAp = do
   tcon <- try concreteType <|> (TVar <$> variable)
   vars <- many $ try (TCon <$> uIdentifier) <|> try ( TVar <$> variable ) 
-                 <|> try (parens typeAp) <|> (TExpr <$> argument)
+                 <|> (parens typeAp) -- <|> (TExpr <$> argument)
   if null vars then return tcon -- concrete type
   else return $ TApp tcon vars -- foldl TApp tcon vars -- type application
 
@@ -178,7 +302,7 @@ lambda = do
     -- if we are not inside typeclass and body is empty - this must be a data constructor,
     -- so changing empty to the tuple of the correct size
     let body = if ((body' == EMPTY) && (not incl)) then Tuple name (map (\a -> VarId "_") args) tp else body'
-    let ex = Lam (vars2record args) body tp preds
+    let ex = LamOld (vars2record args) body tp preds
     -- checking whether it's a data constructor and then whether it has type specified:
     -- this may change if we change the syntaxis for type definition!!!
     case body of
@@ -348,10 +472,10 @@ toplevel = many $ do
 parseExpr s = runParserT (contents expr) initialParserState "<stdin>" s
 
 --parseToplevel :: String -> Either ParseError [Expr]
-parseToplevel s = runParserT (contents defn) initialParserState "<stdin>" s
+-- parseToplevel s = runParserT (contents defn) initialParserState "<stdin>" s
 
 -- give a text and then parse it - need to store source for error reporting
-parseWholeFile s fn = runParserT (contents toplevel) initialParserState fn s
+-- parseWholeFile s fn = runParserT (contents toplevel) initialParserState fn s
 
 -- parse a given file
 parseToplevelFile :: String -> IntState (Either ParseError [Expr])
@@ -366,4 +490,16 @@ parseFromFile p fname st
     
     
    
-    
+-- used to show syntax errors together with source (first argument)
+showSyntaxError :: L.Text -> ParseError -> String
+showSyntaxError s err = L.unpack $ L.unlines [
+      "  ",
+      "  " <> lineContents,
+      "  " <> ((L.replicate col " ") <> "^"),
+      (L.pack $ show err)
+    ]
+  where
+    lineContents = (L.lines s) !! line
+    pos  = errorPos err
+    line = sourceLine pos - 1
+    col  = fromIntegral $ sourceColumn pos - 1

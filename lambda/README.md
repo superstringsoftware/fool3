@@ -36,9 +36,10 @@ We will follow a unified approach to defining most of the language constracts, w
 
 ```Haskell
 -- The above is a top-level identifier for functions, types, data constructor functions, type classes etc. 
-<name>:<type> { name1:type1, ... , namen:typen }
+[<predicate> => ] <name>:<type> { name1:type1 [= <expr>], ... , namen:typen [=<expr>] }
 -- alternatively, we can combine several fields of the same type inside of a tuple:
 { n1,n2,n3:t1, n4:t2, n5,n6:t3 } 
+-- type signatures are optional
 
 -- Examples:
 -- function header:
@@ -83,7 +84,18 @@ Semigroup:Class { a:Type } = {
 ∃ Semigroup a => Monoid:Class { a } = {
     E0:a
 };
+```
 
+Now, besides the definitions the only things we can do is operators and function applications:
+```Haskell
+-- we can do like in haskell:
+g = map f ls
+-- or with the full semicolon based way:
+g = map {f, ls}
+-- these 2 are equivalent
+-- partial applications work a bit nicer than in haskell since we can do things like:
+ml = map { ls = [1,2,3] }
+-- this creates a function ml : (a->b) -> [b] that applies a function f to a fixed list [1,2,3]
 ```
 
 ## Various language constructs examples
