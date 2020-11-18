@@ -80,6 +80,7 @@ processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
 -- VarDefinition is used to declare top-level symbol with the type signature
 -- If the symbol does not exist in the environment, we add it and initialize an Empty Lambda assigned to it with the type signature
 -- If it does exist --> ERROR
+-- Putting FULL variable signature to the Lambda sig field 
 processBinding (VarDefinition v@(Var n t), si) env = 
     case result of
         (Right e)  -> return e
@@ -94,6 +95,7 @@ processBinding (VarDefinition v@(Var n t), si) env =
                         ("Tried to add an identifier named " ++ TC.as [bold,green] n ++ " but it has already been defined before!")) 
                     func
 -- top level binding
+-- putting ONLY RETURN TYPE to the Lambda sig - it's DIFFERENT from the VarDefinition case, can be confusing!!!
 processBinding (Binding v@(Var n t) lam, si) env = 
     case result of
         (Right e)  -> return e
@@ -108,7 +110,13 @@ processBinding (Binding v@(Var n t) lam, si) env =
                         ("Tried to add an identifier named " ++ ppr v ++ " but it has already been defined before!")) 
                     func
 -- This is where it gets interesting - processing pattern match, that encodes both function definitions, class instances and type functions!
--- processBinding 
+-- If it's a Type  application - need to create another specific type
+-- If it's a Class application - need to instantiate all functions and update function lookup tables for specific types of this class
+-- If it's a function application - either add a new function to the environment, or update pattern match cases for the existing function. 
+processBinding (PatternMatch (App (VarId name) args) ex, si) env = do
+    let func = Map.lookup name (topLambdas env)
+    liftIO $ putStrLn $ if (func /= Nothing) then "Found function " ++ name else "NO function " ++ name ++ " yet "
+    return env
 processBinding (ex, si) env = do 
     let lpl = LogPayload 
                 (lineNum si) (colNum si) ""

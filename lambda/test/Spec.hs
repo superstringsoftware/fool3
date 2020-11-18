@@ -16,10 +16,10 @@ main = do
 
 -------------------- NEW SYNTAXIS: TESTING LAMBDA PARSING --------------------
 lambdaParsingCases = [
-        ("Simple untyped pattern match 1", "id x = x", PatternMatch [ App ( VarId "id" ) [ VarId "x" ] ] ( VarId "x" )),
-        ("Simple untyped pattern match 2", "fact 0 = 1", PatternMatch [ App ( VarId "fact" ) [ Lit ( LInt 0 )  ] ] ( Lit ( LInt 1 )  )),
+        ("Simple untyped pattern match 1", "id x = x", PatternMatch (App ( VarId "id" ) [ VarId "x" ]) ( VarId "x" )),
+        ("Simple untyped pattern match 2", "fact 0 = 1", PatternMatch (App ( VarId "fact" ) [ Lit ( LInt 0 )  ]) ( Lit ( LInt 1 )  )),
         ("Simple untyped pattern match with recursion", "fact n = n * fact (n-1)", 
-            PatternMatch [ App ( VarId "fact" ) [ VarId "n" ] ] 
+            PatternMatch (App ( VarId "fact" ) [ VarId "n" ] ) 
                 ( BinaryOp "*" ( VarId "n" ) 
                     ( App ( VarId "fact" ) 
                     [ BinaryOp "-" ( VarId "n" ) 
@@ -93,19 +93,19 @@ lambdaParsingCases = [
             )
         ),
         ("Untyped pattern match with 2 variables", "map _ [] = []", PatternMatch 
-            [ App ( VarId "map" ) 
+            ( App ( VarId "map" ) 
                 [ VarId "_" 
                 , Lit ( LList [] )
                 ] 
-            ] 
+            ) 
             ( Lit ( LList [] ) )),
         -- ("Untyped pattern match with 2 variables", "map f x1 = (f x):::(map f xs)", EMPTY),
         ("Untyped pattern match with 2 variables", "map f (x::xs) = (f x)::(map f xs)", PatternMatch 
-            [ App ( VarId "map" ) 
+            ( App ( VarId "map" ) 
                 [ VarId "f" 
                 , BinaryOp "::" ( VarId "x" ) ( VarId "xs" )
                 ] 
-            ] 
+            ) 
             ( BinaryOp "::" 
                 ( App ( VarId "f" ) [ VarId "x" ] ) 
                 ( App ( VarId "map" ) 
