@@ -94,6 +94,9 @@ binding2field (Binding (Var nm tp) lam) = Field nm tp (Lam lam)
 recordFromExprs :: [Expr] -> Record
 recordFromExprs exs = map (\ex -> Field "" ToDerive ex) exs
 
+emptyRecordFromList :: [a] -> Record
+emptyRecordFromList exs = map (\ex -> Field "" ToDerive EMPTY) exs
+
 data Expr = 
     VarId Name
   | Lit Literal

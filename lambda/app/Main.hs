@@ -92,7 +92,7 @@ processCommand (":help":_) = liftIO showHelp
 processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
 processCommand (":load":xs) = loadFileNew (head xs)
 processCommand (":set":s:xs) = processSet s xs
-processCommand (":compile":_) = compile2JSpass
+-- processCommand (":compile":_) = compile2JSpass
 processCommand (":env":"-d":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
@@ -230,9 +230,9 @@ loadFileNew nm = do
                 showAllLogsWSource
                 clearAllLogs
                 liftIO (putStrLn $ "Executing pass 2: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
-                compile2JSpass
-                showAllLogsWSource
-                clearAllLogs
+                -- compile2JSpass
+                -- showAllLogsWSource
+                -- clearAllLogs
                 -- mod <- get >>= \s -> pure (parsedModule s)
                 -- liftIO (mapM_ (\(ex,_) -> (putStrLn . show) ex ) mod )
 

@@ -42,7 +42,7 @@ import Util.PrettyPrinting as TC
 
 import Data.HashMap.Strict as Map
 
-import Realms.JS.Compiler as CompilerJS
+-- import Realms.JS.Compiler as CompilerJS
 
 --------------------------------------------------------------------------------
 -- PASS 0: initial desugaring etc after parsing
@@ -102,10 +102,26 @@ processBinding (ex@(Binding v@(Var n t) lam), si) env =
 -- If it's a Type  application - need to create another specific type
 -- If it's a Class application - need to instantiate all functions and update function lookup tables for specific types of this class
 -- If it's a function application - either add a new function to the environment, or update pattern match cases for the existing function. 
-processBinding (PatternMatch (App (VarId name) args) ex, si) env = do
+processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
     let func = Map.lookup name (topLambdas env)
     liftIO $ putStrLn $ if (func /= Nothing) then "Found function " ++ name else "NO function " ++ name ++ " yet "
-    return env
+    case func of
+        -- no function with such name yet - creating a function with Patterns as a body and types to figure out
+        Nothing -> do
+            let lam = Lambda {
+                      params = emptyRecordFromList args
+                    , body   = Patterns[pm]
+                    , sig    = ToDerive
+                    , preds  = []
+                    } 
+            return env { topLambdas = Map.insert name lam (topLambdas env) }
+        -- Processing function with an empty body
+        Just lam@(Lambda _ EMPTY _ _)  -> return env { topLambdas = Map.insert name (lam { body = Patterns[pm] }) (topLambdas env)}
+        -- Processing function with already existing patterns - adding the new found one
+        Just lam@(Lambda _ (Patterns ps) _ _) -> return env { topLambdas = Map.insert name (lam { body = Patterns (ps ++ [pm]) }) (topLambdas env)}
+        -- remaining cases are TYPECLASSES - need to implement yet
+        Just l -> (liftIO $ (putStrLn $ "Unknown pattern match:\n" ++ name ++ " = " ++ show l)) >> return env
+            
 
 -- Generic case, adding a warning (it's internal, in production compiler should not be happening at all):
 processBinding (ex, si) env = do 
@@ -145,7 +161,7 @@ buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) prim
 --------------------------------------------------------------------------------
 -- PASS n: compilation passes
 --------------------------------------------------------------------------------
-
+{-
 compile2JSpass :: IntState ()
 compile2JSpass = do
     env <- get >>= \s -> pure (currentEnvironment s)
@@ -161,5 +177,5 @@ compile2JSpass = do
                         let env' = env { jsProgram = Map.insert tk str (jsProgram env)}
                         modify' (\s -> s {currentEnvironment = env'})
 
-                        
+-}                
                         
