@@ -92,6 +92,8 @@ data Expr =
 
   Binding - binding of a typed identifier with arguments to an expression. Used to model ALL functions, types, typeclasses, constants etc at the top level.
   KEY type for us as it can represent pretty much anything.
+
+  On the top level, only Binding, PatternMatch and VarDefinition (which is used for declaring type signatures mostly for the functions) should exist!
   -}
   | Binding Var Lambda
   | Lam Lambda
@@ -105,7 +107,7 @@ data Expr =
   -- first [Expr] here is simply a list of expressions to which lambda bound variables need to be evaluated!!!
   -- second expression is the normal expression as usual
   | PatternMatch [Expr] Expr 
-  | Patterns [Expr] -- only PatternMatch should be used inside here, it's only used inside lambda with patterns!!!
+  | Patterns [Expr] -- only PatternMatch should be inside
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | EMPTY
@@ -130,19 +132,7 @@ afterparse e@(BinaryOp "+" _ _) = e
 afterparse e@(BinaryOp "-" _ _) = e
 afterparse e@(BinaryOp "*" _ _) = e
 afterparse e@(BinaryOp "/" _ _) = e
-
 -- end of the hack
--- top level binding: this is a DATA CONSTRUCTOR (unnamed tuple, bound to typed var) - crazy pattern, need to simplify
--- we are naming the tuple and assigning it's type to var type, since that's how types are being created
-afterparse (Let (( v@(Var n typ) , (Tuple "" args ToDerive) ):[]) EMPTY ) = Let [(v, Tuple n (map afterparse args) typ )] EMPTY 
-afterparse (Let (( v@(Var n typ) , (Lam vars (Tuple "" args ToDerive) typ1 preds )):[]) EMPTY ) = 
-  Let [(v, Lam vars (Tuple n (map afterparse args) typ) typ1 preds )] EMPTY 
-afterparse (Lam vars ex typ preds) = Lam vars (afterparse ex) typ preds
-afterparse (App ex exs) = App (afterparse ex) (map afterparse exs)
-afterparse (Tuple cons exs typ) = Tuple cons (map afterparse exs) typ
-afterparse (Let bnds ex) = Let (map ( \(v,e)-> (v,afterparse e) ) bnds ) (afterparse ex)
-afterparse (PatternMatch args e2) = PatternMatch (map afterparse args) (afterparse e2)
-afterparse (Patterns exs) = Patterns (map afterparse exs)
 -}
 afterparse (Binding v (Lambda p ex t pr) ) = (Binding v (Lambda p (afterparse ex) t pr) )
 afterparse (Lam (Lambda p ex t pr)) = Lam (Lambda p (afterparse ex) t pr)
@@ -194,6 +184,9 @@ instance PrettyPrint Pred where
 
 instance PrettyPrint Lambda where
   ppr (Lambda params body sig pred) = ppr params ++ if (body == EMPTY) then "" else " = " ++ ppr body
+
+showLambdaAsLambda :: String -> Lambda -> String
+showLambdaAsLambda nm (Lambda params body sig pred) = ppr pred ++ nm ++ ":" ++ ppr sig ++ ppr params ++ " = " ++ ppr body 
 
 instance PrettyPrint [Field] where
   ppr [] = ""

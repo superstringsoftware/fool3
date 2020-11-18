@@ -33,12 +33,14 @@ data Environment = Environment {
     -- Map that keeps all our TypeReps in the current environment
     types       :: NameMap TypeRep,
     lambdas     :: NameMap (Var, Expr), -- not only lambdas, but all top-level bindings, including expressions or thunks
+    topLambdas  :: NameMap Lambda,
     jsProgram   :: NameMap String
 } deriving Show
 
 initialEnvironment = Environment {
     types       = Map.empty,
     lambdas     = Map.empty,
+    topLambdas  = Map.empty,
     jsProgram   = Map.empty 
 }
 
@@ -53,6 +55,18 @@ processOneBinding ( Let ((v, ex):[]) EMPTY , si) env =
             -> either (Left) (\env1 -> addLambda v e env1) (addDataConstructor e env)
         e   -> addLambda v e env
 -}
+-- VarDefinition is used to declare top-level symbol with the type signature
+-- If the symbol does not exist in the environment, we add it and initialize an Empty Lambda assigned to it with the type signature
+-- If it does exist --> ERROR
+processOneBinding (VarDefinition v@(Var n t), si) env = 
+    let func = Map.lookup n (topLambdas env)
+        e = Lambda [] EMPTY t []
+    in  maybe (Right $ env { topLambdas = Map.insert n e (topLambdas env) }) 
+              -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
+              (const $ Left $ LogPayload 
+                0 0 ""
+                ("Tried to add lambda or expression named " ++ n ++ " but it has already been defined before!")) 
+              func
 processOneBinding (ex, si) _ = Left $ LogPayload 
         (lineNum si) (colNum si) ""
         ("Cannot add the following expression to the Environment during initial Environment Building pass:\n" 

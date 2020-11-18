@@ -36,6 +36,7 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
 import Data.Text as T
+import qualified Data.Text.Lazy as TL
 
 import Util.PrettyPrinting as TC
 
@@ -68,10 +69,53 @@ runExprPassAndReverse f l = rev f l []
 -- PASS 1: building initial typing and top-level lambdas environment
 --------------------------------------------------------------------------------
 buildEnvironmentM :: (Expr, SourceInfo) -> IntState ()
-buildEnvironmentM x@(e,si) = get >>= \s->
-    either (\err -> logWarning err { linePos = (lineNum si), colPos = (colNum si) } )
-           (\env' -> put s{currentEnvironment = env'})
-           (processOneBinding x (currentEnvironment s))
+buildEnvironmentM x@(e,si) = do
+    s <- get
+    let env = currentEnvironment s
+    env' <- processBinding x env
+    put s{currentEnvironment = env'}
+    -- either (\err -> logWarning err { linePos = (lineNum si), colPos = (colNum si) } )
+           
+processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
+-- VarDefinition is used to declare top-level symbol with the type signature
+-- If the symbol does not exist in the environment, we add it and initialize an Empty Lambda assigned to it with the type signature
+-- If it does exist --> ERROR
+processBinding (VarDefinition v@(Var n t), si) env = 
+    case result of
+        (Right e)  -> return e
+        (Left err) -> (logError err { linePos = (lineNum si), colPos = (colNum si) }) >> return env
+    where result = 
+            let func = Map.lookup n (topLambdas env)
+                e = Lambda [] EMPTY t []
+            in  maybe (Right $ env { topLambdas = Map.insert n e (topLambdas env) }) 
+                    -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
+                    (const $ Left $ LogPayload 
+                        0 0 ""
+                        ("Tried to add an identifier named " ++ TC.as [bold,green] n ++ " but it has already been defined before!")) 
+                    func
+-- top level binding
+processBinding (Binding v@(Var n t) lam, si) env = 
+    case result of
+        (Right e)  -> return e
+        (Left err) -> (logError err { linePos = (lineNum si), colPos = (colNum si) }) >> return env
+    where result = 
+            let func = Map.lookup n (topLambdas env)
+                e = lam { sig = t }
+            in  maybe (Right $ env { topLambdas = Map.insert n e (topLambdas env) }) 
+                    -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
+                    (const $ Left $ LogPayload 
+                        0 0 ""
+                        ("Tried to add an identifier named " ++ ppr v ++ " but it has already been defined before!")) 
+                    func
+processBinding (ex, si) env = do 
+    let lpl = LogPayload 
+                (lineNum si) (colNum si) ""
+                ("Cannot add the following expression to the Environment during initial Environment Building pass:\n" 
+                    ++ (ppr ex) ++ "\n" 
+                    -- ++ (TL.unpack (pShow ex))
+                    ++ "\nThe expression is parsed and stored in LTProgram, but is not in the Environment.")
+    logWarning lpl { linePos = (lineNum si), colPos = (colNum si) } 
+    return env
 
 -- Let [(Var,Expr)] Expr    
 buildEnvPass :: IntState ()

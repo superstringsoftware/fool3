@@ -13,6 +13,7 @@ import Control.Monad (zipWithM_, void, when)
 
 import qualified Data.Text.IO as T (readFile)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 
 import Core.Syntax
 import Core.Pipeline
@@ -21,7 +22,7 @@ import Core.Interpreter
 import Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
 
-import Text.Pretty.Simple (pPrint)
+import Text.Pretty.Simple (pPrint, pShow)
 
 import Data.HashMap.Strict as Map
 
@@ -145,11 +146,15 @@ processCommand (":types":_) = do
     -- liftIO $ mapM_ print (Map.keys types)
 
 processCommand (":functions":"-d":_) = do
-    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
-    liftIO $ mapM_ pPrint res
+    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
+    let out = foldrWithKey (\n l a -> a ++ n ++ " = " ++ (TL.unpack $ pShow l) ++ "\n") "" res
+    liftIO $ putStrLn out
+    --liftIO $ mapM_ pPrint res
 processCommand (":functions":_) = do
-    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
-    liftIO $ mapM_ (putStrLn . ppr) res
+    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
+    let out = foldrWithKey (\n l a -> a ++ (showLambdaAsLambda n l) ++ "\n") "" res
+    liftIO $ putStrLn out
+    -- liftIO $ mapM_ (putStrLn . ppr) res
 
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
