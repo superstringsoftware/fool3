@@ -76,11 +76,12 @@ showHelp = do
     putStrLn $ TC.as [TC.bold, TC.underlined] "Available commands:"
     putStrLn ":h[elp]           -- this message"
     putStrLn ":q[uit]           -- quit"
-    putStrLn ":a[ll]            -- list everything, -d - in core format"
+    putStrLn ":a[ll]            -- list everything that was parsed, -d - in core format"
     putStrLn ":l[oad] <name>    -- load and interpret file <name>"
     putStrLn ":s[et] <command>  -- set environment flags (:s strict, :s lazy, :s trace on/off)"
     putStrLn ":e[nv]            -- show current environment"
     putStrLn ":functions        -- list all global functions"
+    putStrLn ":i[nfo] <name>    -- find and show a top-level binding with <name>"
     putStrLn ":types            -- list all types"
     putStrLn ":compile          -- compile currently loaded program"
     putStrLn ":r[un] <f name>   -- execute expression with a given name that's already loaded. 'main' by detault."
@@ -155,12 +156,19 @@ processCommand (":functions":_) = do
     let out = foldrWithKey (\n l a -> a ++ (showLambdaAsLambda n l) ++ "\n") "" res
     liftIO $ putStrLn out
     -- liftIO $ mapM_ (putStrLn . ppr) res
+-- find a specifically named binding
+processCommand (":info":name:_) = do
+    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
+    let lam = Map.lookup name res
+    let action = maybe (putStrLn "Nothing is found with such name.") (\l -> ( (putStrLn $ showLambdaAsLambda name l) >> pPrint l)) lam
+    liftIO action
 
 processCommand (":q":_) = processCommand [":quit"]
 processCommand (":h":_) = processCommand [":help"]
 processCommand (":a":"-d":_) = processCommand [":all","-d"]
 processCommand (":a":_) = processCommand [":all"]
 processCommand (":l":xs) = processCommand (":load":xs)
+processCommand (":i":xs) = processCommand (":info":xs)
 processCommand (":s":xs) = processCommand (":set":xs)
 processCommand (":e":xs) = processCommand (":env":xs)
 

@@ -68,6 +68,8 @@ runExprPassAndReverse f l = rev f l []
 --------------------------------------------------------------------------------
 -- PASS 1: building initial typing and top-level lambdas environment
 --------------------------------------------------------------------------------
+
+-- Only VarDefinition, Binding and PatternMatch should be seen at the top level
 buildEnvironmentM :: (Expr, SourceInfo) -> IntState ()
 buildEnvironmentM x@(e,si) = do
     s <- get
@@ -109,6 +111,7 @@ processBinding (Binding v@(Var n t) lam, si) env =
                         0 0 ""
                         ("Tried to add an identifier named " ++ ppr v ++ " but it has already been defined before!")) 
                     func
+
 -- This is where it gets interesting - processing pattern match, that encodes both function definitions, class instances and type functions!
 -- If it's a Type  application - need to create another specific type
 -- If it's a Class application - need to instantiate all functions and update function lookup tables for specific types of this class
@@ -117,6 +120,8 @@ processBinding (PatternMatch (App (VarId name) args) ex, si) env = do
     let func = Map.lookup name (topLambdas env)
     liftIO $ putStrLn $ if (func /= Nothing) then "Found function " ++ name else "NO function " ++ name ++ " yet "
     return env
+
+-- Generic case, adding a warning (it's internal, in production compiler should not be happening at all):
 processBinding (ex, si) env = do 
     let lpl = LogPayload 
                 (lineNum si) (colNum si) ""
@@ -144,6 +149,12 @@ primBindings = [
 
 buildPrimitivePass :: IntState ()
 buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) primBindings
+
+-------------------------------------------------------------------------------
+-- Important helper functions
+-------------------------------------------------------------------------------
+
+-- Processing lambda that is a Type and moving its constructors to the top level bindings, so that calls such as Just 4 were able to resolve "Just" correctly
 
 --------------------------------------------------------------------------------
 -- PASS n: compilation passes

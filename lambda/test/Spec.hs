@@ -525,7 +525,37 @@ lambdaParsingCases = [
                 , preds = []
                 } 
             )
-        )
+        ),
+        ("Complex pattern match based on this compiler", "processBinding  { Binding v@(Var n t) lam, si } env = x", 
+            PatternMatch 
+            ( App ( VarId "processBinding" ) 
+                [ Rec 
+                    [ Field 
+                        { fieldName = "" 
+                        , fieldType = ToDerive
+                        , fieldValue = BinaryOp "@" 
+                            ( App ( VarId "Binding" ) [ VarId "v" ] ) 
+                            ( App 
+                                ( App ( VarId "Var" ) 
+                                    [ VarId "n" 
+                                    , VarId "t" 
+                                    ] 
+                                ) [ VarId "lam" ]
+                            )
+                        } 
+                    , Field 
+                        { fieldName = "" 
+                        , fieldType = ToDerive
+                        , fieldValue = VarId "si" 
+                        } 
+                    ] 
+                , VarId "env" 
+                ] 
+            ) ( VarId "x" )
+
+        ),
+        ("", "f x y = g x y", EMPTY),
+        ("", "f x y = g {x, y}", EMPTY)
     ] 
 
 
