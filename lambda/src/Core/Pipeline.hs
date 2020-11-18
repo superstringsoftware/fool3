@@ -107,6 +107,8 @@ processBinding (Binding v@(Var n t) lam, si) env =
                         0 0 ""
                         ("Tried to add an identifier named " ++ ppr v ++ " but it has already been defined before!")) 
                     func
+-- This is where it gets interesting - processing pattern match, that encodes both function definitions, class instances and type functions!
+-- processBinding 
 processBinding (ex, si) env = do 
     let lpl = LogPayload 
                 (lineNum si) (colNum si) ""

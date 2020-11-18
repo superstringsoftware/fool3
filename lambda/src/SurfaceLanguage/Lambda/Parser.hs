@@ -146,7 +146,7 @@ pTopLevelPatternMatch = do
     reservedOp "="
     t <- pExpr
     --dbg "pPatternMatch ended"
-    return $ PatternMatch [h] t
+    return $ PatternMatch h t
 
 -- Building expression parser
 pExpr :: Parser Expr

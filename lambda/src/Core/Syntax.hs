@@ -106,7 +106,7 @@ data Expr =
   -- since we are NOT repeating function name on the left side of the pattern match but put ONLY arguments there,
   -- first [Expr] here is simply a list of expressions to which lambda bound variables need to be evaluated!!!
   -- second expression is the normal expression as usual
-  | PatternMatch [Expr] Expr 
+  | PatternMatch Expr Expr -- one pattern match, expression on the left should only be App 
   | Patterns [Expr] -- only PatternMatch should be inside
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
@@ -139,7 +139,7 @@ afterparse (Lam (Lambda p ex t pr)) = Lam (Lambda p (afterparse ex) t pr)
 afterparse (Rec recr) = Rec (map fn recr) where fn f@(Field _ _ ex) = f {fieldValue = afterparse ex}
 afterparse (RecordAccess exs) = RecordAccess (map afterparse exs)
 afterparse (App ex exs) = App (afterparse ex) (map afterparse exs)
-afterparse (PatternMatch exs ex) = PatternMatch (map afterparse exs) (afterparse ex)
+afterparse (PatternMatch exs ex) = PatternMatch (afterparse exs) (afterparse ex)
 afterparse (Patterns exs) = Patterns (map afterparse exs)
 afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):[])
 afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
@@ -242,8 +242,8 @@ instance PrettyPrint Expr where
   -- ppr (Tuple cons exprs typ) = cons ++ (showListCuBr ppr exprs) ++ " : " ++ ppr typ
   ppr (App f args) = (ppr f) ++ " " ++ (showListRoBrPlain ppr args)
   ppr (Patterns ps) = showListCuBr ppr1 ps
-      where ppr1 (PatternMatch args e2) = (showListPlain ppr args) ++ " -> " ++ ppr e2
-  ppr (PatternMatch args e2) = (showListPlain ppr args) ++ " = " ++ ppr e2
+      where ppr1 (PatternMatch args e2) = ppr args ++ " -> " ++ ppr e2
+  ppr (PatternMatch args e2) = ppr args ++ " = " ++ ppr e2
   ppr (ERROR err) = as [bold,yellow] err
   ppr e = show e
   -- λ  
