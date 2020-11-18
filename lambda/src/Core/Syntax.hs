@@ -130,9 +130,15 @@ data Expr =
 ---------------------------------------------------------------------------------------------------
 -- takes a lambda that is a Type declaration and extracts constructors from it, turning it into proper
 -- and correct form (all types are correct, all parameters, returning Value from Expr)
-extractConstructors :: NamedLambda -> Either String [NamedLambda]
--- extractConstructors (name, Lam typeArgs consRecord SmallType pr)
-extractConstructors ex = Left $ "Tried to extract a Constructor function from the Lambda that is likely not a Type declaration: " ++ (ppr $ snd ex) 
+-- NB! Can only be run AFTER the afterparser stage!!!
+extractConstructors :: Expr -> [NamedLambda]
+extractConstructors (Binding v@(Var n SmallType) (Lambda _ (Rec cons) _ _) ) = map (\(Field nm _ (Lam l)) -> (nm, l)) cons
+extractConstructors ex = []
+-- extractConstructors ex = Left $ "Tried to extract a Constructor function from the Lambda that is likely not a Type declaration: " ++ (ppr ex) 
+
+-- if we have a constructor field, converting it to a named lambda for eventual setting in the environment
+fieldToNamedLambda :: Field -> NamedLambda
+fieldToNamedLambda (Field n t (Lam val)) = (n, val)
 
 -- Helper method for extractConstructors: converts a single Field in a constructor record to a proper Lambda with correct Type etc
 convertFieldToCons :: Type -> Field -> Field
@@ -149,7 +155,7 @@ convertFieldToCons typ (Field name tp EMPTY) = Field {
       }
   }
   where chooseType = if (tp == ToDerive ) then typ else tp
--- constructor with some parameters - simply setting up a record to return
+-- constructor with some parameters - simply setting up a record to return with correct ConsTag and Type:
 convertFieldToCons typ (Field name tp (Lam lam)) = Field {
     fieldName = name 
   , fieldType = chooseType 
@@ -159,7 +165,7 @@ convertFieldToCons typ (Field name tp (Lam lam)) = Field {
       }
   }
   where chooseType = if (tp == ToDerive ) then typ else tp
-
+-- general case, do nothing
 convertFieldToCons _ f = f
 
 
@@ -187,8 +193,9 @@ afterparse e@(BinaryOp "/" _ _) = e
 afterparse (VarDefinition v@(Var n t)) = Binding v (Lambda [] EMPTY ToDerive [])
 -- Processing Type Declaration: setting up type signatures and constructor function bodies
 afterparse (Binding v@(Var n SmallType) (Lambda p ex@(Rec cons) t pr) ) = 
-    let typeType = constructTypeFunction n p
-    in  (Binding v (Lambda p (Rec $ map (convertFieldToCons typeType) cons) t pr) )
+    let typeType = constructTypeFunction n p -- creating a correct type signature for the type declaration
+        (Rec cons') = afterparse ex -- walking down the tree to desugar possible values inside the record
+    in  (Binding v (Lambda p (Rec $ map (convertFieldToCons typeType) cons') t pr) )
 -- walking down the tree
 afterparse (Binding v (Lambda p ex t pr) ) = (Binding v (Lambda p (afterparse ex) t pr) )
 afterparse (Lam (Lambda p ex t pr)) = Lam (Lambda p (afterparse ex) t pr)

@@ -81,17 +81,20 @@ buildEnvironmentM x@(e,si) = do
 processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
 -- top level binding
 -- putting ONLY RETURN TYPE to the Lambda sig - it's DIFFERENT from the VarDefinition case, can be confusing!!!
-processBinding (Binding v@(Var n t) lam, si) env = 
+processBinding (ex@(Binding v@(Var n t) lam), si) env = 
     case result of
         (Right e)  -> return e
-        (Left err) -> (logError err { linePos = (lineNum si), colPos = (colNum si) }) >> return env
+        (Left err) -> (logError err) >> return env
     where result = 
             let func = Map.lookup n (topLambdas env)
-                e = lam { sig = t }
-            in  maybe (Right $ env { topLambdas = Map.insert n e (topLambdas env) }) 
+                e = if (t /= SmallType) 
+                    then env { topLambdas = Map.insert n (lam { sig = t }) (topLambdas env) }
+                    else let insertMany cs = Prelude.foldl (\acc (n1,l1) -> Map.insert n1 l1 acc) (topLambdas env) cs -- folding list of cons functions to a map
+                         in  env { topLambdas = Map.insert n (lam { sig = t }) $ insertMany (extractConstructors ex) }   
+            in  maybe (Right e) 
                     -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
                     (const $ Left $ LogPayload 
-                        0 0 ""
+                        (lineNum si) (colNum si) ""
                         ("Tried to add an identifier named " ++ ppr v ++ " but it has already been defined before!")) 
                     func
 

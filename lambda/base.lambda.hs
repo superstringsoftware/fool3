@@ -70,7 +70,8 @@ ls = [1,3,4,3];
 
 main = print# (map (+2) ls);
 
-Expr:Type {a} = {Val:(Expr Int) {:Int}, Bool:(Expr Bool)};
+-- Expr:Type {a} = {Val:(Expr Int) {:Int}, Bool:(Expr Bool)};
+
 
 
 
