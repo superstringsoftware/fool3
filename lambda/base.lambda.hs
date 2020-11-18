@@ -46,15 +46,11 @@ Semigroup:Class { a:Type } = {
 };
 
 ∃ Semigroup a => Monoid:Class {a} = { E0:a };
+∃ Monoid    a => Group :Class {a} = { (-):a { x, y : a } };
 
-Semigroup Int = {
-    (+) = primPlusInt
-};
-
-Monoid Int = {
-    E0 = 0
-};
-
+Semigroup Int = { (+) = primPlus# };
+Monoid Int = { E0 = 0 };
+Group Int = { (+) = primMinus# };
 
 ------------------ some list functions -----------------
 

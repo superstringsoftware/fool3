@@ -40,4 +40,5 @@ primOps = [
   , "primMinus#"
   , "primMul#"
   , "primDiv#"
+  , "print#"
   ]
