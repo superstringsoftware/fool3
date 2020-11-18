@@ -66,9 +66,17 @@ map : (List b) { func:(a->b), ls:(List a) };
 map _ [] = [];
 map f (x::xs) = (f x)::(map f xs);
 
+--------------------- test program --------------------
+
 ls = [1,3,4,3];
 
-main = print# (map (+2) ls);
+fib {n:Int};
+fib 0 = 1;
+fib 1 = 1;
+fib n = fib(n-1) + fib(n-2);
+
+main = print# (fib 20);
+-- main = print# (map (+2) ls);
 
 -- Expr:Type {a} = {Val:(Expr Int) {:Int}, Bool:(Expr Bool)};
 

@@ -20,6 +20,10 @@ fib n = go 0 1 0 where
 
 -}
 
+length1 [] = 0
+length1 (x:xs) = 1 + length xs
+
+{-
 data Widget = Box Int Int | Circle Int
 
 area (Box x y) = x * y
@@ -29,7 +33,7 @@ data Person = Person {
     name :: String,
     age :: Int
 }
-
+-}
 -- plus2 x = x + 2
 
 -- foreign import ccall unsafe "print_int" print_int :: Int -> IO ()

@@ -104,7 +104,7 @@ processBinding (ex@(Binding v@(Var n t) lam), si) env =
 -- If it's a function application - either add a new function to the environment, or update pattern match cases for the existing function. 
 processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
     let func = Map.lookup name (topLambdas env)
-    liftIO $ putStrLn $ if (func /= Nothing) then "Found function " ++ name else "NO function " ++ name ++ " yet "
+    -- liftIO $ putStrLn $ if (func /= Nothing) then "Found function " ++ name else "NO function " ++ name ++ " yet "
     case func of
         -- no function with such name yet - creating a function with Patterns as a body and types to figure out
         Nothing -> do
@@ -120,7 +120,8 @@ processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
         -- Processing function with already existing patterns - adding the new found one
         Just lam@(Lambda _ (Patterns ps) _ _) -> return env { topLambdas = Map.insert name (lam { body = Patterns (ps ++ [pm]) }) (topLambdas env)}
         -- remaining cases are TYPECLASSES - need to implement yet
-        Just l -> (liftIO $ (putStrLn $ "Unknown pattern match:\n" ++ name ++ " = " ++ show l)) >> return env
+        Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""
+                                        ("Unknown pattern match:\n" ++ name ++ " = " ++ show l)) >> return env
             
 
 -- Generic case, adding a warning (it's internal, in production compiler should not be happening at all):

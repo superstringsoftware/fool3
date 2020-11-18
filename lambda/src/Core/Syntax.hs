@@ -74,6 +74,9 @@ data Lambda = Lambda {
 type NamedLambda = (Name, Lambda)
 
 
+arity :: Lambda -> Int
+arity lam = length (params lam)
+
 var2field :: Var -> Field
 var2field (Var n t) = Field n t EMPTY
 
