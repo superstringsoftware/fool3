@@ -73,6 +73,8 @@ data Lambda = Lambda {
 -- needed for environment manipulations
 type NamedLambda = (Name, Lambda)
 
+emptyLambda = Lambda [] EMPTY ToDerive []
+
 
 arity :: Lambda -> Int
 arity lam = length (params lam)
@@ -125,6 +127,7 @@ data Expr =
   -- second expression is the normal expression as usual
   | PatternMatch Expr Expr -- one pattern match, expression on the left should only be App 
   | Patterns [Expr] -- only PatternMatch should be inside
+  | Prim Name -- primitive operation or function
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | EMPTY
@@ -180,8 +183,6 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
                LString !String | LList [Expr] | LVec [Expr]
                deriving (Eq, Show)
 
-
-data PrimOp = PPlus | PMinus | PMul | PDiv deriving (Show, Eq)
 
 -- the very first pass that we run right after parsing the source file    
 -- Some desugaring (Operators to Apps)

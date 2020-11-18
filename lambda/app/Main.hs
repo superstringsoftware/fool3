@@ -19,6 +19,7 @@ import Core.Syntax
 import Core.Pipeline
 import Core.Environment
 import Core.Interpreter
+import Core.Primitives
 import Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
 
@@ -252,6 +253,8 @@ loop = do
 
 runInterpreter :: InputTState ()
 runInterpreter = do
+    liftIO $ putStrLn "Building primitive environment..."
+    lift $ loadPrimitiveEnv
     liftIO $ putStrLn "Loading base library..."
     lift $ loadFileNew baseLibPath
     -- lift $ processCommand [":all"]
@@ -266,7 +269,7 @@ main = do
 
 greetings = do
     putStrLn "Welcome to Tea-Lambda Language!"
-    putStrLn "Version 0.0.1"
-    putStrLn "(c) Copyright 2016-2019 by Anton Antich (a@s3.ag)\n"
+    putStrLn "Version 0.0.5"
+    putStrLn "(c) Copyright 2016-2020 by Anton Antich (a@s3.ag)\n"
     putStrLn "Type :help for help on commands or :load a file.\n"
     

@@ -8,6 +8,8 @@ import Core.Syntax
 import Logs
 import State
 
+import Core.Primitives
+
 import Util.PrettyPrinting
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State.Strict
