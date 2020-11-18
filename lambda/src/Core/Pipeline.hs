@@ -79,23 +79,6 @@ buildEnvironmentM x@(e,si) = do
     -- either (\err -> logWarning err { linePos = (lineNum si), colPos = (colNum si) } )
            
 processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
--- VarDefinition is used to declare top-level symbol with the type signature
--- If the symbol does not exist in the environment, we add it and initialize an Empty Lambda assigned to it with the type signature
--- If it does exist --> ERROR
--- Putting FULL variable signature to the Lambda sig field 
-processBinding (VarDefinition v@(Var n t), si) env = 
-    case result of
-        (Right e)  -> return e
-        (Left err) -> (logError err { linePos = (lineNum si), colPos = (colNum si) }) >> return env
-    where result = 
-            let func = Map.lookup n (topLambdas env)
-                e = Lambda [] EMPTY t []
-            in  maybe (Right $ env { topLambdas = Map.insert n e (topLambdas env) }) 
-                    -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
-                    (const $ Left $ LogPayload 
-                        0 0 ""
-                        ("Tried to add an identifier named " ++ TC.as [bold,green] n ++ " but it has already been defined before!")) 
-                    func
 -- top level binding
 -- putting ONLY RETURN TYPE to the Lambda sig - it's DIFFERENT from the VarDefinition case, can be confusing!!!
 processBinding (Binding v@(Var n t) lam, si) env = 

@@ -50,6 +50,11 @@ data Type
   | TClass -- typeclass or type family
   deriving (Show, Eq)
 
+-- helper function that constructs e.g. TApp (TCon "Maybe") [TVar (Var "a" ...)] from Maybe a
+constructTypeFunction :: Name -> Record -> Type
+constructTypeFunction name []   = TCon name
+constructTypeFunction name args = TApp (TCon name) (map (TVar . field2var) args)
+
 -- Record is the representation of any record or tuple (with names being absent) - a list of typed field names, nothing more
 data Field = Field {
     fieldName  :: Name, -- name of the field
@@ -65,10 +70,15 @@ data Lambda = Lambda {
   , sig    :: Type -- full type signature
   , preds  :: [Pred] -- rank-1 predicates (related to the whole type signature)
 } deriving (Show, Eq)
+-- needed for environment manipulations
+type NamedLambda = (Name, Lambda)
 
 
 var2field :: Var -> Field
 var2field (Var n t) = Field n t EMPTY
+
+field2var :: Field -> Var
+field2var (Field n t _) = Var n t
 
 vars2record :: [Var] -> Record
 vars2record vs = map var2field vs
@@ -97,7 +107,8 @@ data Expr =
   -}
   | Binding Var Lambda
   | Lam Lambda
-  | Rec Record
+  | Rec Record -- generic record used to pass things around
+  | Value Record ConsTag Type -- The ONLY object that is a value object in our land (well, except Lit for primitives)
   | VarDefinition Var -- for standalone type signatures for functions and other symbols, e.g. fact : Int -> Int etc
   | RecordAccess [Expr] -- Accessing fields of a record. r.address.city will be recorded as RecordAccess (VarId "r") ["address", "city"]
   | LetIns [Field] Expr -- bindings "in" Expr; top level function definitions go here as well with EMPTY "in"
@@ -114,6 +125,44 @@ data Expr =
   | ERROR String -- used only in Interpreter
   deriving (Show, Eq)
 
+---------------------------------------------------------------------------------------------------
+-- PURE CONVERSION / PROCESSING FUNCTIONS
+---------------------------------------------------------------------------------------------------
+-- takes a lambda that is a Type declaration and extracts constructors from it, turning it into proper
+-- and correct form (all types are correct, all parameters, returning Value from Expr)
+extractConstructors :: NamedLambda -> Either String [NamedLambda]
+-- extractConstructors (name, Lam typeArgs consRecord SmallType pr)
+extractConstructors ex = Left $ "Tried to extract a Constructor function from the Lambda that is likely not a Type declaration: " ++ (ppr $ snd ex) 
+
+-- Helper method for extractConstructors: converts a single Field in a constructor record to a proper Lambda with correct Type etc
+convertFieldToCons :: Type -> Field -> Field
+-- Unit constructor (Nil, Nothing etc)
+-- Setting it up to return an empty Value record
+convertFieldToCons typ (Field name tp EMPTY) = Field {
+    fieldName = name 
+  , fieldType = chooseType 
+  , fieldValue = Lam $ Lambda {
+        params = [], 
+        body = Value [] name chooseType,
+        sig  = chooseType,
+        preds = []
+      }
+  }
+  where chooseType = if (tp == ToDerive ) then typ else tp
+-- constructor with some parameters - simply setting up a record to return
+convertFieldToCons typ (Field name tp (Lam lam)) = Field {
+    fieldName = name 
+  , fieldType = chooseType 
+  , fieldValue = Lam $ lam {
+        body = Value (params lam) name chooseType,
+        sig  = chooseType
+      }
+  }
+  where chooseType = if (tp == ToDerive ) then typ else tp
+
+convertFieldToCons _ f = f
+
+
 
 data Literal = LInt !Int | LFloat !Double | LChar !Char |
                LString !String | LList [Expr] | LVec [Expr]
@@ -123,8 +172,8 @@ data Literal = LInt !Int | LFloat !Double | LChar !Char |
 data PrimOp = PPlus | PMinus | PMul | PDiv deriving (Show, Eq)
 
 -- the very first pass that we run right after parsing the source file    
--- beyond some desugaring it also reverses the order of statements and brings it to the correct one we need for 
--- the environment building pass           
+-- Some desugaring (Operators to Apps)
+-- Setting up initial guesses for Types inside Type Declarations           
 afterparse :: Expr -> Expr
 -- this is a hack for 'built in' operators, needs to go once Classes are supported!!!
 {-
@@ -134,6 +183,13 @@ afterparse e@(BinaryOp "*" _ _) = e
 afterparse e@(BinaryOp "/" _ _) = e
 -- end of the hack
 -}
+-- converting VarDefinition to Binding with an empty lambda and a guess for the type signature
+afterparse (VarDefinition v@(Var n t)) = Binding v (Lambda [] EMPTY ToDerive [])
+-- Processing Type Declaration: setting up type signatures and constructor function bodies
+afterparse (Binding v@(Var n SmallType) (Lambda p ex@(Rec cons) t pr) ) = 
+    let typeType = constructTypeFunction n p
+    in  (Binding v (Lambda p (Rec $ map (convertFieldToCons typeType) cons) t pr) )
+-- walking down the tree
 afterparse (Binding v (Lambda p ex t pr) ) = (Binding v (Lambda p (afterparse ex) t pr) )
 afterparse (Lam (Lambda p ex t pr)) = Lam (Lambda p (afterparse ex) t pr)
 afterparse (Rec recr) = Rec (map fn recr) where fn f@(Field _ _ ex) = f {fieldValue = afterparse ex}
@@ -235,6 +291,7 @@ instance PrettyPrint Expr where
   ppr (Lam lam) = ppr lam
   ppr (VarDefinition v) = ppr v
   ppr (Rec r) = ppr r
+  ppr (Value r ct tp) = as [bold, green] ct ++ ppr r ++ ":" ++ ppr tp
   -- ppr (Let ((v,e):[]) _ ) = ppr v ++ " = " ++ ppr e
   -- ppr (Lam vars expr tp preds) = ppr preds ++ (as [bold,lgray] "λ ") ++ (showListPlain ppr vars) ++ " . " ++ ppr expr
   ppr (BinaryOp n e1 e2) = ppr e1 ++ " " ++ n ++ " " ++ ppr e2

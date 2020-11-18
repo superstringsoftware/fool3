@@ -10,6 +10,7 @@ Bool     : Type = { True, False };
 Ordering : Type = { LT, EQ, GT  };
 Maybe    : Type { a:Type } = { Nothing, Just { :a } };
 List     : Type { a:Type } = { Nil, (::) { head:a, tail:(List a) } };
+Pair     : Type { a:Type, b:Type} = { Pair { fst:a, snd:b } };
 
 not True  = False;
 not False = True;
@@ -69,6 +70,7 @@ ls = [1,3,4,3];
 
 main = print# (map (+2) ls);
 
+Expr:Type {a} = {Val:(Expr Int) {:Int}, Bool:(Expr Bool)};
 
 
 
