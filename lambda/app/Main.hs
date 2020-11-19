@@ -102,7 +102,7 @@ processCommand (":env":"-d":_) = do
     let tkeys = Map.keys types
     liftIO $ mapM_ (fenv1 types) tkeys
     liftIO $ putStrLn "\n--------------- LAMBDAS ----------------"
-    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
+    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
     let fkeys = Map.keys res
     liftIO $ mapM_ (fenv1 res) fkeys
     liftIO $ putStrLn "\n--------------- JS REALM ----------------"
@@ -121,7 +121,7 @@ processCommand (":env":_) = do
     let tkeys = Map.keys types
     liftIO $ mapM_ (fenv1 types) tkeys
     liftIO $ putStrLn "\n--------------- LAMBDAS ----------------"
-    res <- get >>= \s -> pure ( (lambdas . currentEnvironment) s)
+    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
     let fkeys = Map.keys res
     liftIO $ mapM_ (fenv1 res) fkeys
     liftIO $ putStrLn "\n--------------- JS REALM ----------------"

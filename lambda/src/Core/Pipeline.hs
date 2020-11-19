@@ -67,6 +67,10 @@ runExprPassAndReverse f l = rev f l []
 
 --------------------------------------------------------------------------------
 -- PASS 1: building initial typing and top-level lambdas environment
+-- This is a pretty important pass - it establishes top-level lambdas, 
+-- moves constructor functions from inside Type declarations to the top level,
+-- and processes instances of typeclasses (so, applications of typeclass functions to specific types) - 
+-- which involves some basic typechecking etc already.
 --------------------------------------------------------------------------------
 
 -- Only VarDefinition, Binding and PatternMatch should be seen at the top level
@@ -86,26 +90,22 @@ processBinding (ex@(Binding v@(Var n t) lam), si) env =
         (Right e)  -> return e
         (Left err) -> (logError err) >> return env
     where result = 
-            let func = Map.lookup n (topLambdas env)
-                e = if (t /= SmallType) 
-                    then env { topLambdas = Map.insert n (lam { sig = t }) (topLambdas env) }
-                    else let insertMany cs = Prelude.foldl (\acc (n1,l1) -> Map.insert n1 l1 acc) (topLambdas env) cs -- folding list of cons functions to a map
-                         in  env { topLambdas = Map.insert n (lam { sig = t }) $ insertMany (extractConstructors ex) }   
+            let e = if t /= SmallType 
+                    then addLambda n (lam { sig = t }) env
+                    else addLambda n (lam { sig = t }) (addManyLambdas (extractConstructors ex) env)    
             in  maybe (Right e) 
                     -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
                     (const $ Left $ LogPayload 
                         (lineNum si) (colNum si) ""
                         ("Tried to add an identifier named " ++ ppr v ++ " but it has already been defined before!")) 
-                    func
+                    (lookupLambda n env)
 
 -- This is where it gets interesting - processing pattern match, that encodes both function definitions, class instances and type functions!
 -- If it's a Type  application - need to create another specific type
 -- If it's a Class application - need to instantiate all functions and update function lookup tables for specific types of this class
 -- If it's a function application - either add a new function to the environment, or update pattern match cases for the existing function. 
 processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
-    let func = Map.lookup name (topLambdas env)
-    -- liftIO $ putStrLn $ if (func /= Nothing) then "Found function " ++ name else "NO function " ++ name ++ " yet "
-    case func of
+    case (lookupLambda name env) of
         -- no function with such name yet - creating a function with Patterns as a body and types to figure out
         Nothing -> do
             let lam = Lambda {
@@ -114,11 +114,11 @@ processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
                     , sig    = ToDerive
                     , preds  = []
                     } 
-            return env { topLambdas = Map.insert name lam (topLambdas env) }
+            return $ addLambda name lam env
         -- Processing function with an empty body
-        Just lam@(Lambda _ EMPTY _ _)  -> return env { topLambdas = Map.insert name (lam { body = Patterns[pm] }) (topLambdas env)}
+        Just lam@(Lambda _ EMPTY _ _)  -> return $ addLambda name (lam { body = Patterns[pm] }) env
         -- Processing function with already existing patterns - adding the new found one
-        Just lam@(Lambda _ (Patterns ps) _ _) -> return env { topLambdas = Map.insert name (lam { body = Patterns (ps ++ [pm]) }) (topLambdas env)}
+        Just lam@(Lambda _ (Patterns ps) _ _) -> return $ addLambda name (lam { body = Patterns (ps ++ [pm]) }) env
         -- remaining cases are TYPECLASSES - need to implement yet
         Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""
                                         ("Unknown pattern match:\n" ++ name ++ " = " ++ show l)) >> return env
@@ -135,7 +135,29 @@ processBinding (ex, si) env = do
     logWarning lpl { linePos = (lineNum si), colPos = (colNum si) } 
     return env
 
--- Let [(Var,Expr)] Expr    
+{-
+PatternMatch 
+    ( App ( VarId "Group" ) [ VarId "Int" ] ) 
+    ( Rec 
+        [ Field 
+            { fieldName = "+" 
+            , fieldType = ToDerive
+            , fieldValue = Lam 
+                ( Lambda 
+                    { params = []
+                    , body = VarId "primMinus#" 
+                    , sig = ToDerive
+                    , preds = []
+                    } 
+                )
+            } 
+        ]
+    )
+
+-}
+-- applyClass 
+
+-- The pass itself   
 buildEnvPass :: IntState ()
 buildEnvPass = buildPrimitivePass >> get >>= pure . parsedModule >>= mapM_ buildEnvironmentM
 

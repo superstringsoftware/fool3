@@ -73,8 +73,23 @@ data Lambda = Lambda {
 -- needed for environment manipulations
 type NamedLambda = (Name, Lambda)
 
+emptyLambda :: Lambda
 emptyLambda = Lambda [] EMPTY ToDerive []
 
+-- Record equality functions - FOR TYPE CHECKING!!!
+-- checks if only the TYPE is equal 
+fieldTypeEqual :: Field -> Field -> Bool
+fieldTypeEqual f1 f2 = (fieldType f1) == (fieldType f2)
+
+recTypeEqual :: Record -> Record -> Bool
+recTypeEqual r1 r2 = (length r1 == length r2) && and (zipWith fieldTypeEqual r1 r2)
+
+-- checks if both TYPE and NAME(s) are equal
+fieldNameTypeEqual :: Field -> Field -> Bool
+fieldNameTypeEqual f1 f2 = (fieldType f1 == fieldType f2) && ( fieldName f1 == fieldName f2)
+
+recNameTypeEqual :: Record -> Record -> Bool
+recNameTypeEqual r1 r2 = (length r1 == length r2) && and (zipWith fieldNameTypeEqual r1 r2)
 
 arity :: Lambda -> Int
 arity lam = length (params lam)

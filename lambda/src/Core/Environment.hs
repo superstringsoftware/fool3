@@ -32,83 +32,34 @@ data TypeRep = LiftedTypeRep {
 data Environment = Environment {
     -- Map that keeps all our TypeReps in the current environment
     types       :: NameMap TypeRep,
-    lambdas     :: NameMap (Var, Expr), -- not only lambdas, but all top-level bindings, including expressions or thunks
     topLambdas  :: NameMap Lambda,
     jsProgram   :: NameMap String
 } deriving Show
 
 initialEnvironment = Environment {
     types       = Map.empty,
-    lambdas     = Map.empty,
     topLambdas  = Map.empty,
     jsProgram   = Map.empty 
 }
 
--- only processing Let bindings on the top level
-processOneBinding :: (Expr, SourceInfo) -> Environment -> Either LogPayload Environment
-{-
-processOneBinding ( Let ((v, ex):[]) EMPTY , si) env = 
-    case ex of
-        e@(Lam vars (Tuple constag exs typ) typlam preds) 
-            -> either (Left) (\env1 -> addLambda v e env1) (addDataConstructor e env)
-        e@(Tuple constag exs typ)
-            -> either (Left) (\env1 -> addLambda v e env1) (addDataConstructor e env)
-        e   -> addLambda v e env
--}
--- VarDefinition is used to declare top-level symbol with the type signature
--- If the symbol does not exist in the environment, we add it and initialize an Empty Lambda assigned to it with the type signature
--- If it does exist --> ERROR
-processOneBinding (VarDefinition v@(Var n t), si) env = 
-    let func = Map.lookup n (topLambdas env)
-        e = Lambda [] EMPTY t []
-    in  maybe (Right $ env { topLambdas = Map.insert n e (topLambdas env) }) 
-              -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
-              (const $ Left $ LogPayload 
-                0 0 ""
-                ("Tried to add lambda or expression named " ++ n ++ " but it has already been defined before!")) 
-              func
-processOneBinding (ex, si) _ = Left $ LogPayload 
-        (lineNum si) (colNum si) ""
-        ("Cannot add the following expression to the Environment during initial Environment Building pass:\n" 
-            ++ (ppr ex) ++ "\n" 
-            ++ (TL.unpack (pShow ex))
-            ++ "\nThe expression is parsed and stored in LTProgram, but is not in the Environment.")
+-- We need to provide a clean and pure interface for different functions, types etc lookup and insertion,
+-- also, to handle Classes nicely --> instead of forcing monad functions to use low-level Map manipulations etc.
+-- see State for the monadic interface!!!
 
--- pure function that takes an expression and Environment and 
--- then either constructs a new type from the data constructor or adds constructor to the existing type
--- at this point, data constructor is either Lam ... Tuple or just Tuple, in the latter case it must be empty.
-addDataConstructor :: Expr -> Environment -> Either LogPayload Environment
--- addDataConstructor e@(Lam vars (Tuple constag exs typ) typlam preds) env = _addDataConstructor e typ env
--- addDataConstructor e@(Tuple constag exs typ) env = _addDataConstructor e typ env
-addDataConstructor e _ = Left $ LogPayload 
-    0 0 ""
-    ("Tried to add data constructor to the typing environment, but the expression is a " ++ ppr e)
-_addDataConstructor e typ env@Environment{types=types} = 
-    case (maybeTypeName typ) of
-        Nothing -> Left $ LogPayload 
-            0 0 ""
-            ("Tried to add data constructor to the typing environment, but it's type is " ++ ppr typ)
-        Just tr -> Right $ env{ types = Map.alter f (name tr) types }
-            where f Nothing        = Just tr{dataCons=[e]}
-                  f (Just typerep) = Just typerep{dataCons = (e: (dataCons typerep))}
+lookupLambda :: Name -> Environment -> Maybe Lambda
+lookupLambda n env = Map.lookup n (topLambdas env)
 
+addLambda :: Name -> Lambda -> Environment -> Environment
+addLambda n l env = env { topLambdas = Map.insert n l (topLambdas env) }
+
+addManyLambdas :: [(Name, Lambda)] -> Environment -> Environment
+addManyLambdas ls env = env { topLambdas = Prelude.foldl (\acc (n1,l1) -> Map.insert n1 l1 acc) (topLambdas env) ls }
 
 maybeTypeName :: Type -> Maybe TypeRep
 maybeTypeName (TCon n)              = Just $ LiftedTypeRep n []   []
 maybeTypeName (TApp (TCon n) args)  = Just $ LiftedTypeRep n args []
 maybeTypeName _                     = Nothing
 
--- adds a lambda or expression to the typing environment
-addLambda :: Var -> Expr -> Environment -> Either LogPayload Environment
-addLambda v@(Var n _) e env = 
-    let func = Map.lookup n (lambdas env)
-    in  maybe (Right $ env { lambdas = Map.insert n (v,e) (lambdas env) }) 
-              -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
-              (const $ Left $ LogPayload 
-                0 0 ""
-                ("Tried to add lambda or expression named " ++ n ++ " but it has already been defined before!")) 
-              func
-            
 
 
 

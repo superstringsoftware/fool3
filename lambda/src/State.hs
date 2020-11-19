@@ -59,6 +59,10 @@ initializeInterpreter = return $ InterpreterState {
     currentEnvironment = initialEnvironment
 }
 
+------------------ Monadic interface to the Environment ---------------------
+lookupLambdaM :: Name -> IntState (Maybe Lambda)
+lookupLambdaM n = get >>= pure . currentEnvironment >>= pure . (lookupLambda n)
+
 -- outputs a message only if tracing is on
 trace :: String -> IntState ()
 trace msg = do

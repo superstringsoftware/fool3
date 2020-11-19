@@ -50,7 +50,7 @@ Semigroup:Class { a:Type } = {
 
 Semigroup Int = { (+) = primPlus# };
 Monoid Int = { E0 = 0 };
-Group Int = { (+) = primMinus# };
+Group Int = { (-) = primMinus# };
 
 ------------------ some list functions -----------------
 

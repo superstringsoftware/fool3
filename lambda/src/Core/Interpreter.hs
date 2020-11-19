@@ -28,6 +28,7 @@ import Data.HashMap.Strict as Map
 interpretExpr :: Expr -> IntState Expr
 interpretExpr e@(Lit l) = trace (ppr l) >> pure e
 interpretExpr e@(ERROR _) = trace (ppr e) >> pure e
+{-
 interpretExpr ex@(VarId n) = do
     env <- currentEnvironment <$> get
     maybe ((trace $ "Expression named '" ++ n ++ "' not found.") >> pure ex)
@@ -46,6 +47,7 @@ interpretExpr ex@(App (VarId n) args) = do
             trace $ ppr res
             -- liftIO $ putStrLn $ show res
             interpretExpr res
+-}
 {-
 -- primops are strict:
 interpretExpr (App (Prim op) ((Lit x):(Lit y):[]) ) = do
