@@ -76,6 +76,10 @@ type NamedLambda = (Name, Lambda)
 emptyLambda :: Lambda
 emptyLambda = Lambda [] EMPTY ToDerive []
 
+-- generating a fully qualified name for a top-level binding (now mostly for CLASSes):
+-- fullyQualifiedName :: Expr -> Name
+-- fullyQualifiedName 
+
 -- Record equality functions - FOR TYPE CHECKING!!!
 -- checks if only the TYPE is equal 
 fieldTypeEqual :: Field -> Field -> Bool
@@ -330,6 +334,6 @@ instance PrettyPrint Expr where
   ppr (Patterns ps) = showListCuBr ppr1 ps
       where ppr1 (PatternMatch args e2) = ppr args ++ " -> " ++ ppr e2
   ppr (PatternMatch args e2) = ppr args ++ " = " ++ ppr e2
-  ppr (ERROR err) = as [bold,yellow] err
+  ppr (ERROR err) = as [bold,red] err
   ppr e = show e
   -- λ  

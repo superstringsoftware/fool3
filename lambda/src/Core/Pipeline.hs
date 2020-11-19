@@ -120,6 +120,11 @@ processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
         -- Processing function with already existing patterns - adding the new found one
         Just lam@(Lambda _ (Patterns ps) _ _) -> return $ addLambda name (lam { body = Patterns (ps ++ [pm]) }) env
         -- remaining cases are TYPECLASSES - need to implement yet
+        -- Typeclass processing 
+        Just lam@(Lambda _ (Rec funcs) TClass preds) -> do
+            liftIO $ putStrLn $ "Found Class in a pattern match: " ++ (ppr lam)
+            let env' = addClassFuncs funcs env
+            return env'
         Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""
                                         ("Unknown pattern match:\n" ++ name ++ " = " ++ show l)) >> return env
             

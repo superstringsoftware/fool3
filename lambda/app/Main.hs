@@ -124,6 +124,10 @@ processCommand (":env":_) = do
     res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
     let fkeys = Map.keys res
     liftIO $ mapM_ (fenv1 res) fkeys
+    liftIO $ putStrLn "\n--------------- CLASS FUNCS LOOKUP TABLE ----------------"
+    cfs <- get >>= \s -> pure ( (classFuncs . currentEnvironment) s)
+    let cfkeys = Map.keys cfs
+    liftIO $ mapM_ (fenv1 cfs) cfkeys
     liftIO $ putStrLn "\n--------------- JS REALM ----------------"
     jsp <- get >>= \s -> pure ( (jsProgram . currentEnvironment) s)
     liftIO $ mapM_ putStrLn jsp
