@@ -90,9 +90,11 @@ processBinding (ex@(Binding v@(Var n t) lam), si) env =
         (Right e)  -> return e
         (Left err) -> (logError err) >> return env
     where result = 
-            let e = if t /= SmallType 
-                    then addLambda n (lam { sig = t }) env
-                    else addLambda n (lam { sig = t }) (addManyLambdas (extractConstructors ex) env)    
+            let e = case t of 
+                        SmallType -> addLambda n (lam { sig = t }) (addManyLambdas (extractConstructors ex) env)
+                        TClass    -> addLambda n (lam { sig = t }) (addClassFuncs (extractRecord $ body lam) env) 
+                        _         -> addLambda n (lam { sig = t }) env
+                         
             in  maybe (Right e) 
                     -- name conflict - need BETTER ERROR MESSAGING! (line numbers etc)
                     (const $ Left $ LogPayload 
@@ -123,7 +125,8 @@ processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
         -- Typeclass processing 
         Just lam@(Lambda _ (Rec funcs) TClass preds) -> do
             liftIO $ putStrLn $ "Found Class in a pattern match: " ++ (ppr lam)
-            let env' = addClassFuncs funcs env
+            -- let env' = addClassFuncs funcs env -- this is WRONG!!! We need to add class functions to the top-level when we initially process typeclasses!
+            let env' = env
             return env'
         Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""
                                         ("Unknown pattern match:\n" ++ name ++ " = " ++ show l)) >> return env

@@ -153,6 +153,10 @@ data Expr =
   | ERROR String -- used only in Interpreter
   deriving (Show, Eq)
 
+extractRecord :: Expr -> Record
+extractRecord (Rec r) = r
+extractRecord _ = fail "WHAT???"
+
 ---------------------------------------------------------------------------------------------------
 -- PURE CONVERSION / PROCESSING FUNCTIONS
 ---------------------------------------------------------------------------------------------------
