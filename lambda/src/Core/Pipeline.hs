@@ -39,6 +39,7 @@ import Data.Text as T
 import qualified Data.Text.Lazy as TL
 
 import Util.PrettyPrinting as TC
+import Text.Pretty.Simple (pPrint, pShow)
 
 import Data.HashMap.Strict as Map
 
@@ -91,8 +92,8 @@ processBinding (ex@(Binding v@(Var n t) lam), si) env =
         (Left err) -> (logError err) >> return env
     where result = 
             let e = case t of 
-                        SmallType -> addLambda n (lam { sig = t }) (addManyLambdas (extractConstructors ex) env)
-                        TClass    -> addLambda n (lam { sig = t }) (addClassFuncs (extractRecord $ body lam) env) 
+                        SmallType -> addLambda n (lam { sig = t }) (addManyLambdas (extractConstructors ex)   env) -- adding type declaration and exctracting constructors
+                        TClass    -> addLambda n (lam { sig = t }) (addClassFuncs  (extractRecord $ body lam) env) -- adding typeclass and extracting function defs
                         _         -> addLambda n (lam { sig = t }) env
                          
             in  maybe (Right e) 
@@ -106,7 +107,7 @@ processBinding (ex@(Binding v@(Var n t) lam), si) env =
 -- If it's a Type  application - need to create another specific type
 -- If it's a Class application - need to instantiate all functions and update function lookup tables for specific types of this class
 -- If it's a function application - either add a new function to the environment, or update pattern match cases for the existing function. 
-processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
+processBinding ( pm@(PatternMatch app@(App (VarId name) args) ex), si) env = do
     case (lookupLambda name env) of
         -- no function with such name yet - creating a function with Patterns as a body and types to figure out
         Nothing -> do
@@ -122,10 +123,12 @@ processBinding ( pm@(PatternMatch (App (VarId name) args) ex), si) env = do
         -- Processing function with already existing patterns - adding the new found one
         Just lam@(Lambda _ (Patterns ps) _ _) -> return $ addLambda name (lam { body = Patterns (ps ++ [pm]) }) env
         -- remaining cases are TYPECLASSES - need to implement yet
-        -- Typeclass processing 
+        -- Typeclass processing - Application of a class to variables, so defining an INSTANCE
         Just lam@(Lambda _ (Rec funcs) TClass preds) -> do
-            liftIO $ putStrLn $ "Found Class in a pattern match: " ++ (ppr lam)
+            liftIO $ putStrLn $ "Found Class in a pattern match:\n" ++ (ppr pm) ++ "\n" ++ (TL.unpack $ pShow pm)
             -- let env' = addClassFuncs funcs env -- this is WRONG!!! We need to add class functions to the top-level when we initially process typeclasses!
+            let funcNamePrefix = fullyQualifiedName app
+            liftIO $ putStrLn $ "Generated name: " ++ funcNamePrefix
             let env' = env
             return env'
         Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""

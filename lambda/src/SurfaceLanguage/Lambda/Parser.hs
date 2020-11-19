@@ -131,7 +131,7 @@ pBindingWithArgs = do
 pBindingNoArgs :: Parser Expr
 pBindingNoArgs = do
     var   <- pVar -- mandatory identificator
-    ex    <- (reservedOp "=" *> pExpr) -- parse the body
+    ex    <- reservedOp "=" *> pExpr -- parse the body
     return $ Binding var (Lambda [] ex ToDerive [])
 
 
@@ -142,11 +142,19 @@ pTopLevelBinding = try pBindingWithArgs <|> pBindingNoArgs
 pTopLevelPatternMatch :: Parser Expr
 pTopLevelPatternMatch = do
     --dbg "pPatternMatch started"
-    h <- pArgs <?> "pArgs in pattern match"
+    h <- pApp <?> "pArgs in pattern match"
     reservedOp "="
-    t <- pExpr
     --dbg "pPatternMatch ended"
-    return $ PatternMatch h t
+    PatternMatch h <$> (try (braces pClassPatternMatches) <|> pExpr)
+
+pClassPatternMatches :: Parser Expr
+pClassPatternMatches = Patterns <$> commaSep pClassPatternMatch
+
+pClassPatternMatch :: Parser Expr
+pClassPatternMatch = do 
+    h <- pApp <?> "pArgs in pattern match"
+    reservedOp "="
+    PatternMatch h <$> pExpr
 
 -- Building expression parser
 pExpr :: Parser Expr
@@ -157,12 +165,11 @@ pFactor = try pArgs <?> "arguments in pFactor failed?"
 
 pContainers :: Parser Expr
 pContainers = -- try  (FlTuple TTVector <$> angles   (commaSep expr)) <|>
-        try  $ do
-            args <- brackets (commaSep pExpr)
-            return $ Lit $ LList args
+        try (brackets (commaSep pExpr) >>= return . Lit . LList)
         <|> (try pFields >>= \args -> return (Rec args))
         -- <|> try (braces (commaSep pAnonVar) >>= \args -> return $ Rec $ vars2record args)
         <|> try (braces (commaSep pExpr) >>= \args -> return $ Rec $ recordFromExprs args)
+        -- <|> try (braces pClassPatternMatches)
         <|> (angles (commaSep pFactor)  >>= \args -> return (Lit $ LVec args))
 
 pArg :: Parser Expr
@@ -176,11 +183,19 @@ pArg = try pContainers
     <|> symbolId
     <?> "container, literal, symbol id or parenthesized expression"
 
+-- Clear function application
+pApp :: Parser Expr
+pApp = do
+    func <- symbolId
+    args <- many pArg
+    let er = if args == [] then func else App func args
+    return er
+
 pArgs :: Parser Expr
 pArgs = do
     args@(f:xs) <- many1 pArg
     --return $ foldl1 App args -- need to use left fold here because application is highest precedence
-    let er = if (xs == []) then f else (App f xs)
+    let er = if xs == [] then f else App f xs
     return er
 
 pRecordAccess :: Parser Expr

@@ -77,8 +77,12 @@ emptyLambda :: Lambda
 emptyLambda = Lambda [] EMPTY ToDerive []
 
 -- generating a fully qualified name for a top-level binding (now mostly for CLASSes):
--- fullyQualifiedName :: Expr -> Name
--- fullyQualifiedName 
+fullyQualifiedName :: Expr -> Name
+fullyQualifiedName (App (VarId name) args) = Prelude.foldl (\acc v -> acc ++ "." ++ (_argToName v)) name args
+
+_argToName :: Expr -> Name
+_argToName (VarId n) = n
+_argToName ex = "[ERROR] Called _argToName with argument being: " ++ show ex  
 
 -- Record equality functions - FOR TYPE CHECKING!!!
 -- checks if only the TYPE is equal 
@@ -155,7 +159,7 @@ data Expr =
 
 extractRecord :: Expr -> Record
 extractRecord (Rec r) = r
-extractRecord _ = fail "WHAT???"
+extractRecord ex = fail $ "WHAT??? Tried to extract a record from a non-record expression: " ++ (show ex)
 
 ---------------------------------------------------------------------------------------------------
 -- PURE CONVERSION / PROCESSING FUNCTIONS

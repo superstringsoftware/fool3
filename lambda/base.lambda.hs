@@ -48,6 +48,19 @@ Semigroup:Class { a:Type } = {
 ∃ Semigroup a => Monoid:Class {a} = { E0:a };
 ∃ Monoid    a => Group :Class {a} = { (-):a { x, y : a } };
 
+Functor:Class { f:Type->Type } = {
+    fmap:(f b) { func:(a->b), ls:(f a) }
+};
+
+{-
+Show:Class {a:Type} = { show:String {:a} };
+Show SomeClass = {
+    show (Var x) = f1 x,
+    show _ = "No",
+    f3 = new_func {x=3, n=19, b=x+4}
+};
+-}
+
 Semigroup Int = { (+) = primPlus# };
 Monoid Int = { E0 = 0 };
 Group Int = { (-) = primMinus# };
@@ -65,11 +78,14 @@ map f (x::xs) = (f x)::(map f xs);
 --------------------- test program --------------------
 
 ls = [1,3,4,3];
+v = <1,2,3>;
 
 fib {n:Int};
 fib 0 = 1;
 fib 1 = 1;
 fib n = fib(n-1) + fib(n-2);
+
+-- testFunc = f {x=3, n=19, b=x+4};
 
 main = print# (fib 20);
 -- main = print# (map (+2) ls);
