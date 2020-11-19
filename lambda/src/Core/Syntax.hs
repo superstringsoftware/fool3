@@ -341,6 +341,7 @@ instance PrettyPrint Expr where
   ppr (App f args) = (ppr f) ++ " " ++ (showListRoBrPlain ppr args)
   ppr (Patterns ps) = showListCuBr ppr1 ps
       where ppr1 (PatternMatch args e2) = ppr args ++ " -> " ++ ppr e2
+            ppr1 ex = ppr ex
   ppr (PatternMatch args e2) = ppr args ++ " = " ++ ppr e2
   ppr (ERROR err) = as [bold,red] err
   ppr e = show e

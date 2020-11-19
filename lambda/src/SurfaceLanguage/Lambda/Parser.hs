@@ -148,7 +148,7 @@ pTopLevelPatternMatch = do
     PatternMatch h <$> (try (braces pClassPatternMatches) <|> pExpr)
 
 pClassPatternMatches :: Parser Expr
-pClassPatternMatches = Patterns <$> commaSep pClassPatternMatch
+pClassPatternMatches = Patterns <$> (try (commaSep pTopLevelBinding) <|> (commaSep pClassPatternMatch))
 
 pClassPatternMatch :: Parser Expr
 pClassPatternMatch = do 

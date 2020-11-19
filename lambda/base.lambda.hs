@@ -52,14 +52,15 @@ Functor:Class { f:Type->Type } = {
     fmap:(f b) { func:(a->b), ls:(f a) }
 };
 
-{-
+
 Show:Class {a:Type} = { show:String {:a} };
 Show SomeClass = {
     show (Var x) = f1 x,
     show _ = "No",
+    E1 = 1,
     f3 = new_func {x=3, n=19, b=x+4}
 };
--}
+
 
 Semigroup Int = { (+) = primPlus# };
 Monoid Int = { E0 = 0 };
@@ -86,6 +87,8 @@ fib 1 = 1;
 fib n = fib(n-1) + fib(n-2);
 
 -- testFunc = f {x=3, n=19, b=x+4};
+
+-- tt = x;
 
 main = print# (fib 20);
 -- main = print# (map (+2) ls);
