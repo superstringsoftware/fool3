@@ -16,6 +16,32 @@ import Control.Monad.Trans.State.Strict
 
 import Data.HashMap.Strict as Map
 
+
+-------------------- PURE Expr manipulation functions ---------------------------
+processExpr :: Environment -> Expr -> Expr
+-- trying to beta-reduce - in case f is an existing function
+processExpr env e@(App (VarId f) ex) = 
+    case (lookupLambda f env) of
+            Nothing    -> e -- didn't find the function, so can't do anything here
+            (Just lam) -> App (Lam lam) ex
+processExpr _ e = ERROR $ "[processExpr] Not implemented for expression " ++ (ppr e) 
+
+
+
+
+
+
+-- betaReduce (App (Lam lam) ex) =  
+
+
+
+
+
+
+
+
+
+----------------------------------- OLD -----------------------------------------
 {-
   | Lam [Var] Expr Type [Pred] 
   | App Expr [Expr] -- tuple application mechanism (since even haskell eventually gets there!!!): Expr1 (Expr1,...,Exprn)
@@ -87,7 +113,7 @@ runLitPrimOp _ _ PDiv = LString "Type error while applying primitive /"
 
 
 -- beta reducing lambda application to arguments
-betaReduce :: Expr -> [Expr] -> Expr
+-- betaReduce :: Expr -> [Expr] -> Expr
 -- data constructor application - can only be fully saturated
 {-
 betaReduce (Lam vars (Tuple cons expr typ ) t p) args = 
@@ -101,7 +127,7 @@ betaReduce (Lam []   expr t p) args     = App expr args -- thunk
 betaReduce (Lam vars expr t p) []       = Lam vars expr t p -- function value
 betaReduce f@(Lam vars expr t p) (a:as) = betaReduce (betaReduceSingle f a) as
 -}
-betaReduce e args = App e args
+-- betaReduce e args = App e args
 
 betaReduceSingle :: Expr -> Expr -> Expr
 betaReduceSingle e1 e2 = e1 -- WRONG!!!

@@ -64,7 +64,7 @@ Show SomeClass = {
 
 Semigroup Int = { (+) = primPlus# };
 Monoid Int = { E0 = 0 };
-Group Int = { (-) = primMinus# };
+Group Int = { (-) = primMinus#, (+) = x + 13 };
 
 ------------------ some list functions -----------------
 
@@ -75,6 +75,8 @@ length (x::xs) = 1 + length xs;
 map : (List b) { func:(a->b), ls:(List a) };
 map _ [] = [];
 map f (x::xs) = (f x)::(map f xs);
+
+typeof:Type {x:a} = a;
 
 --------------------- test program --------------------
 
@@ -90,10 +92,16 @@ fib n = fib(n-1) + fib(n-2);
 
 -- tt = x;
 
-main = print# (fib 20);
--- main = print# (map (+2) ls);
+--main = print# (fib 20);
+main = print# (map (+2) ls);
 
 -- Expr:Type {a} = {Val:(Expr Int) {:Int}, Bool:(Expr Bool)};
+
+-- coolFunc:Type {a:Type, x:Int, c:(String->List a)} = Bool;
+
+
+
+-- plus {x:Int, y:Int} = primplus; -- can't do pattern match on type explicitly. Maybe we don't need to?
 
 
 

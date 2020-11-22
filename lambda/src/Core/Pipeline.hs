@@ -29,6 +29,7 @@ import State
 import Core.Syntax    
 import Logs    
 import Core.Environment    
+import Core.Interpreter
 
 -- import Util.IOLogger
 
@@ -126,9 +127,12 @@ processBinding ( pm@(PatternMatch app@(App (VarId name) args) ex), si) env = do
         -- Typeclass processing - Application of a class to variables, so defining an INSTANCE
         Just lam@(Lambda _ (Rec funcs) TClass preds) -> do
             liftIO $ putStrLn $ "Found Class in a pattern match:\n" ++ (ppr pm) ++ "\n" ++ (TL.unpack $ pShow pm)
+            -- liftIO $ putStrLn $ "Class definition is:" ++ (ppr lam) ++ "\n" ++ (TL.unpack $ pShow lam)
             -- let env' = addClassFuncs funcs env -- this is WRONG!!! We need to add class functions to the top-level when we initially process typeclasses!
             let funcNamePrefix = fullyQualifiedName app
             liftIO $ putStrLn $ "Generated name: " ++ funcNamePrefix
+            let e' = processExpr env app
+            liftIO $ putStrLn $ "Substituted expression: " ++ (ppr e')
             let env' = env
             return env'
         Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""

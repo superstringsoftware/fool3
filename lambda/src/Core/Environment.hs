@@ -58,17 +58,29 @@ initialEnvironment = Environment {
     -- Add another TOP LEVEL lambda named Semigroup.Int.+ that maps to the actual body
     -- Then, when we do lookup during code generation - we ask the indirection table with the full type signature etc.
 
+-- NEW IDEA:
+-- Storing typeclass functions as simply a function with pattern matches for specific type signatures!!!
+-- They still will redirect to the global level functions, e.g., for +:
+-- + = {"Int->Int" -> VarId "Semigroup.Int.+", "Float->Float" -> VarId "Semigroup.Float.+" }
+-- then on the top level we'll have:
+-- Semigroup.Int.+ = primplusint
+-- Semigroup.Float.+ = primplusfloat
+-- ETC.
+-- Maybe it's too many indirections, and we'll want to optimize for inline cases etc.
+
+-- DEFAULT PATTERN is treated as the one with EMPTY instead of a pattern match!
+
 -- adds one newly encountered class function to the top level environment (basically, sets up a default function if any at the top level and initializes a Sig -> Name) lookup table
 -- TODO: ADD ERROR HANDLING IN CASE THERE ARE SAME NAMES!!!!!!
 addOneClassFunc :: Field -> Environment -> Environment
-addOneClassFunc (Field nm tp (Lam lam@(Lambda _ _ sig _) )) env = 
-    let env' = addLambda nm (lam { sig = tp }) env
+addOneClassFunc (Field nm tp (Lam lam@(Lambda args body sig _) )) env = 
+    let env' = addLambda nm (lam { sig = tp, body = Patterns [PatternMatch EMPTY body] }) env -- adding DEFAULT pattern match to the patterns in the class function. Can use this instead: (App (VarId nm) [Rec args])
     in  env' {
             classFuncs = Map.insert nm [] (classFuncs env')
         }
 -- case such as E0 in monoid - just a constant basically
 addOneClassFunc (Field nm tp EMPTY) env = 
-    let env' = addLambda nm (emptyLambda { sig = tp }) env
+    let env' = addLambda nm (emptyLambda { sig = tp, body = Patterns[PatternMatch EMPTY EMPTY] }) env
     in  env' {
             classFuncs = Map.insert nm [] (classFuncs env')
         }
