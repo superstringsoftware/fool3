@@ -206,6 +206,24 @@ convertFieldToCons typ (Field name tp (Lam lam)) = Field {
 -- general case, do nothing
 convertFieldToCons _ f = f
 
+-- Builds a Record of fields used for beta reduction using "substituteVariable/Type" functions below
+-- Given an expression App (Lambda ...) [exs] - we make exs values inside parameters of the lambda
+-- then doing a beta reduction inside the lambda for both total application (returning the body expression)
+-- and the partial application (INCORRECT NOW!!! - need to construct a lambda with new arguments)
+betaReduceLambda :: Lambda -> [Expr] -> Expr
+betaReduceLambda lam exs = 
+  let ar1 = length $ params lam
+      ar2 = length exs
+      (result, args)
+        | ar1 == ar2
+        = (body lam, 
+          zipWith (\ f e -> f {fieldValue = e}) (params lam) exs) -- build an arguments record from arguments names and expressions given
+        | ar1 > ar2
+        = (body lam, 
+          zipWith (\ f e -> f {fieldValue = e}) (take ar2 $ params lam) exs)
+        | otherwise = (EMPTY, [])
+  in if result == EMPTY then ERROR "Tried to give more arguments to the function than it can take"
+     else traverseModify (substituteVariables args) (substituteTypeVariables args) result
 
 
 
@@ -260,11 +278,21 @@ instance ExprTraversable Expr where
 substituteVariable :: Field -> Expr -> Expr
 substituteVariable fld ex@(VarId n) = if fieldName fld == n then fieldValue fld else ex
 substituteVariable _ ex = ex
+
+-- substitues ANY variable in the field list with its occurence in Expr
+substituteVariables :: [Field] -> Expr -> Expr
+substituteVariables (f:fs) ex@(VarId n) = if fieldName f == n then fieldValue f else substituteVariables fs ex
+substituteVariables [] ex = ex
+substituteVariables _ ex = ex
 -- same but for types
 substituteTypeVariable :: Field -> Type -> Type
 substituteTypeVariable fld tex@(TVar (Var n t)) = if fieldName fld == n then TExpr $ fieldValue fld else tex
 substituteTypeVariable _ tex = tex
 
+substituteTypeVariables :: [Field] -> Type -> Type
+substituteTypeVariables (f:fs) tex@(TVar (Var n t)) = if fieldName f == n then TExpr $ fieldValue f else substituteTypeVariables fs tex
+substituteTypeVariables [] tex = tex
+substituteTypeVariables _ tex = tex
 
 -- the very first pass that we run right after parsing the source file    
 -- Some desugaring (Operators to Apps)

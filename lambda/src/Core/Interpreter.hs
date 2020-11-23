@@ -25,7 +25,7 @@ processExpr :: Environment -> Expr -> Expr
 processExpr env e@(App (VarId f) ex) = 
     case lookupLambda f env of
             Nothing    -> e -- didn't find the function, so can't do anything here
-            (Just lam) -> betaReduce $ App (Lam lam) ex
+            (Just lam) -> betaReduceLambda lam ex
 processExpr _ e = ERROR $ "[processExpr] Not implemented for expression " ++ ppr e 
 
 
@@ -39,7 +39,8 @@ betaReduce ex@(App (Lam lam) args@(_:_)) =
     let ar1 = length $ params lam
         ar2 = length args 
     in  if ar1 > ar2 then ERROR $ "Tried to apply a function of arity " ++ show ar1 ++ " to " ++ show ar2 ++ " arguments. Details:\n" ++ ppr ex
-        else ex
+        else if ar1 < ar2 then ERROR $ "Tried to apply a function partially, which is not implemented yet. Details:\n" ++ ppr ex
+                          else ERROR "Not implemented"
 
 
 
