@@ -95,6 +95,8 @@ fib n = fib(n-1) + fib(n-2);
 --main = print# (fib 20);
 main = print# (map (+2) ls);
 
+plus {x:Int} = x + 2;
+
 -- Expr:Type {a} = {Val:(Expr Int) {:Int}, Bool:(Expr Bool)};
 
 -- coolFunc:Type {a:Type, x:Int, c:(String->List a)} = Bool;

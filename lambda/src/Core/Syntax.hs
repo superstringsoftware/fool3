@@ -157,9 +157,11 @@ data Expr =
   | ERROR String -- used only in Interpreter
   deriving (Show, Eq)
 
+data Literal = LInt !Int | LFloat !Double | LChar !Char | LString !String | LList [Expr] | LVec [Expr] deriving (Eq, Show)
+
 extractRecord :: Expr -> Record
 extractRecord (Rec r) = r
-extractRecord ex = fail $ "WHAT??? Tried to extract a record from a non-record expression: " ++ (show ex)
+extractRecord ex = fail $ "WHAT??? Tried to extract a record from a non-record expression: " ++ show ex
 
 ---------------------------------------------------------------------------------------------------
 -- PURE CONVERSION / PROCESSING FUNCTIONS
@@ -206,23 +208,68 @@ convertFieldToCons _ f = f
 
 
 
-data Literal = LInt !Int | LFloat !Double | LChar !Char |
-               LString !String | LList [Expr] | LVec [Expr]
-               deriving (Eq, Show)
+
+-- --------------------------------- TRAVERSAL AND MODIFICATION --------------------------------------------
+-- need to define functions that take an Expr->Expr function and modify all our datatypes correctly.
+-- Then, beta-reduction will use these functions to work properly. It's a bit more complicated in our case,
+-- as bound variables can be used in Type Signatures, where we'll need to make substitution as well.
+
+class ExprTraversable a where
+  traverseModify :: (Expr -> Expr) -> (Type -> Type) -> a -> a
+
+instance ExprTraversable a => ExprTraversable[a] where
+  traverseModify fe ft exs = map (traverseModify fe ft) exs
+
+instance ExprTraversable Field where
+  traverseModify fe ft fld = fld { 
+      fieldValue = fe $ traverseModify fe ft (fieldValue fld) 
+    , fieldType = ft $ traverseModify fe ft (fieldType fld) 
+    }
+
+instance ExprTraversable Lambda where
+  traverseModify fe ft lam = lam { 
+      params = traverseModify fe ft (params lam)
+    , body = fe $ traverseModify fe ft (body lam)
+    , sig = ft $ traverseModify fe ft (sig lam) 
+    }
+
+instance ExprTraversable Type where
+  traverseModify fe ft (TApp t1 ts) = TApp (ft $ traverseModify fe ft t1) (traverseModify fe ft ts)
+  traverseModify fe ft (TArr t1 t2) = TArr (ft $ traverseModify fe ft t1) (ft $ traverseModify fe ft t2)
+  traverseModify fe ft tex = ft tex
+
+instance ExprTraversable Expr where 
+  traverseModify fe ft (Binding v lam) = Binding v (traverseModify fe ft lam)
+  traverseModify fe ft (Lam lam) = Lam (traverseModify fe ft lam)
+  traverseModify fe ft (Rec r) = Rec (traverseModify fe ft r)
+  traverseModify fe ft (Value r c t) = Value (traverseModify fe ft r) c t
+  traverseModify fe ft (RecordAccess exs) = RecordAccess (traverseModify fe ft exs)
+  traverseModify fe ft (LetIns fs ex) = LetIns (traverseModify fe ft fs) (fe $ traverseModify fe ft ex)
+  traverseModify fe ft (App ex exs) = App (fe $ traverseModify fe ft ex) (traverseModify fe ft exs)
+  traverseModify fe ft (PatternMatch e1 e2) = PatternMatch (fe $ traverseModify fe ft e1) (fe $ traverseModify fe ft e2)
+  traverseModify fe ft (Patterns exs) = Patterns (traverseModify fe ft exs)
+  -- not including Ops since they will be desugared into Apps
+  traverseModify fe ft ex = fe ex
+
+
+-- ---------------------------------- Helper function for the variable substitution -----------------------
+-- can add type checking eventually
+-- it takes a Field (name, type, value) and substitutes a variables in the Expr with the same name to the field value,
+-- *including* bound variables with the same name in the type signatures!
+-- Theoretically, if we traverse modify with these 2 functions we should get a beta reduction?
+substituteVariable :: Field -> Expr -> Expr
+substituteVariable fld ex@(VarId n) = if fieldName fld == n then fieldValue fld else ex
+substituteVariable _ ex = ex
+-- same but for types
+substituteTypeVariable :: Field -> Type -> Type
+substituteTypeVariable fld tex@(TVar (Var n t)) = if fieldName fld == n then TExpr $ fieldValue fld else tex
+substituteTypeVariable _ tex = tex
 
 
 -- the very first pass that we run right after parsing the source file    
 -- Some desugaring (Operators to Apps)
 -- Setting up initial guesses for Types inside Type Declarations           
 afterparse :: Expr -> Expr
--- this is a hack for 'built in' operators, needs to go once Classes are supported!!!
-{-
-afterparse e@(BinaryOp "+" _ _) = e
-afterparse e@(BinaryOp "-" _ _) = e
-afterparse e@(BinaryOp "*" _ _) = e
-afterparse e@(BinaryOp "/" _ _) = e
--- end of the hack
--}
 -- converting VarDefinition to Binding with an empty lambda and a guess for the type signature
 afterparse (VarDefinition v@(Var n t)) = Binding v (Lambda [] EMPTY ToDerive [])
 -- Processing Type Declaration: setting up type signatures and constructor function bodies
@@ -242,33 +289,8 @@ afterparse (BinaryOp n e1 e2) = App (VarId n) ( (afterparse e1):(afterparse e2):
 afterparse (UnaryOp n e) = App (VarId n) ( (afterparse e):[])
 afterparse e = e
 
-{-
--- traversing AST with modifying function f
-traverseModify :: (Expr -> Expr) -> Expr -> Expr
-traverseModify f (Lam v ex t p)        = Lam v (traverseModify f ex) t p
-traverseModify f (App ex exs)          = App (traverseModify f ex) (map (traverseModify f) exs)
-traverseModify f (Tuple c exs t)       = Tuple c (map (traverseModify f) exs) t
-traverseModify f (PatternMatch exs ex) = PatternMatch (map (traverseModify f) exs) (traverseModify f ex)
-traverseModify f (Patterns exs)        = Patterns (map (traverseModify f) exs)
-traverseModify f (BinaryOp n e1 e2)    = BinaryOp n (traverseModify f e1) (traverseModify f e2)
-traverseModify f (UnaryOp n e1)        = UnaryOp n (traverseModify f e1)
-traverseModify f (Let bnds ex)         = Let (map (fn f) bnds) (traverseModify f ex)
-    where fn g (v, ex) = (v, traverseModify g ex)
-traverseModify f e = f e
 
-traverseModify' :: (Expr -> Expr) -> Expr -> Expr
-traverseModify' f (Lam v ex t p)        = f $ Lam v (traverseModify f ex) t p
-traverseModify' f (App ex exs)          = f $ App (traverseModify f ex) (map (traverseModify f) exs)
-traverseModify' f (Tuple c exs t)       = f $ Tuple c (map (traverseModify f) exs) t
-traverseModify' f (PatternMatch exs ex) = f $ PatternMatch (map (traverseModify f) exs) (traverseModify f ex)
-traverseModify' f (Patterns exs)        = f $ Patterns (map (traverseModify f) exs)
-traverseModify' f (BinaryOp n e1 e2)    = f $ BinaryOp n (traverseModify f e1) (traverseModify f e2)
-traverseModify' f (UnaryOp n e1)        = f $ UnaryOp n (traverseModify f e1)
-traverseModify' f (Let bnds ex)         = f $ Let (map (fn f) bnds) (traverseModify f ex)
-    where fn g (v, ex) = (v, traverseModify g ex)
-traverseModify' f e = f e
--}
-
+-- --------------------------------- PRETTY PRINTING --------------------------------------------
 
 instance PrettyPrint Field where
   ppr (Field fn ft EMPTY) = fn ++ pprTypeOnly ft

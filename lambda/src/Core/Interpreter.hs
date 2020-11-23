@@ -11,6 +11,8 @@ import State
 import Core.Primitives
 
 import Util.PrettyPrinting
+
+import Util.PrettyPrinting
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State.Strict
 
@@ -21,17 +23,23 @@ import Data.HashMap.Strict as Map
 processExpr :: Environment -> Expr -> Expr
 -- trying to beta-reduce - in case f is an existing function
 processExpr env e@(App (VarId f) ex) = 
-    case (lookupLambda f env) of
+    case lookupLambda f env of
             Nothing    -> e -- didn't find the function, so can't do anything here
-            (Just lam) -> App (Lam lam) ex
-processExpr _ e = ERROR $ "[processExpr] Not implemented for expression " ++ (ppr e) 
+            (Just lam) -> betaReduce $ App (Lam lam) ex
+processExpr _ e = ERROR $ "[processExpr] Not implemented for expression " ++ ppr e 
 
 
 
 
 
-
--- betaReduce (App (Lam lam) ex) =  
+-- Applying a lambda to a given list of expressions (NON EMPTY!)
+-- will probably need to change in the future - convert the list into a record, deduce types, typecheck etc?
+-- NOTE: Now there's NO TYPECHECKING WHATSOEVER!!!
+betaReduce ex@(App (Lam lam) args@(_:_)) =  
+    let ar1 = length $ params lam
+        ar2 = length args 
+    in  if ar1 > ar2 then ERROR $ "Tried to apply a function of arity " ++ show ar1 ++ " to " ++ show ar2 ++ " arguments. Details:\n" ++ ppr ex
+        else ex
 
 
 

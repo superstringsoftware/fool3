@@ -87,6 +87,7 @@ buildEnvironmentM x@(e,si) = do
 processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
 -- top level binding
 -- putting ONLY RETURN TYPE to the Lambda sig - it's DIFFERENT from the VarDefinition case, can be confusing!!!
+-- Adds functions, type declarations and class declarations.
 processBinding (ex@(Binding v@(Var n t) lam), si) env = 
     case result of
         (Right e)  -> return e
@@ -132,7 +133,7 @@ processBinding ( pm@(PatternMatch app@(App (VarId name) args) ex), si) env = do
             let funcNamePrefix = fullyQualifiedName app
             liftIO $ putStrLn $ "Generated name: " ++ funcNamePrefix
             let e' = processExpr env app
-            liftIO $ putStrLn $ "Substituted expression: " ++ (ppr e')
+            liftIO $ putStrLn $ "Substituted expression: " ++ (ppr e') -- ++ "\n" ++ (TL.unpack $ pShow e')
             let env' = env
             return env'
         Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""
