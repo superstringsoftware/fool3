@@ -133,7 +133,8 @@ processBinding ( pm@(PatternMatch app@(App (VarId name) args) ex), si) env = do
             let funcNamePrefix = fullyQualifiedName app
             liftIO $ putStrLn $ "Generated name: " ++ funcNamePrefix
             let e' = processExpr env app
-            liftIO $ putStrLn $ "Substituted expression: " ++ (ppr e') -- ++ "\n" ++ (TL.unpack $ pShow e')
+            liftIO $ putStrLn $ "Substituted expression: " ++ (ppr e') ++ "\n" ++ (TL.unpack $ pShow e')
+            liftIO $ putStrLn $ "Need to match it with:\n" ++ (TL.unpack $ pShow ex)
             let env' = env
             return env'
         Just l -> (logError $ LogPayload (lineNum si) (colNum si) ""

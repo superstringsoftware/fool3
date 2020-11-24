@@ -276,21 +276,21 @@ instance ExprTraversable Expr where
 -- *including* bound variables with the same name in the type signatures!
 -- Theoretically, if we traverse modify with these 2 functions we should get a beta reduction?
 substituteVariable :: Field -> Expr -> Expr
-substituteVariable fld ex@(VarId n) = if fieldName fld == n then fieldValue fld else ex
+substituteVariable fld ex@(VarId n) = if (fieldName fld == n) && (fieldName fld /= "") then fieldValue fld else ex
 substituteVariable _ ex = ex
 
 -- substitues ANY variable in the field list with its occurence in Expr
 substituteVariables :: [Field] -> Expr -> Expr
-substituteVariables (f:fs) ex@(VarId n) = if fieldName f == n then fieldValue f else substituteVariables fs ex
+substituteVariables (f:fs) ex@(VarId n) = if (fieldName f == n) && (fieldName f /= "") then fieldValue f else substituteVariables fs ex
 substituteVariables [] ex = ex
 substituteVariables _ ex = ex
 -- same but for types
 substituteTypeVariable :: Field -> Type -> Type
-substituteTypeVariable fld tex@(TVar (Var n t)) = if fieldName fld == n then TExpr $ fieldValue fld else tex
+substituteTypeVariable fld tex@(TVar (Var n t)) = if (fieldName fld == n) && (fieldName fld /= "") then TExpr $ fieldValue fld else tex
 substituteTypeVariable _ tex = tex
 
 substituteTypeVariables :: [Field] -> Type -> Type
-substituteTypeVariables (f:fs) tex@(TVar (Var n t)) = if fieldName f == n then TExpr $ fieldValue f else substituteTypeVariables fs tex
+substituteTypeVariables (f:fs) tex@(TVar (Var n t)) = if (fieldName f == n) && (fieldName f /= "") then TExpr $ fieldValue f else substituteTypeVariables fs tex
 substituteTypeVariables [] tex = tex
 substituteTypeVariables _ tex = tex
 

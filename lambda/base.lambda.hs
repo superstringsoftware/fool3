@@ -64,7 +64,7 @@ Show SomeClass = {
 
 Semigroup Int = { (+) = primPlus# };
 Monoid Int = { E0 = 0 };
-Group Int = { (-) = primMinus#, (+) = x + 13 };
+Group Int = { (-) = primMinus# };
 
 ------------------ some list functions -----------------
 

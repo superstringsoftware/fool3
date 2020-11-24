@@ -32,18 +32,6 @@ processExpr _ e = ERROR $ "[processExpr] Not implemented for expression " ++ ppr
 
 
 
--- Applying a lambda to a given list of expressions (NON EMPTY!)
--- will probably need to change in the future - convert the list into a record, deduce types, typecheck etc?
--- NOTE: Now there's NO TYPECHECKING WHATSOEVER!!!
-betaReduce ex@(App (Lam lam) args@(_:_)) =  
-    let ar1 = length $ params lam
-        ar2 = length args 
-    in  if ar1 > ar2 then ERROR $ "Tried to apply a function of arity " ++ show ar1 ++ " to " ++ show ar2 ++ " arguments. Details:\n" ++ ppr ex
-        else if ar1 < ar2 then ERROR $ "Tried to apply a function partially, which is not implemented yet. Details:\n" ++ ppr ex
-                          else ERROR "Not implemented"
-
-
-
 
 
 
