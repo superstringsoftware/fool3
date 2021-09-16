@@ -194,6 +194,14 @@ Monoid = Semigroup a => \a:U0. (
     Z0 = \a:U0. Expr : a
 ) : Sigma
 
+The whole "exists" thing becomes tricky, and we actually need a Semigroup instance inside our Monoid instance, don't we? So, maybe like:
+
+Monoid = \a:U0. (
+    exists Semigroup(a),
+    Z0 = \a:U0. Expr : a
+) : Sigma
+
+
 Add = \a:U0 b:U0. (
     SumTy = \a:U0 b:U0. Expr : U0,
     add = \a:U0 b:U0. \x:a y:b . Expr : SumTy (a,b)
@@ -282,5 +290,35 @@ Eq (a:Type) : Sigma = (
     x /= y = not (x == y)
     -}
 )
+
+#### Aha, so the type signature problem
+
+Arises when we want to write a function type in *arguments*, e.g. for the Functor:
+
+Functor (f:Type -> Type) : Sigma = (
+    fmap (g:a->b, x:f(a)) : f(b)
+)
+
+For regular functions we can use arrows, but what if we need a proper Pi?
+
+g: (x:a)->B(x)
+f: (x,y:a) -> B(x,y)  
+
+Write it as a full function sig???
+
+fmap ( g(x:a):b, x:f(a) ) -- looks ugly. So, back to arrows I guess?
+
+#### Some runtime considerations
+
+show [a:Type] (x:a) : String
+show [Int] = toString
+show [String] = id
+
+show (4) --> show (4:Int) --> show [a = Int] (x = 4)
+
+Should we make optional params only type params? Then we can track tables of polymorphic functions depending on the type params - and make these tables extendable?
+
+**Ok, so we can start with functions-only (no operators) language! --> this will allow us to test all end-to-end concepts, since the core language remains the same, so we will compile to .Net etc!!! Then we will add operators, since they are nothing more than syntactic sugar that makes parsing much more difficult, so bells and whistles!**
+
 
 
