@@ -23,12 +23,24 @@ data Expr =
     UNDEFINED -- used basically instead of Nothing in default values etc
   | Id Name
   | Lit Literal
-  | U Int
+  | U Int -- universe hierarchy
   | Pi Record Expr 
   -- ^^^ generalization of Pi-types - mapping a tuple of name:type to a type. Each subsequent argument
   -- type may depend on the previous variable here! Of course, "val" is ignored here since we are interested in types only.
   | Lam Record Expr -- same, defining a function by abstracting a bunch of variables in a tuple
-  -- Now, application is a bit tricky, we distinguish between anonymous application and named:
-  | AApp Expr (Tuple Expr)  -- anonymous application
-  | NApp Expr (Tuple Field) -- named application
+  | App Expr Record  -- in case of anonymous application, `name` fields will be empty or index; typ is calculated for type checking
+  | Sigma Record -- generalization of a Sigma type
     deriving (Show, Eq)
+
+
+{- 
+We probably won't use Lambda in Core, since we'll desugar impl and expl into one record?
+
+data Lambda = Lambda {
+    implParams :: Record, -- [a1:to1, ...] - optional parameters, usually types
+    explParams :: Record -- (x1:t1 = v1, ..., xn:tn = vn) - supporting default values
+  , body       :: Expr -- whatever our lambda is bound to
+  , lamType    :: Expr -- return type of the function, used in type checking
+} deriving (Show, Eq)
+
+-}

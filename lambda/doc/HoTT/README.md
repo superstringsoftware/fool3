@@ -54,3 +54,78 @@ Can we express constructor functions now?
 `Bool = True | False` -> `True = Lam [] [], False = Lam [] []` - so, both are constructors that don't take any arguments and return an empty tuple, but we need to distinguish between them by ConsTag - which we cannot do before sum types (or inductive types?) are defined.
 
 `Just = \a:Type x:a . (x)` -> `Just = Lam [a:U0, x:a] [x]` -- how do we capture the fact `a` is implicit???
+
+### Some thoughts on compilation to .Net / JS
+
+Let's use a typical Pi-type, sized vector:
+
+```haskell
+data Vect : Nat -> Type -> Type where
+    Nil  : Vect Z a
+    (::) : a -> Vect k a -> Vect (S k) a
+
+app : Vect n a -> Vect m a -> Vect (n + m) a
+app Nil       ys = ys
+app (x :: xs) ys = x :: app xs ys
+```
+
+TBD
+
+## ∑ examples
+
+Since we want to generalize ∑ to n-tuples as well, we want to represent it simply as `Sigma Record`. Now, for non-dependent cases it works fine, since the Record is just that - a product type with named fields. However, how about a basic typeclass hierarchy?
+
+```haskell
+Semigroup (a:Type) : Sigma = (
+    -- "normal" function has no body - it's ok because it's a typeclass definition!
+    (+) (x,y:a) :a
+    -- constraint (law), associativity (basically a function with a predicate, constraint simply says it's a constraint)
+    -- associativity = x + (y + z) == (x + y) + z 
+),
+
+Monoid : Class = ∃ Semigroup a => \a. {
+    E0:a
+    -- forall x:a => (Z0 + x == x, x + Z0 == x) -- constraint (law)
+};
+```
+
+Translates to:
+
+```
+Semigroup = Sigma [
+    Field "a" U0 UNDEFINED,
+    Field "(+)" (Pi [Field "x" (Id "a") UNDEFINED, Field "y" (Id "a") UNDEFINED] (Id "a")) UNDEFINED,
+    <how to record associativity???>
+]
+
+Monoid = Sigma [
+    Field "a" (App (Id "Semigroup") (Id "a")) UNDEFINED,
+    Field "E0" (Id "a") UNDEFINED
+]
+```
+
+Ok something close to it should work. Multiparam will be tricky, for now, more basic - Equality:
+
+```
+Eq : Class = \a:Type . {
+    (==):Bool = \x:a y:a. not (x /= y);
+    (/=):Bool = \x:a y:a. not (x == y); 
+    (≠) = (/=);
+    required = (==) || (/=)
+}
+```
+
+translates to:
+
+```
+Eq = Sigma [
+    Field "a" U0 UNDEFINED,
+    Field {
+        var = "(==)",
+        typ = Pi [Field "x" (Id "a") UNDEFINED, Field "y" (Id "a") UNDEFINED] (Id "Bool"), 
+        val = App (Id "not") [Field "" UNDEFINED 
+                                (App (Id "/=" ) [Field "x", Field "y"] )] }
+]
+```
+
+Not really, should be lambda, so redo.
