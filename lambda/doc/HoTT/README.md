@@ -128,4 +128,159 @@ Eq = Sigma [
 ]
 ```
 
-Not really, should be lambda, so redo.
+Not really, should be lambda, so redo, but at least it works. How about multiparameter typeclasses with type synonims?
+
+```haskell
+class Add a b where
+  type SumTy a b
+  add :: a -> b -> SumTy a b
+
+-- ours:
+Add = Sigma [
+    Field "a" U0 UNDEFINED,
+    Field "b" U0 UNDEFINED,
+    Field {
+        var = "SumTy",
+        typ = Pi [Field "" (Id "a") UNDEFINED, Field "" (Id "b") UNDEFINED] (U 0),
+        val = UNDEFINED 
+    },
+    Field {
+        var = "add",
+        typ = Pi [Field "" (Id "a") UNDEFINED, Field "" (Id "b") UNDEFINED] (App (Id "SumTy") [Field "a",Field "b"]),
+        val = UNDEFINED 
+    }
+]
+```
+
+Something like the above. So, what I don't really get is why wouldn't we simply record both Pi and Sigma as lambdas?!
+
+### Pi and Sigma as Lambdas
+
+\n:Nat. \v:Vec(n,Real). Expr : C(n,v) - this is a Pi type, where we can deduce the signature by simply ignoring the Expr. Other examples:
+
+Constructors:
+
+Maybe = \a:U0. (
+    Just = \a:U0. \x:a. (x) : Maybe (a),
+    Nothing \a:U0.      ()  : Maybe (a)
+) : U0
+
+^^^ this way, we can *both* apply Maybe to some type and generate specific constructors, as well as just apply constructors directly and deduce the types from the arguments, but all of them are a lambda!!!
+
+Nil = \a:U0. () : List(a)
+Cons = \a:U0. \x:a xs:List(a). (x,xs):List(a)
+
+Dependent constructors:
+
+Vec = \a:U0 r:Nat. (
+    Nil  = \a:U0. () : Vec (a,0),
+    (::) = \a:U0. \x:a xs:Vec(a,n). (x,xs) : Vec(a, n+1)
+)
+
+Dependent functions:
+
+(++) = \v1:Vec (n,a) \v2:Vec (m,a) . case v1 of
+    Nil     -> v2
+    (x::xs) -> x :: xs ++ ys
+: Vec (n+m, a)
+
+Sigmas:
+
+Semigroup = \a:U0. (
+    (*) = \a:U0. \x:a y:a. Expr : a
+) : Sigma
+
+Monoid = Semigroup a => \a:U0. (
+    Z0 = \a:U0. Expr : a
+) : Sigma
+
+Add = \a:U0 b:U0. (
+    SumTy = \a:U0 b:U0. Expr : U0,
+    add = \a:U0 b:U0. \x:a y:b . Expr : SumTy (a,b)
+) : Sigma
+
+Etc.
+
+**So, we are back to the whole "everything is either a Lambda or a Tuple" concept!!!**
+
+So, Core language should be explicitly typed Lambdas + Tuples?!
+
+## Another take at the surface language, based on "Lambdas + Tuples" thing
+
+#### Function definition: 
+`<Name> [opt params] (params) : <Type> = <body>`
+
+#### Regular function:
+
+fact (n:Int) : Int = if n==0 then 0 else n*fact(n)
+fact (n: exists Num(a) => a:Type) : Type = ...
+
+#### Simple types:
+
+Bool : Type = (True, False) -- simply a tuple of constructors. So, can omit functions from value constructors.
+
+Maybe (a:Type) : Type = (
+    Just (x:a) : Maybe (a) = (x),
+    Nothing () : Maybe (a) = ()
+)
+
+List (a:Type) : Type = (
+    (::) (x:a, xs: List(a)) : List (a) = (x,xs)
+    ([]) () : List(a) = ()
+)
+
+#### GADTs and records
+
+Expr (a:Type) : Type = (
+    I (:Int) : Expr(Int) = (_),
+    B (:Bool): Expr(Bool) = (_),
+    Add (:Expr(Int), :Expr(Int)):Expr Int = (_,_)
+    -- etc
+)
+
+Record:
+
+Person : Type = (
+    MkPerson (fname, lname: String, dob: Date) : Person
+)
+
+In fact, can introduce the type directly, if it's a simple record (without the sum type):
+
+MkPerson (fname, lname: String, dob: Date, ) : Person
+
+#### Typeclasses and explicit type parameters
+
+Show function via function (no typeclass):
+
+show [a:Type] (x:a) : String
+show [String] = id
+show [Int] = ...
+etc
+
+This is in fact exactly what a typeclass would generate:
+
+Show (a:Type) : Sigma = (
+    show (x:a) : String
+)
+
+Eq (a:Type) : Sigma = (
+    (==) (x,y:a) : Bool = not (x /= y),
+    (/=) (x,y:a) : Bool = not (x == y),
+    (≠) = (/=),
+    required = (==) || (/=)
+    {-
+    Laws to define further:
+    Reflexivity
+    x == x = True
+    Symmetry
+    x == y = y == x
+    Transitivity
+    if x == y && y == z = True, then x == z = True
+    Substitutivity
+    if x == y = True and f is a "public" function whose return type is an instance of Eq, then f x == f y = True
+    Negation
+    x /= y = not (x == y)
+    -}
+)
+
+
