@@ -4,6 +4,8 @@ Foundational types and functions
 
 id (x:a) : a = x 
 
+Void     : Type = () -- 0 in HoTT. Uninhabited. "Bottom" in Haskell.
+Unit     : Type = ( Unit ) -- 1 in HoTT
 Bool     : Type = ( True, False )
 Ordering : Type = ( LT, EQ, GT  )
 
@@ -61,7 +63,7 @@ Eq (a:Universe) : Sigma = (
 )
 
 -- Don't need type signature for a below since it is given in the superclass definition
-Ord (∃ Eq (a) => a) : Sigma =  (
+∃ Eq (a) => Ord (a) : Sigma =  (
     compare (x,y:a) : Ordering = if x == y then EQ else if x <= y then LT else GT,
     (<)  (x,y:a) : Bool = (x <= y) && (x /= y),
     (<=) (x,y:a) : Bool = let r = compare (x, y) in 
@@ -102,9 +104,11 @@ r2 = x1:t1 ::: x2:t2 ::: {} is equal to {x1:t1, x2:t2}.
 These operators are built-in, but thanks to them we can define record manipulation functions:
 -}
 
+{-
 recmap = \func:({String, Type}->{String, Type}) rec . {
     {}     -> {};
     r:::rs -> (func r):::(recmap func rs) 
 } 
+-}
 -- func has a weird type of converting one field to another field. Since we have dependent functions,
 -- it should work for us quite well.

@@ -321,4 +321,11 @@ Should we make optional params only type params? Then we can track tables of pol
 **Ok, so we can start with functions-only (no operators) language! --> this will allow us to test all end-to-end concepts, since the core language remains the same, so we will compile to .Net etc!!! Then we will add operators, since they are nothing more than syntactic sugar that makes parsing much more difficult, so bells and whistles!**
 
 
+How about Existentials?
+
+```haskell
+data Obj = forall a. (Show a) => Obj a
+
+Obj : Type = ( Obj (exists (Show a) => a )
+```
 

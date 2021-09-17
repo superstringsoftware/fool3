@@ -19,6 +19,13 @@ type Record = [Var]
 
 data Literal = LInt !Int | LFloat !Double | LChar !Char | LString !String | LList [Expr] | LVec [Expr] deriving (Eq, Show)
 
+-- Predicates can and will be extended
+-- Do we need them in HoTT?!
+data Pred
+  = Exists [Expr] 
+  | Unconstrained -- variables can be anything
+  deriving (Show, Eq)
+
 -- Lambda - represents EVERYTHING pretty much (see README in HoTT folder). Its type signature is
 -- also obvious from the definition, so it encodes Pi types already!
 data Lambda = Lambda {
@@ -45,6 +52,7 @@ data Expr =
   -- typ is calculated for type checking. Optional + Explicit params. 
   -- SHOULD WE MAKE ALL PARAMS EXPLICIT IN CORE?!?!?!?!
   | Tuple [Expr] -- a general tuple of expressions
+  | RecordAccess [Expr] -- Accessing fields of a record. r.address.city will be recorded as RecordAccess (VarId "r") ["address", "city"]
     deriving (Show, Eq)
 
 
