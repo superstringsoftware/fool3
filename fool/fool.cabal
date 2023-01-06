@@ -27,6 +27,7 @@ library
   exposed-modules:
       Core
       Lib
+      Logs
       Util.IOLogger
       Util.Logger
       Util.PrettyPrinting
@@ -39,6 +40,7 @@ library
       base >=4.7 && <5
     , containers
     , mtl
+    , text
     , time
     , transformers
   default-language: Haskell2010
@@ -55,6 +57,7 @@ executable fool-exe
     , containers
     , fool
     , mtl
+    , text
     , time
     , transformers
   default-language: Haskell2010
@@ -72,6 +75,7 @@ test-suite fool-test
     , containers
     , fool
     , mtl
+    , text
     , time
     , transformers
   default-language: Haskell2010
