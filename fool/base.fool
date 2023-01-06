@@ -1,0 +1,36 @@
+Bool:Type = { True, False }
+
+not (b:Bool) : Bool = {
+    True -> False,
+    False -> True
+}
+
+id(x:a) : a = x
+
+Person:Type = { Person { name:String, age:Int } }
+
+Maybe(a:Type) : Type = {
+    Nothing,
+    Just(x:a):Maybe(a) = {x} // full signature, alternatively simply Just {:a};
+}
+
+exists Ord(a) =>
+OrderedPair(a):Set = {
+    OrderedPair (x:a,y:a) : DepPair(a) = if (x<y) then {x,y} else {y,x} 
+}
+
+Nat:Set = {
+  Z,
+  Succ {:Nat}
+}
+
+plus (x:Nat,y:Nat):Nat = {
+  (x, Z) -> x,
+  (Z, x) -> x,
+  (Succ(n), x) -> Succ (plus(n,x))  
+}
+
+Eq (a:Type):Sigma = {
+  (==) (x,y:a) : Bool = not (x != y),
+  (!=) (x,y:a) : Bool = not (x == y)
+}
