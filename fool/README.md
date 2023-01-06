@@ -38,6 +38,23 @@ record Person = {name:String, age:Int}
 // much easier to manipulate this in the future
 ```
 
+### Open SumTypes
+
+Sometimes we may want to leave the sum type open - so that it may be extended by the other constructors in the future - this way we can mimic haskell data families etc.
+
+```typescript
+open type Shapes = { Circle {x,y,r: Float}, Square {x,y,a,b:Float} }
+
+// adding another constructor, "Dot":
+Shapes = Shapes + Dot {x,y:Float}
+// alternatively:
+constructor Dot:Shapes = {x,y:Float}
+// need the constructor keyword here as we are introducing new constructor outside of type
+// definition
+```
+
+Obvious downside of this is that we'll need to add additional case for all the functions that worked with this type will need to be refefined, that's why this works much better in conjunction with typeclasses and typefamilies, more on that below.
+
 ## Things to take care of:
 
 * Type levels - e.g., Nat on values level vs type level???
