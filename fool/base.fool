@@ -1,36 +1,21 @@
-Bool:Type = { True, False }
+// below is a minimal definition of something we can work with - Nat and summation on it!
+// let's implement it all the way!!! following the MVP principle - do not build wheels for a car,
+// build a scooter first!
 
-not (b:Bool) : Bool = {
+type Bool = { True, False }
+
+function not (b:Bool) : Bool = {
     True -> False,
     False -> True
 }
 
-id(x:a) : a = x
-
-Person:Type = { Person { name:String, age:Int } }
-
-Maybe(a:Type) : Type = {
-    Nothing,
-    Just(x:a):Maybe(a) = {x} // full signature, alternatively simply Just {:a};
-}
-
-exists Ord(a) =>
-OrderedPair(a):Set = {
-    OrderedPair (x:a,y:a) : DepPair(a) = if (x<y) then {x,y} else {y,x} 
-}
-
-Nat:Set = {
+type Nat = {
   Z,
-  Succ {:Nat}
+  Succ (:Nat)
 }
 
-plus (x:Nat,y:Nat):Nat = {
-  (x, Z) -> x,
+function plus (x:Nat,y:Nat):Nat = {
   (Z, x) -> x,
   (Succ(n), x) -> Succ (plus(n,x))  
 }
 
-Eq (a:Type):Sigma = {
-  (==) (x,y:a) : Bool = not (x != y),
-  (!=) (x,y:a) : Bool = not (x == y)
-}

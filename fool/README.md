@@ -78,7 +78,7 @@ type Expr(a) = {
 ```
 
 Also note how in the above we are skipping actual tuple definition. However this looks confusing, since in Maybe and record definitions we are using curly braces???
-TODO: Fix this inconcistency
+TODO: Fix this inconcistency - () look to be preferrable for consistency, as they denote function call / application, while {} denote a tuple.
 
 ### Functions
 Functions are defined via pattern matching as usual, preferred way being with all patterns grouped at one place:
