@@ -48,12 +48,46 @@ open type Shapes = { Circle {x,y,r: Float}, Square {x,y,a,b:Float} }
 // adding another constructor, "Dot":
 Shapes = Shapes + Dot {x,y:Float}
 // alternatively:
-constructor Dot:Shapes = {x,y:Float}
+constructor Dot(x,y:Float):Shapes = {x,y}
 // need the constructor keyword here as we are introducing new constructor outside of type
 // definition
 ```
 
 Obvious downside of this is that we'll need to add additional case for all the functions that worked with this type will need to be refefined, that's why this works much better in conjunction with typeclasses and typefamilies, more on that below.
+
+### GADTs 
+
+GADTs are obvious and easy in fool, e.g. typical haskell example:
+```haskell
+data Expr a where
+    I   :: Int  -> Expr Int
+    B   :: Bool -> Expr Bool
+    Add :: Expr Int -> Expr Int -> Expr Int
+    Mul :: Expr Int -> Expr Int -> Expr Int
+    Eq  :: Eq a => Expr a -> Expr a -> Expr Bool
+```
+
+translates into:
+
+```typescript
+type Expr(a) = {
+    I (:Int)  : Expr(Int),
+    B (:Bool) : Expr(Bool),
+    Add (:Expr(Int), :(Expr Int)) : Expr(Int)
+}
+```
+
+Also note how in the above we are skipping actual tuple definition. However this looks confusing, since in Maybe and record definitions we are using curly braces???
+TODO: Fix this inconcistency
+
+### Functions
+Functions are defined via pattern matching as usual, preferred way being with all patterns grouped at one place:
+```typescript
+function plus(x:Nat, y:Nat) : Nat = {
+  (x, Z) -> x,
+  (Succ(n), x) -> Succ (plus(n,x))
+}
+```
 
 ## Things to take care of:
 
