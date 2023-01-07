@@ -100,10 +100,11 @@ pFunc = Function <$> pFuncL
 -- pattern match Expr -> Expr
 pPatternMatch :: Parser Expr
 pPatternMatch = do
+    pos <- getPosition
     ex1 <- try symbolId <|> Tuple <$> parens (sepBy1 pExpr (reservedOp ","))
     reservedOp "->"
     ex2 <- pExpr
-    return $ PatternMatch ex1 ex2
+    return $ PatternMatch ex1 ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
 
 -- ACTIONS =====================================================
 pBinding :: Parser Expr

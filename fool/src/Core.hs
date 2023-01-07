@@ -7,6 +7,7 @@ module Core
 where
 
 import Util.PrettyPrinting
+import Logs
 
 type Name = String
 
@@ -49,7 +50,7 @@ data Expr =
   | Action Lambda -- Action is simply a list of expressions in order
   | Constructors [Lambda] -- only for constructor list inside sum types
   | App Expr [Expr] -- application
-  | PatternMatch Expr Expr -- pattern match
+  | PatternMatch Expr Expr SourceInfo -- pattern match with source info attached
   | PatternMatches [Expr] -- only PatternMatch is allowed, need to distinquish with generic tuple
   | Tuple [Expr] -- any tuple { ... , ... }, -- only CONSTRUCTORS return it!!!
   | Statements [Expr] -- for Action body, simply a list of statements to execute in order
@@ -85,7 +86,7 @@ instance PrettyPrint Var where
 instance PrettyPrint Expr where
   ppr UNDEFINED = ""
   ppr (Id v) = as [bold] v
-  ppr (PatternMatch e1 e2) = ppr e1 ++ " -> " ++ ppr e2
+  ppr (PatternMatch e1 e2 _) = ppr e1 ++ " -> " ++ ppr e2
   ppr (PatternMatches ps) = showListCuBr ppr ps
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex

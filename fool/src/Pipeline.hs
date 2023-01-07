@@ -29,25 +29,31 @@ import Data.HashMap.Strict as Map
 afterparserPass :: IntState ()
 afterparserPass = do
     s <- get
-    let mod = runExprPassAndReverse afterparse (parsedModule s)
+    mod <- (runExprPassAndReverse afterparse (parsedModule s))
     put (s { parsedModule = mod } )
+    -- now for more interesting stuff, initial optimizations with error checks
     return ()
 
--- the only reason we need this is because parser reverses the order of the program while parsing,
--- so we need to reverse it again first before we start mapping stuff    
-runExprPassAndReverse :: (Expr -> Expr) -> LTProgram -> LTProgram
+-- reversal plus a bunch of initial error checks
+runExprPassAndReverse :: (Expr -> IntState Expr) -> LTProgram -> IntState LTProgram
 runExprPassAndReverse f l = rev f l []
-    where rev f [] a = a
-          rev f ((ex, srci):xs) a = rev f xs ( (f ex, srci):a )
+    where rev f [] a = pure a
+          rev f ((ex, srci):xs) a = f ex >>= \ttt -> rev f xs ( (ttt, srci):a )
 
--- for now, only expand Constructors inside SumTypes to their full form
--- so that they clearly return a tuple of values
-afterparse :: Expr -> Expr
--- sum type - need to map over all constructors!
+-- initial quick checks and optimizations
+afterparse :: Expr -> IntState Expr
+-- sum type - need to map over all constructors and expand them to the full signature form
 afterparse (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) = 
-    SumType lam { body = Constructors $ Prelude.map fixCons cons }
+    pure $ SumType lam { body = Constructors $ Prelude.map fixCons cons }
     where fixCons lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) then lam else lam { body = Tuple $ Prelude.map (\v -> Id $ name v) args}
-afterparse e = e
+afterparse e = pure e
+
+-- initial checks with errors - so monadic
+initialCheckM :: Expr -> IntState Expr
+-- function with pattern match - check arity etc
+initialCheckM (Function lam@(Lambda nm args (PatternMatches pms) tp)) = do
+    pms' <- mapM initialCheckM pms
+    return $ Function (lam { body = PatternMatches pms'} )
 
 --------------------------------------------------------------------------------
 -- PASS 1: building initial typing and top-level lambdas environment
