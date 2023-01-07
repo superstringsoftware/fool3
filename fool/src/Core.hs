@@ -40,6 +40,7 @@ data Expr =
   | Binding Var -- Var contains both the name and the expression to be bound to, used inside Actions etc
   | Function Lambda -- defining a function by abstracting a bunch of variables in a tuple
   | Action Lambda -- Action is simply a list of expressions in order
+  | Constructors [Lambda] -- only for constructor list inside sum types
   | App Expr [Expr] -- application
   | PatternMatch Expr Expr -- pattern match
   | PatternMatches [Expr] -- only PatternMatch is allowed, need to distinquish with generic tuple

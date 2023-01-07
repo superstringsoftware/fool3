@@ -52,7 +52,7 @@ pSumType = do
     let lam = Lambda {
        lamName    = name
      , params = args
-     , body       = Tuple ex
+     , body       = Constructors ex
      , lamType    = Type 
     }
     return $ SumType lam
@@ -62,17 +62,16 @@ pSumType = do
 -- For now, simple constructors as in haskell (eventually for dependent types we'll need others)
 -- passing the name of the SumType to set type of the constructors --
 -- eventually we'll need to parse the type (for GADT support etc)
-pConstructor :: Expr -> Parser Expr
+pConstructor :: Expr -> Parser Lambda
 pConstructor tp = do
     name <- identifier
     args <- try pVars <|> pure []
-    let lam = Lambda {
+    return Lambda {
        lamName    = name
      , params = args
      , body       = UNDEFINED
      , lamType    = tp 
     }
-    return $ Function lam
 
 -- FUNCTIONS ---------------------------------------------------------
 pFuncHeader :: Parser Lambda
@@ -127,7 +126,7 @@ pAction = do
        lamName    = name
      , params = args
      , body       = Tuple ex
-     , lamType    = tp 
+     , lamType    = if (tp /= UNDEFINED) then tp else Id "Action"
     }
     
 

@@ -85,6 +85,12 @@ lookupLambda n env = Map.lookup n (topLambdas env)
 addLambda :: Name -> Lambda -> Environment -> Environment
 addLambda n l env = env { topLambdas = Map.insert n l (topLambdas env) }
 
+addNamedLambda :: Lambda -> Environment -> Environment
+addNamedLambda l env = env { topLambdas = Map.insert (lamName l) l (topLambdas env) }
+
+addManyNamedLambdas :: [Lambda] -> Environment -> Environment
+addManyNamedLambdas ls env = env { topLambdas = Prelude.foldl (\acc l1 -> Map.insert (lamName l1) l1 acc) (topLambdas env) ls }
+
 addManyLambdas :: [(Name, Lambda)] -> Environment -> Environment
 addManyLambdas ls env = env { topLambdas = Prelude.foldl (\acc (n1,l1) -> Map.insert n1 l1 acc) (topLambdas env) ls }
 
