@@ -37,8 +37,8 @@ data Expr =
     UNDEFINED -- used basically instead of Nothing in default values etc
   | Id Name
   | Typed Expr Expr -- expression with type
-  | Lam Lambda -- same, defining a function by abstracting a bunch of variables in a tuple
   | Binding Var -- Var contains both the name and the expression to be bound to, used inside Actions etc
+  | Function Lambda -- defining a function by abstracting a bunch of variables in a tuple
   | Action Lambda -- Action is simply a list of expressions in order
   | App Expr [Expr] -- application
   | PatternMatch Expr Expr -- pattern match
@@ -63,12 +63,18 @@ data Expr =
 -- --------------------------------- PRETTY PRINTING --------------------------------------------
 
 instance PrettyPrint Lambda where
-  ppr (Lambda name params body sig) = name ++ " " ++ ppr params ++ if (body == UNDEFINED) then "" else " = " ++ ppr body
+  ppr (Lambda name params body sig) = name ++ " " 
+    ++ showListRoBr ppr params 
+    ++ if (sig == UNDEFINED) then "" else " : " ++ ppr sig
+    ++ if (body == UNDEFINED) then "" else " = " ++ ppr body
 
 instance PrettyPrint Var where
-  ppr (Var n t _) = as [bold] n
+  ppr (Var n t _) = as [bold] n ++ if (t == UNDEFINED) then "" else ":" ++ ppr t
 
 instance PrettyPrint Expr where
-  ppr (Id v) = v
+  ppr (Id v) = as [bold] v
+  ppr (PatternMatch e1 e2) = ppr e1 ++ " -> " ++ ppr e2
+  ppr (PatternMatches ps) = showListCuBr ppr ps
+  ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr e = show e
   -- λ  

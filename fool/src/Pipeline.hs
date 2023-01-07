@@ -60,6 +60,8 @@ buildEnvironmentM x@(e,si) = do
     -- either (\err -> logWarning err { linePos = (lineNum si), colPos = (colNum si) } )
            
 processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
+processBinding (Function lam, si) env = pure $ addLambda (lamName lam) lam env
+
 processBinding (ex, si) env = do 
     let lpl = LogPayload 
                 (lineNum si) (colNum si) ""

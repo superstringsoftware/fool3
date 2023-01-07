@@ -78,6 +78,17 @@ initializeInterpreter = return $ InterpreterState {
     currentEnvironment = initialEnvironment
 }
 
+---------------------------- BASIC FUNCTIONS -----------------------------
+lookupLambda :: Name -> Environment -> Maybe Lambda
+lookupLambda n env = Map.lookup n (topLambdas env)
+
+addLambda :: Name -> Lambda -> Environment -> Environment
+addLambda n l env = env { topLambdas = Map.insert n l (topLambdas env) }
+
+addManyLambdas :: [(Name, Lambda)] -> Environment -> Environment
+addManyLambdas ls env = env { topLambdas = Prelude.foldl (\acc (n1,l1) -> Map.insert n1 l1 acc) (topLambdas env) ls }
+
+
 ------------------ Monadic interface to the Environment ---------------------
 -- lookupLambdaM :: Name -> IntState (Maybe Lambda)
 -- lookupLambdaM n = get >>= pure . currentEnvironment >>= pure . (lookupLambda n)

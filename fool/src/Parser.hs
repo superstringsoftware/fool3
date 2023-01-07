@@ -72,7 +72,7 @@ pConstructor tp = do
      , body       = UNDEFINED
      , lamType    = tp 
     }
-    return $ Lam lam
+    return $ Function lam
 
 -- FUNCTIONS ---------------------------------------------------------
 pFuncHeader :: Parser Lambda
@@ -96,7 +96,7 @@ pFuncL = do
     return $ lam { body = ex }
 
 pFunc :: Parser Expr
-pFunc = Lam <$> pFuncL
+pFunc = Function <$> pFuncL
 
 -- pattern match Expr -> Expr
 pPatternMatch :: Parser Expr
