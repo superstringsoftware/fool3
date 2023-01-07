@@ -19,6 +19,9 @@ data Var = Var {
 -- type Tuple a = [a]
 type Record = [Var]
 
+arity :: Lambda -> Int
+arity (Lambda _ args _ _) = length args
+
 -- data Literal = LInt !Int | LFloat !Double | LChar !Char | LString !String | LList [Expr] | LVec [Expr] deriving (Eq, Show)
 
 -- Lambda - represents EVERYTHING pretty much (see README in HoTT folder). Its type signature is
@@ -31,7 +34,11 @@ data Lambda = Lambda {
    -- Type for type constructors, Sigma for typeclasses etc, specific type for type constructors and functions etc
 } deriving (Show, Eq)
 
-
+-- lambda is only a constructor if its body is a tuple and it has a clear
+-- return type!
+isLambdaConstructor :: Lambda -> Bool
+isLambdaConstructor (Lambda _ _ (Tuple _) tp) = if (tp == UNDEFINED) then False else True
+isLambdaConstructor _ = False
 
 data Expr =
     UNDEFINED -- used basically instead of Nothing in default values etc
@@ -44,7 +51,8 @@ data Expr =
   | App Expr [Expr] -- application
   | PatternMatch Expr Expr -- pattern match
   | PatternMatches [Expr] -- only PatternMatch is allowed, need to distinquish with generic tuple
-  | Tuple [Expr] -- any tuple { ... , ... }, 
+  | Tuple [Expr] -- any tuple { ... , ... }, -- only CONSTRUCTORS return it!!!
+  | Statements [Expr] -- for Action body, simply a list of statements to execute in order
   | SumType Lambda -- sum type definition, which is also basically a lambda with 
   -- body expression being a tuple of Lambdas which are constructors
   | UnaryOp Name Expr
@@ -81,6 +89,7 @@ instance PrettyPrint Expr where
   ppr (PatternMatches ps) = showListCuBr ppr ps
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex
+  ppr (Statements ex) = showListCuBr ppr ex
   ppr (Binding (Var nm tp val)) = as [bold] nm ++ pprTyp tp ++ " = " ++ ppr val 
   ppr (Constructors cs) = showListCuBr ppr cs
   ppr (SumType (Lambda name params body sig)) = name ++ " "

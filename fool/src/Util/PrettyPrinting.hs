@@ -26,6 +26,7 @@ showListSqBr fun = showListWFormat fun "[" "]" ", " "[]"
 showListRoBr fun = showListWFormat fun "(" ")" ", " "()"     
 showListCuBr fun = showListWFormat fun "{" "}" ", " "{}"
 showListCuBrSpace fun = showListWFormat fun "{ " " }" ", " "{}"     
+showListPlainSep fun sep = showListWFormat fun "" "" sep ""
 showListPlain fun = showListWFormat fun "" "" " " ""
 showListRoBrPlain fun = showListWFormat fun "(" ")" " " ""
 

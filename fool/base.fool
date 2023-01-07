@@ -11,14 +11,22 @@ type Nat = {
 function id (x:a):a = x;
 
 function not (b:Bool) : Bool = {
-    True -> False,
+    True  -> False,
     False -> True
 };
 
-function plus (x:Nat,y:Nat):Nat = {
-  plus (Z, x) -> x,
-  plus (Succ(n), x) -> Succ (plus(n,x))  
+function eq(x:Nat,y:Nat):Bool = {
+  (Z,Z) -> True,
+  (Z,n) -> False,
+  (Succ(m),Succ(n)) -> eq(m,n)
 };
+
+function plus (x:Nat,y:Nat):Nat = {
+  (Z, x) -> x,
+  (Succ(n), x) -> Succ (plus(n,x))  
+};
+
+function plus2 (x:Nat):Nat = plus(x, Succ(Succ(Z)) );
 
 action main = {
   one = Succ(Z),

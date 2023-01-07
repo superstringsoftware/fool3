@@ -30,7 +30,7 @@ data Environment = Environment {
     -- Map that keeps all our TypeReps in the current environment
     types       :: NameMap Expr,
     topLambdas  :: NameMap Lambda,
-    outProgram   :: NameMap String
+    outProgram  :: NameMap String
 } deriving Show
 
 initialEnvironment = Environment {

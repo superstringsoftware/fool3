@@ -45,6 +45,7 @@ library
     , directory
     , hashtables
     , haskeline
+    , ilist
     , mtl
     , parsec
     , pretty-simple
@@ -69,6 +70,7 @@ executable fool
     , fool
     , hashtables
     , haskeline
+    , ilist
     , mtl
     , parsec
     , pretty-simple
@@ -94,6 +96,7 @@ test-suite fool-test
     , fool
     , hashtables
     , haskeline
+    , ilist
     , mtl
     , parsec
     , pretty-simple

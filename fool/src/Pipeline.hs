@@ -12,6 +12,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
 import Data.Text as T
 import qualified Data.Text.Lazy as TL
+import Data.List.Index
 
 import Util.PrettyPrinting as TC
 import Text.Pretty.Simple (pPrint, pShow)
@@ -105,3 +106,52 @@ primBindings = [
 
 buildPrimitivePass :: IntState ()
 buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) primBindings
+
+--------------------------------------------------------------------------------
+-- PASS 2: Preliminary Optimizations and basic sanity checks
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- PASS 3: Type checking
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- PASS 4: Further optimizations
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- PASS 5: Compilation - JS
+--------------------------------------------------------------------------------
+mkConsName :: String -> String -> String
+mkConsName typName consName = "cons_" ++ typName ++ "_" ++ consName
+
+compileExprToJS :: Expr -> [String]
+compileExprToJS (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) = 
+    imap (compileConstructorToJS ("cons_" ++ typName ++ "_") ) cons
+compileExprToJS (Function lam) = [compileFunctionToJS "" lam]
+compileExprToJS e = ["/* NOT SUPPORTED:\n" ++ ppr e ++ "\n*/"]
+
+argsToString :: Record -> String
+argsToString args = showListRoBr f args
+    where f (Var nm tp vl) = nm
+
+argsToTupleFields :: Record -> String
+argsToTupleFields args = showListPlainSep f ", " args
+    where f (Var nm tp vl) = nm ++ ": " ++ nm
+
+compileConstructorToJS :: String -> Int -> Lambda -> String
+compileConstructorToJS pref i (Lambda nm args ex tp) = "function " ++ pref++nm ++
+                         argsToString args 
+                         ++ " { return { __consTag: " ++ (show i) ++ ", "
+                         ++ argsToTupleFields args ++ " } } "                         
+    
+compileFunctionToJS :: String -> Lambda -> String
+compileFunctionToJS pref (Lambda nm args ex tp) = "function " ++ pref++nm ++
+                         argsToString args 
+                         ++ funBodyToString ex
+
+-- compiling pattern matches is the most complicated thing as we need to 
+-- consult the environment about the order of constructors etc
+funBodyToString :: Expr -> String
+funBodyToString (Id x) = "{ return " ++ x ++ "; }"
+funBodyToString e = " { /* NOT IMPLEMENTED:\n" ++ ppr e ++ "\n*/ }" 

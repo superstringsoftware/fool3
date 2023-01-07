@@ -33,6 +33,7 @@ dependencies:
 - pretty-simple
 - haskeline
 - directory
+- ilist
 
 ghc-options:
 # - -Wall

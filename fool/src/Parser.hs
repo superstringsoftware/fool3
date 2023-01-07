@@ -100,7 +100,7 @@ pFunc = Function <$> pFuncL
 -- pattern match Expr -> Expr
 pPatternMatch :: Parser Expr
 pPatternMatch = do
-    ex1 <- pExpr
+    ex1 <- try symbolId <|> Tuple <$> parens (sepBy1 pExpr (reservedOp ","))
     reservedOp "->"
     ex2 <- pExpr
     return $ PatternMatch ex1 ex2
@@ -125,7 +125,7 @@ pAction = do
     return $ Action $ Lambda {
        lamName    = name
      , params = args
-     , body       = Tuple ex
+     , body       = Statements ex
      , lamType    = if (tp /= UNDEFINED) then tp else Id "Action"
     }
     
@@ -177,7 +177,7 @@ pFactor = try pApp
 
 symbolId :: Parser Expr
 symbolId = do 
-    s <- (try (parens operator) <|> identifier)
+    s <- identifier
     return $ Id s
 
 -- Clear function application
