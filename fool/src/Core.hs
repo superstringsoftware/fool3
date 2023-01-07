@@ -65,16 +65,21 @@ data Expr =
 instance PrettyPrint Lambda where
   ppr (Lambda name params body sig) = name ++ " " 
     ++ showListRoBr ppr params 
-    ++ if (sig == UNDEFINED) then "" else " : " ++ ppr sig
+    ++ pprTyp sig
     ++ if (body == UNDEFINED) then "" else " = " ++ ppr body
+
+pprTyp ex = if (ex == UNDEFINED) then "" else ":" ++ ppr ex
 
 instance PrettyPrint Var where
   ppr (Var n t _) = as [bold] n ++ if (t == UNDEFINED) then "" else ":" ++ ppr t
 
 instance PrettyPrint Expr where
+  ppr UNDEFINED = ""
   ppr (Id v) = as [bold] v
   ppr (PatternMatch e1 e2) = ppr e1 ++ " -> " ++ ppr e2
   ppr (PatternMatches ps) = showListCuBr ppr ps
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
+  ppr (Tuple ex) = showListCuBr ppr ex
+  ppr (Binding (Var nm tp val)) = as [bold] nm ++ pprTyp tp ++ " = " ++ ppr val 
   ppr e = show e
   -- λ  

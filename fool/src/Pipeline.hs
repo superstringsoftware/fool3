@@ -60,7 +60,10 @@ buildEnvironmentM x@(e,si) = do
     -- either (\err -> logWarning err { linePos = (lineNum si), colPos = (colNum si) } )
            
 processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
+-- function definition
 processBinding (Function lam, si) env = pure $ addLambda (lamName lam) lam env
+-- treating actions the same way - they will have some proper type eventually anyway
+processBinding (Action lam, si) env = pure $ addLambda (lamName lam) lam env
 
 processBinding (ex, si) env = do 
     let lpl = LogPayload 
