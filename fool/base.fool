@@ -3,6 +3,11 @@
 // build a scooter first!
 
 type Bool = { True, False };
+type Nat = {
+  Z,
+  Succ (n:Nat)
+};
+
 
 /*
 function not (b:Bool) : Bool = {
@@ -10,10 +15,6 @@ function not (b:Bool) : Bool = {
     False -> True
 }
 
-type Nat = {
-  Z,
-  Succ (:Nat)
-}
 
 function plus (x:Nat,y:Nat):Nat = {
   (Z, x) -> x,

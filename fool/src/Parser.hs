@@ -41,22 +41,73 @@ import qualified Data.Text.Lazy as TL
 
 dbg msg = liftIO $ putStrLn msg
 
--- sum type
+-- sum type:
+-- type Bool = {True, False}
 pSumType :: Parser Expr
 pSumType = do
     reserved "type"
     name <- identifier
-    ex   <- reservedOp "=" *> (braces (sepBy1 identifier (reservedOp ",") ))
-    let pex = map (\x -> (Id x)) ex
+    args <- try pVars <|> pure []
+    ex   <- reservedOp "=" *> (braces (sepBy1 (pConstructor (Id name)) (reservedOp ",") ))
     let lam = Lambda {
        lamName    = name
-     , params = []
-     , body       = Tuple pex
+     , params = args
+     , body       = Tuple ex
      , lamType    = Type 
     }
     return $ SumType lam
 
+-- To properly parse the type definition we need to properly parse
+-- CONSTRUCTORS inside the sum type
+-- For now, simple constructors as in haskell (eventually for dependent types we'll need others)
+-- passing the name of the SumType to set type of the constructors --
+-- eventually we'll need to parse the type (for GADT support etc)
+pConstructor :: Expr -> Parser Expr
+pConstructor tp = do
+    name <- identifier
+    args <- try pVars <|> pure []
+    let lam = Lambda {
+       lamName    = name
+     , params = args
+     , body       = UNDEFINED
+     , lamType    = tp 
+    }
+    return $ Lam lam
 
+-- Variable with optional type signature, to be used in DEFINITIONS!!!
+-- (as opposed to function calls, as there it can be any expression)
+-- TODO: eventually needs to parse (= EXPR) part
+pVar :: Parser Var
+pVar = do
+  name <- identifier --emptyStringParser -- added unnamed variables for easier record parsing
+  typ  <- typeSignature
+  return $ Var name typ UNDEFINED
+
+-- variables in parenthesis in function / type etc definitions:
+-- Maybe (a:Type) etc
+pVars :: Parser Record
+pVars = parens (sepBy pVar (reservedOp ",") )
+
+strictTypeSignature :: Parser Expr
+strictTypeSignature =
+        -- try (reservedOp ":" *> tArr) <|>
+        -- try (reservedOp ":" *> parens tArr) <|>
+        -- try (reservedOp ":" *> parens typeAp) <|>
+        -- try (reservedOp ":" *> spaces *> string "Type" *> spaces *> return SmallType) <|> -- built in "Type" parsing as SmallType right away
+        try (reservedOp ":" *> concreteType) -- <|>
+        -- try (reservedOp ":" *> typeVar)
+       
+typeSignature = try strictTypeSignature <|> pure UNDEFINED
+
+concreteType :: Parser Expr
+concreteType = do
+    nm <- uIdentifier
+    return $ Id nm
+
+
+{- 
+=====================================================================================
+-}
 -- Building expression parser
 pExpr :: Parser Expr
 pExpr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) pFactor

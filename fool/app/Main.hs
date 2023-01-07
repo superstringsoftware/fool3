@@ -32,6 +32,7 @@ type InputTState = InputT IntState
 -- baseLibPath = "prog1.fool.hs" -- "base.fool.hs"
 --baseLibPath = "base.thask.hs"
 baseLibPath = "base.fool"
+-- baseLibPath = "parsertests.fool"
 
 processNew :: T.Text -> IntState ()
 processNew line = do
