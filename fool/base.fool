@@ -11,7 +11,7 @@ type Nat = {
 function id (x:a):a = x;
 
 function not (b:Bool) : Bool = {
-    (True, x)  -> False,
+    (True)  -> False,
     (False) -> True
 };
 

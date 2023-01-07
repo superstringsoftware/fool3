@@ -49,14 +49,17 @@ afterparse (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) =
 
 -- function with pattern match - check arity etc
 afterparse (Function lam@(Lambda nm args (PatternMatches pms) tp)) = do
-    pms' <- mapM (handlePM nm args) pms
+    pms' <- mapM (handlePM lam args) pms
     return $ Function (lam { body = PatternMatches pms'} )
-    where handlePM :: String -> Record -> Expr -> IntState Expr
-          handlePM nm args pm@(PatternMatch (Tuple ms) e2 si) 
+    where handlePM :: Lambda -> Record -> Expr -> IntState Expr
+          handlePM lam args pm@(PatternMatch (Tuple ms) e2 si) 
             |  ( (Prelude.length ms) /= (Prelude.length args)) = do
                                                     let lpl = LogPayload 
                                                                 (lineNum si) (colNum si) ""
-                                                                ("Mismatch in the number of arguments in a pattern match for the function " ++ nm ++ ". The function expects " ++ show (Prelude.length args) ++ " arguments")
+                                                                ("Mismatch in the number of arguments in a pattern match for the function:\n" 
+                                                                ++ ppr lam ++ ".\nThe function expects " 
+                                                                ++ show (Prelude.length args) ++ " arguments and was given "
+                                                                ++ show (Prelude.length ms) ++ ".")
                                                     logError lpl { linePos = (lineNum si), colPos = (colNum si) } 
                                                     return pm
             | otherwise = pure pm
