@@ -74,6 +74,24 @@ pConstructor tp = do
     }
     return $ Lam lam
 
+-- FUNCTIONS ---------------------------------------------------------
+pFuncL :: Parser Lambda
+pFuncL = do
+    reserved "function"
+    name <- identifier
+    args <- try pVars <|> pure []
+    tp <- typeSignature
+    ex <- try (reservedOp "=" *> pExpr) <|> pure UNDEFINED
+    return Lambda {
+       lamName    = name
+     , params = args
+     , body       = ex
+     , lamType    = tp 
+    }
+
+pFunc :: Parser Expr
+pFunc = Lam <$> pFuncL
+
 -- Variable with optional type signature, to be used in DEFINITIONS!!!
 -- (as opposed to function calls, as there it can be any expression)
 -- TODO: eventually needs to parse (= EXPR) part
@@ -101,27 +119,41 @@ typeSignature = try strictTypeSignature <|> pure UNDEFINED
 
 concreteType :: Parser Expr
 concreteType = do
-    nm <- uIdentifier
+    nm <- identifier
     return $ Id nm
 
 
 {- 
 =====================================================================================
 -}
--- Building expression parser
+-- Building expression parser - for RIGHT HAND SIDE ONLY!!!
 pExpr :: Parser Expr
 pExpr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) pFactor
 
 pFactor :: Parser Expr
-pFactor = try pSumType <?> "arguments in pFactor failed?"
+pFactor = try pApp
+    <|> try (parens pExpr)
+    <|> symbolId
+    <?> "container, literal, symbol id or parenthesized expression"
 
+symbolId :: Parser Expr
+symbolId = do 
+    s <- (try (parens operator) <|> identifier)
+    return $ Id s
+
+-- Clear function application
+pApp :: Parser Expr
+pApp = do
+    func <- try (parens pExpr) <|> (Id <$> identifier)
+    args <- parens (sepBy pExpr (reservedOp ",") )
+    return $ App func args
 
 -- Building top level parsers
 pDef :: Parser Expr
-pDef =  do
-    expr <- try pFactor
-            <?> "lambda, binding, pattern match or expression"
-    return expr
+pDef =  try pSumType 
+        <|> pFunc
+        <?> "lambda, binding, pattern match or expression"
+    
           
 
 pToplevel :: Parser [Expr]

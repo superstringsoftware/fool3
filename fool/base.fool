@@ -8,6 +8,7 @@ type Nat = {
   Succ (n:Nat)
 };
 
+function id (x:a):a = x;
 
 /*
 function not (b:Bool) : Bool = {

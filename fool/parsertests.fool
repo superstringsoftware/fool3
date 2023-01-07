@@ -22,6 +22,15 @@ type Nat = {
   Succ (n:Nat)
 };
 
+function id (x:a):a = x;
+
+function g(x) = f(x,y);
+function g1(x) = f();
+function g2(x,y) = x+y;
+
+function g(x) = (f(x,y)) (z, a+b);
+
+
 
 /*
 function not (b:Bool) : Bool = {
