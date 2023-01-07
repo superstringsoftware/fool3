@@ -16,6 +16,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 
 import Core
+import Pipeline
 import Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
 
@@ -204,6 +205,7 @@ loadFileNew nm = do
     st <- get
     -- liftIO $ print (newParsedModule st)
     put $ st { currentSource = fileText }
+    -- liftIO $ print st
     case res of
         Left err -> liftIO ( putStrLn $ "There were " ++ TC.as [TC.red] "parsing errors:") >> liftIO (putStrLn $ showSyntaxError fileText err)
         -- desugaring on the first pass
@@ -212,11 +214,11 @@ loadFileNew nm = do
                 liftIO (putStrLn "... successfully loaded.")
                 liftIO (putStrLn $ "Received " ++ show (length (parsedModule st)) ++ " statements.")
                 liftIO (putStrLn $ "Executing pass 0: " ++ TC.as [TC.bold, TC.underlined] "after parser desugaring")
-                -- afterparserPass
+                afterparserPass
                 showAllLogsWSource
                 clearAllLogs
                 liftIO (putStrLn $ "Executing pass 1: " ++ TC.as [TC.bold, TC.underlined] "initial top level environment building")
-                -- buildEnvPass
+                buildEnvPass
                 showAllLogsWSource
                 clearAllLogs
                 liftIO (putStrLn $ "Executing pass 2: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
@@ -257,8 +259,8 @@ main = do
     initializeInterpreter >>= (runIntState (runInputT defaultSettings {historyFile=Just "./.fool_history"} runInterpreter))
 
 greetings = do
-    putStrLn "Welcome to Tea-Lambda Language!"
-    putStrLn "Version 0.0.5"
-    putStrLn "(c) Copyright 2016-2020 by Anton Antich (a@s3.ag)\n"
+    putStrLn "Welcome to the Ultimate Fool!"
+    putStrLn "Version 0.0.9"
+    putStrLn "(c) Copyright 2016-2023 by Anton Antich (a@s3.ag)\n"
     putStrLn "Type :help for help on commands or :load a file.\n"
     

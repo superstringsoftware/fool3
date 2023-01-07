@@ -2,6 +2,42 @@
 
 This is a from scratch implementation of the type-theory based functional language with flexible compilation targets (initially - javascript, .Net, potentially x86 native) based on the learnings of the last 6 years.
 
+## Compiler internals
+
+Current version deals with the simplest possible type set and a program:
+```typescript
+type Bool = { True, False };
+type Nat = {
+  Z,
+  Succ (n:Nat)
+};
+
+function id (x:a):a = x;
+
+function not (b:Bool) : Bool = {
+    True -> False,
+    False -> True
+};
+
+function plus (x:Nat,y:Nat):Nat = {
+  plus (Z, x) -> x,
+  plus (Succ(n), x) -> Succ (plus(n,x))  
+};
+
+action main = {
+  one = Succ(Z),
+  three = Succ(Succ(one)),
+  res = plus(three,one),
+  print# (res)
+};
+```
+
+We are defining types Bool and Nat, functions not and plus, and then run a simple program that (magically) prints the result of 1+3.
+
+However, such a simple case is enough to test the whole pipeline, from parsing to typechecking to optimizations to code gen.
+
+Let's start with this in order - after the program is parsed into Expr via our parser, we need to build an environment for the current "module" so that it's convenient to operate with. If we forget typechecking for a second, the main thing we need to do is extract ALL lambdas to the top level, including constructor functions from the SumTypes. That is done in the **Environment** state.
+
 ## Key grammar concepts
 
 ### Sum Types

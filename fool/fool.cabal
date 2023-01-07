@@ -29,6 +29,7 @@ library
       Lexer
       Logs
       Parser
+      Pipeline
       State
       Util.IOLogger
       Util.Logger
