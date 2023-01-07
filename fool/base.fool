@@ -20,3 +20,9 @@ function plus (x:Nat,y:Nat):Nat = {
   plus (Succ(n), x) -> Succ (plus(n,x))  
 };
 
+action main = {
+  one = Succ(Z),
+  three = Succ(Succ(one)),
+  res = plus(three,one),
+  print# (res)
+};

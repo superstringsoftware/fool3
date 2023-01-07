@@ -38,6 +38,8 @@ data Expr =
   | Id Name
   | Typed Expr Expr -- expression with type
   | Lam Lambda -- same, defining a function by abstracting a bunch of variables in a tuple
+  | Binding Var -- Var contains both the name and the expression to be bound to, used inside Actions etc
+  | Action Lambda -- Action is simply a list of expressions in order
   | App Expr [Expr] -- application
   | PatternMatch Expr Expr -- pattern match
   | PatternMatches [Expr] -- only PatternMatch is allowed, need to distinquish with generic tuple

@@ -66,7 +66,7 @@ lexer :: TokenParserIS ParserState
 lexer = Tok.makeTokenParser style
     where
     ops = [";","=",",",".",":", "->", "=>", "<",">", "|", "?", "<:", "\\"]
-    names = ["type","function","if","then","else","in",
+    names = ["type","function","if","then","else","in","action",
             "let", "case", "of", "where", "∃", "∀", "exists", "forall"]
     style = emptyDef {
                 Tok.commentStart   = "/*"

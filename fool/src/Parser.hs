@@ -106,6 +106,32 @@ pPatternMatch = do
     ex2 <- pExpr
     return $ PatternMatch ex1 ex2
 
+-- ACTIONS =====================================================
+pBinding :: Parser Expr
+pBinding = do
+    name <- identifier
+    tp <- typeSignature
+    reservedOp "="
+    ex <- pExpr
+    return $ Binding $ Var name tp ex
+
+pAction :: Parser Expr    
+pAction = do
+    reserved "action"
+    name <- identifier
+    args <- try pVars <|> pure []
+    tp <- typeSignature
+    reservedOp "="
+    ex <- braces (sepBy1 (try pDef <|> pApp ) (reservedOp ",") ) 
+    return $ Action $ Lambda {
+       lamName    = name
+     , params = args
+     , body       = Tuple ex
+     , lamType    = tp 
+    }
+    
+
+
 -- Variable with optional type signature, to be used in DEFINITIONS!!!
 -- (as opposed to function calls, as there it can be any expression)
 -- TODO: eventually needs to parse (= EXPR) part
@@ -165,7 +191,9 @@ pApp = do
 -- Building top level parsers
 pDef :: Parser Expr
 pDef =  try pSumType 
-        <|> pFunc
+        <|> try pFunc
+        <|> try pAction
+        <|> pBinding
         <?> "lambda, binding, pattern match or expression"
     
           
@@ -256,5 +284,5 @@ showSyntaxError s err = L.unpack $ L.unlines [
   where
     lineContents = (L.lines s) !! line
     pos  = errorPos err
-    line = sourceLine pos - 1
+    line = fromIntegral $ sourceLine pos - 1
     col  = fromIntegral $ sourceColumn pos - 1
