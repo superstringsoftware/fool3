@@ -46,14 +46,22 @@ afterparse :: Expr -> IntState Expr
 afterparse (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) = 
     pure $ SumType lam { body = Constructors $ Prelude.map fixCons cons }
     where fixCons lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) then lam else lam { body = Tuple $ Prelude.map (\v -> Id $ name v) args}
-afterparse e = pure e
 
--- initial checks with errors - so monadic
-initialCheckM :: Expr -> IntState Expr
 -- function with pattern match - check arity etc
-initialCheckM (Function lam@(Lambda nm args (PatternMatches pms) tp)) = do
-    pms' <- mapM initialCheckM pms
+afterparse (Function lam@(Lambda nm args (PatternMatches pms) tp)) = do
+    pms' <- mapM (handlePM nm args) pms
     return $ Function (lam { body = PatternMatches pms'} )
+    where handlePM :: String -> Record -> Expr -> IntState Expr
+          handlePM nm args pm@(PatternMatch (Tuple ms) e2 si) 
+            |  ( (Prelude.length ms) /= (Prelude.length args)) = do
+                                                    let lpl = LogPayload 
+                                                                (lineNum si) (colNum si) ""
+                                                                ("Mismatch in the number of arguments in a pattern match for the function " ++ nm ++ ". The function expects " ++ show (Prelude.length args) ++ " arguments")
+                                                    logError lpl { linePos = (lineNum si), colPos = (colNum si) } 
+                                                    return pm
+            | otherwise = pure pm
+
+afterparse e = pure e
 
 --------------------------------------------------------------------------------
 -- PASS 1: building initial typing and top-level lambdas environment

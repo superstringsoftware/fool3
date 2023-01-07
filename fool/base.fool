@@ -11,8 +11,8 @@ type Nat = {
 function id (x:a):a = x;
 
 function not (b:Bool) : Bool = {
-    True  -> False,
-    False -> True
+    (True, x)  -> False,
+    (False) -> True
 };
 
 function eq(x:Nat,y:Nat):Bool = {

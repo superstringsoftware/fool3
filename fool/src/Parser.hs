@@ -101,10 +101,10 @@ pFunc = Function <$> pFuncL
 pPatternMatch :: Parser Expr
 pPatternMatch = do
     pos <- getPosition
-    ex1 <- try symbolId <|> Tuple <$> parens (sepBy1 pExpr (reservedOp ","))
+    ex1 <- parens (sepBy1 pExpr (reservedOp ","))
     reservedOp "->"
     ex2 <- pExpr
-    return $ PatternMatch ex1 ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
+    return $ PatternMatch (Tuple ex1) ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
 
 -- ACTIONS =====================================================
 pBinding :: Parser Expr
@@ -194,7 +194,7 @@ pDef =  try pSumType
         <|> try pFunc
         <|> try pAction
         <|> pBinding
-        <?> "lambda, binding, pattern match or expression"
+        -- <?> "lambda, binding, pattern match or expression"
     
           
 
