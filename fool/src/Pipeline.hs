@@ -73,8 +73,8 @@ processBinding (Action lam, si) env = pure $ addLambda (lamName lam) lam env
 
 -- now extracting constructors from SumTypes, body is guaranteed to be
 -- a list of Lambdas under Constructors constructor
-processBinding (SumType (Lambda typName typArgs (Constructors cons) typTyp), si) env = 
-    pure $ addManyNamedLambdas cons env
+processBinding ( tp@(SumType (Lambda typName typArgs (Constructors cons) typTyp)), si) env = do
+    pure $ addManyNamedLambdas cons (addNamedSumType tp env)
 
 processBinding (ex, si) env = do 
     let lpl = LogPayload 
