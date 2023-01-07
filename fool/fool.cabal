@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Core
+      Lexer
       Lib
       Logs
       State
@@ -42,6 +43,7 @@ library
     , containers
     , hashtables
     , mtl
+    , parsec
     , text
     , time
     , transformers
@@ -61,6 +63,7 @@ executable fool-exe
     , fool
     , hashtables
     , mtl
+    , parsec
     , text
     , time
     , transformers
@@ -81,6 +84,7 @@ test-suite fool-test
     , fool
     , hashtables
     , mtl
+    , parsec
     , text
     , time
     , transformers

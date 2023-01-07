@@ -28,6 +28,7 @@ dependencies:
 - text
 - hashtables
 - unordered-containers
+- parsec
 
 ghc-options:
 # - -Wall
