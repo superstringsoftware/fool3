@@ -40,6 +40,8 @@ data Expr =
   | Tuple [Expr] -- any tuple { ... , ... }
   | SumType Lambda -- sum type definition, which is also basically a lambda with 
   -- body expression being a tuple of Lambdas which are constructors
+  | UnaryOp Name Expr
+  | BinaryOp Name Expr Expr
   | Type -- U 0 synonim
 
   -- | U Int -- universe hierarchy

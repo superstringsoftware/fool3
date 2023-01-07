@@ -29,6 +29,8 @@ dependencies:
 - hashtables
 - unordered-containers
 - parsec
+- vector
+- pretty-simple
 
 ghc-options:
 # - -Wall

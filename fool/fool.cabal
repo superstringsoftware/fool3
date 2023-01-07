@@ -29,6 +29,7 @@ library
       Lexer
       Lib
       Logs
+      Parser
       State
       Util.IOLogger
       Util.Logger
@@ -44,10 +45,12 @@ library
     , hashtables
     , mtl
     , parsec
+    , pretty-simple
     , text
     , time
     , transformers
     , unordered-containers
+    , vector
   default-language: Haskell2010
 
 executable fool-exe
@@ -64,10 +67,12 @@ executable fool-exe
     , hashtables
     , mtl
     , parsec
+    , pretty-simple
     , text
     , time
     , transformers
     , unordered-containers
+    , vector
   default-language: Haskell2010
 
 test-suite fool-test
@@ -85,8 +90,10 @@ test-suite fool-test
     , hashtables
     , mtl
     , parsec
+    , pretty-simple
     , text
     , time
     , transformers
     , unordered-containers
+    , vector
   default-language: Haskell2010
