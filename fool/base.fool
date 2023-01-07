@@ -2,8 +2,9 @@
 // let's implement it all the way!!! following the MVP principle - do not build wheels for a car,
 // build a scooter first!
 
-type Bool = { True, False }
+type Bool = { True, False };
 
+/*
 function not (b:Bool) : Bool = {
     True -> False,
     False -> True
@@ -18,4 +19,4 @@ function plus (x:Nat,y:Nat):Nat = {
   (Z, x) -> x,
   (Succ(n), x) -> Succ (plus(n,x))  
 }
-
+*/

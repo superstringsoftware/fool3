@@ -6,6 +6,8 @@
 module Core
 where
 
+import Util.PrettyPrinting
+
 type Name = String
 
 data Var = Var {
@@ -52,3 +54,17 @@ data Expr =
   -- typ is calculated for type checking. Optional + Explicit params. 
     deriving (Show, Eq)
 
+
+
+-- --------------------------------- PRETTY PRINTING --------------------------------------------
+
+instance PrettyPrint Lambda where
+  ppr (Lambda name params body sig) = name ++ " " ++ ppr params ++ if (body == UNDEFINED) then "" else " = " ++ ppr body
+
+instance PrettyPrint Var where
+  ppr (Var n t _) = as [bold] n
+
+instance PrettyPrint Expr where
+  ppr (Id v) = v
+  ppr e = show e
+  -- λ  

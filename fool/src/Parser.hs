@@ -160,4 +160,4 @@ showSyntaxError s err = L.unpack $ L.unlines [
     lineContents = (L.lines s) !! line
     pos  = errorPos err
     line = sourceLine pos - 1
-    col  = sourceColumn pos - 1
+    col  = fromIntegral $ sourceColumn pos - 1

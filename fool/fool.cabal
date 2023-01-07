@@ -27,7 +27,6 @@ library
   exposed-modules:
       Core
       Lexer
-      Lib
       Logs
       Parser
       State
@@ -42,7 +41,9 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , directory
     , hashtables
+    , haskeline
     , mtl
     , parsec
     , pretty-simple
@@ -53,7 +54,7 @@ library
     , vector
   default-language: Haskell2010
 
-executable fool-exe
+executable fool
   main-is: Main.hs
   other-modules:
       Paths_fool
@@ -63,8 +64,10 @@ executable fool-exe
   build-depends:
       base >=4.7 && <5
     , containers
+    , directory
     , fool
     , hashtables
+    , haskeline
     , mtl
     , parsec
     , pretty-simple
@@ -86,8 +89,10 @@ test-suite fool-test
   build-depends:
       base >=4.7 && <5
     , containers
+    , directory
     , fool
     , hashtables
+    , haskeline
     , mtl
     , parsec
     , pretty-simple
