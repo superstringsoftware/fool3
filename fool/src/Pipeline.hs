@@ -39,8 +39,14 @@ runExprPassAndReverse f l = rev f l []
     where rev f [] a = a
           rev f ((ex, srci):xs) a = rev f xs ( (f ex, srci):a )
 
--- for now, do nothing, just reversing
-afterparse = id
+-- for now, only expand Constructors inside SumTypes to their full form
+-- so that they clearly return a tuple of values
+afterparse :: Expr -> Expr
+-- sum type - need to map over all constructors!
+afterparse (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) = 
+    SumType lam { body = Constructors $ Prelude.map fixCons cons }
+    where fixCons lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) then lam else lam { body = Tuple $ Prelude.map (\v -> Id $ name v) args}
+afterparse e = e
 
 --------------------------------------------------------------------------------
 -- PASS 1: building initial typing and top-level lambdas environment
