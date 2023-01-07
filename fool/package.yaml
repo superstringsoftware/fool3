@@ -26,6 +26,8 @@ dependencies:
 - transformers
 - time
 - text
+- hashtables
+- unordered-containers
 
 ghc-options:
 # - -Wall
@@ -33,7 +35,7 @@ ghc-options:
 - -Widentities
 - -Wincomplete-record-updates
 - -Wincomplete-uni-patterns
-- -Wmissing-export-lists
+# - -Wmissing-export-lists
 - -Wmissing-home-modules
 - -Wpartial-fields
 - -Wredundant-constraints

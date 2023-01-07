@@ -28,6 +28,7 @@ library
       Core
       Lib
       Logs
+      State
       Util.IOLogger
       Util.Logger
       Util.PrettyPrinting
@@ -35,14 +36,16 @@ library
       Paths_fool
   hs-source-dirs:
       src
-  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
     , containers
+    , hashtables
     , mtl
     , text
     , time
     , transformers
+    , unordered-containers
   default-language: Haskell2010
 
 executable fool-exe
@@ -51,15 +54,17 @@ executable fool-exe
       Paths_fool
   hs-source-dirs:
       app
-  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , containers
     , fool
+    , hashtables
     , mtl
     , text
     , time
     , transformers
+    , unordered-containers
   default-language: Haskell2010
 
 test-suite fool-test
@@ -69,13 +74,15 @@ test-suite fool-test
       Paths_fool
   hs-source-dirs:
       test
-  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , containers
     , fool
+    , hashtables
     , mtl
     , text
     , time
     , transformers
+    , unordered-containers
   default-language: Haskell2010
