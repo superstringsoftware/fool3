@@ -82,5 +82,10 @@ instance PrettyPrint Expr where
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex
   ppr (Binding (Var nm tp val)) = as [bold] nm ++ pprTyp tp ++ " = " ++ ppr val 
+  ppr (Constructors cs) = showListCuBr ppr cs
+  ppr (SumType (Lambda name params body sig)) = name ++ " "
+    ++ showListRoBr ppr params 
+    ++ pprTyp sig ++ " = "
+    ++ ppr body
   ppr e = show e
   -- λ  
