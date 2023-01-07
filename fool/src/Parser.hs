@@ -75,22 +75,36 @@ pConstructor tp = do
     return $ Lam lam
 
 -- FUNCTIONS ---------------------------------------------------------
-pFuncL :: Parser Lambda
-pFuncL = do
+pFuncHeader :: Parser Lambda
+pFuncHeader = do
     reserved "function"
     name <- identifier
     args <- try pVars <|> pure []
     tp <- typeSignature
-    ex <- try (reservedOp "=" *> pExpr) <|> pure UNDEFINED
     return Lambda {
        lamName    = name
      , params = args
-     , body       = ex
+     , body       = UNDEFINED
      , lamType    = tp 
     }
 
+pFuncL :: Parser Lambda
+pFuncL = do
+    lam <- pFuncHeader
+    reservedOp "="
+    ex <- try (PatternMatches <$> braces (sepBy pPatternMatch (reservedOp ",") ) ) <|> pExpr
+    return $ lam { body = ex }
+
 pFunc :: Parser Expr
 pFunc = Lam <$> pFuncL
+
+-- pattern match Expr -> Expr
+pPatternMatch :: Parser Expr
+pPatternMatch = do
+    ex1 <- pExpr
+    reservedOp "->"
+    ex2 <- pExpr
+    return $ PatternMatch ex1 ex2
 
 -- Variable with optional type signature, to be used in DEFINITIONS!!!
 -- (as opposed to function calls, as there it can be any expression)

@@ -39,7 +39,9 @@ data Expr =
   | Typed Expr Expr -- expression with type
   | Lam Lambda -- same, defining a function by abstracting a bunch of variables in a tuple
   | App Expr [Expr] -- application
-  | Tuple [Expr] -- any tuple { ... , ... }
+  | PatternMatch Expr Expr -- pattern match
+  | PatternMatches [Expr] -- only PatternMatch is allowed, need to distinquish with generic tuple
+  | Tuple [Expr] -- any tuple { ... , ... }, 
   | SumType Lambda -- sum type definition, which is also basically a lambda with 
   -- body expression being a tuple of Lambdas which are constructors
   | UnaryOp Name Expr

@@ -10,15 +10,13 @@ type Nat = {
 
 function id (x:a):a = x;
 
-/*
 function not (b:Bool) : Bool = {
     True -> False,
     False -> True
-}
-
+};
 
 function plus (x:Nat,y:Nat):Nat = {
-  (Z, x) -> x,
-  (Succ(n), x) -> Succ (plus(n,x))  
-}
-*/
+  plus (Z, x) -> x,
+  plus (Succ(n), x) -> Succ (plus(n,x))  
+};
+
