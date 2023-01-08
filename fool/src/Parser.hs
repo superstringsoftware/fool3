@@ -91,21 +91,34 @@ pFuncL :: Parser Lambda
 pFuncL = do
     lam <- pFuncHeader
     reservedOp "="
-    ex <- try (PatternMatches <$> braces (sepBy pPatternMatch (reservedOp ",") ) ) <|> pExpr
+    ex <- try (PatternMatches <$> braces (sepBy (pPatternMatch lam) (reservedOp ",") ) ) <|> pExpr
     return $ lam { body = ex }
 
 pFunc :: Parser Expr
 pFunc = Function <$> pFuncL
 
 -- pattern match Expr -> Expr
-pPatternMatch :: Parser Expr
-pPatternMatch = do
+-- Lambda is given for external context to do some basic error checking,
+-- e.g. # of arguments correspondence etc
+pPatternMatch :: Lambda -> Parser Expr
+pPatternMatch lam = do
     pos <- getPosition
     ex1 <- parens (sepBy1 pExpr (reservedOp ","))
-    reservedOp "->"
-    ex2 <- pExpr
-    return $ PatternMatch (Tuple ex1) ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
+    if (length (params lam) /= (length ex1) ) 
+        then parserFail $
+                "\nWrong number of arguments in a pattern match in a function:\n\n"
+                ++ (ppr lam) ++ "\n\nThe function expects "
+                ++ show (length (params lam)) ++ " arguments "
+                ++ "but was given " ++ show (length ex1) 
+                ++ " in the pattern match shown above."
+        else do 
+                reservedOp "->"
+                ex2 <- pExpr
+                return $ PatternMatch (Tuple ex1) ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
 
+    
+    
+    
 -- ACTIONS =====================================================
 pBinding :: Parser Expr
 pBinding = do

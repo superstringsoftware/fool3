@@ -50,6 +50,12 @@ data Expr =
   | Action Lambda -- Action is simply a list of expressions in order
   | Constructors [Lambda] -- only for constructor list inside sum types
   | App Expr [Expr] -- application
+  | CaseOf Var Expr -- in the course of optimizations we transfer pattern matches
+  -- to the case x of val -> expr statements. Case Var.name of Var.val -> Expr is the format.
+  -- Var.name obviously can only be the one bound by the encompassing function.
+  -- Two and more pattern matches in one statement - (x::xs, Cons x1 x2) etc - 
+  -- are changed into hierarchical cases: case a of x::xs -> case b of Cons x1 x2 -> expr
+  -- this means PatternMatches eventually MUST contain only CaseOf expressions
   | PatternMatch Expr Expr SourceInfo -- pattern match with source info attached
   | PatternMatches [Expr] -- only PatternMatch is allowed, need to distinquish with generic tuple
   | Tuple [Expr] -- any tuple { ... , ... }, -- only CONSTRUCTORS return it!!!

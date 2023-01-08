@@ -78,6 +78,36 @@ initializeInterpreter = return $ InterpreterState {
     currentEnvironment = initialEnvironment
 }
 
+------------------ Monadic traversal of the Expr tree ---------------------
+-- needed for optimizations, error checking etc
+
+{-
+data Expr =
+  | Binding Var -- Var contains both the name and the expression to be bound to, used inside Actions etc
+  | Function Lambda -- defining a function by abstracting a bunch of variables in a tuple
+  | Action Lambda -- Action is simply a list of expressions in order
+  | Constructors [Lambda] -- only for constructor list inside sum types
+  | SumType Lambda -- sum type definition, which is also basically a lambda with 
+  -- body expression being a tuple of Lambdas which are constructors
+  | UnaryOp Name Expr
+  | BinaryOp Name Expr Expr
+  | Type -- U 0 synonim
+-}
+
+traverseExprM :: (Expr -> IntState Expr) -> Expr -> IntState Expr
+traverseExprM f UNDEFINED = pure UNDEFINED
+traverseExprM f (Typed e1 e2) = Typed <$> (f e1) <*> (f e2)
+traverseExprM f (App e exs) = App <$> (f e) <*> (mapM f exs)
+traverseExprM f (PatternMatch e1 e2 si) = do
+    e1' <- f e1
+    e2' <- f e2
+    return $ PatternMatch e1' e2' si
+traverseExprM f (PatternMatches exs) = PatternMatches <$> (mapM f exs)
+traverseExprM f (Tuple exs) = Tuple <$> (mapM f exs)
+traverseExprM f (Statements exs) = Statements <$> (mapM f exs)
+traverseExprM f (UnaryOp nm e) = UnaryOp <$> (pure nm) <*> (f e)
+traverseExprM f e = f e
+
 ---------------------------- BASIC FUNCTIONS -----------------------------
 lookupLambda :: Name -> Environment -> Maybe Lambda
 lookupLambda n env = Map.lookup n (topLambdas env)

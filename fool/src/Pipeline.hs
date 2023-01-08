@@ -48,23 +48,14 @@ afterparse (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) =
     where fixCons lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) then lam else lam { body = Tuple $ Prelude.map (\v -> Id $ name v) args}
 
 -- function with pattern match - check arity etc
+{- 
 afterparse (Function lam@(Lambda nm args (PatternMatches pms) tp)) = do
     pms' <- mapM (handlePM lam args) pms
     return $ Function (lam { body = PatternMatches pms'} )
-    where handlePM :: Lambda -> Record -> Expr -> IntState Expr
-          handlePM lam args pm@(PatternMatch (Tuple ms) e2 si) 
-            |  ( (Prelude.length ms) /= (Prelude.length args)) = do
-                                                    let lpl = LogPayload 
-                                                                (lineNum si) (colNum si) ""
-                                                                ("Mismatch in the number of arguments in a pattern match for the function:\n" 
-                                                                ++ ppr lam ++ ".\nThe function expects " 
-                                                                ++ show (Prelude.length args) ++ " arguments and was given "
-                                                                ++ show (Prelude.length ms) ++ ".")
-                                                    logError lpl { linePos = (lineNum si), colPos = (colNum si) } 
-                                                    return pm
-            | otherwise = pure pm
-
+-}
 afterparse e = pure e
+
+
 
 --------------------------------------------------------------------------------
 -- PASS 1: building initial typing and top-level lambdas environment
