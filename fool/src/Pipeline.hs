@@ -10,9 +10,10 @@ import Logs
 import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
-import Data.Text as T
+import Data.Text as T hiding (intercalate)
 import qualified Data.Text.Lazy as TL
 import Data.List.Index
+import Data.List (intercalate)
 
 import Util.PrettyPrinting as TC
 import Text.Pretty.Simple (pPrint, pShow)
@@ -200,8 +201,25 @@ expandCase lam e = pure e
 --------------------------------------------------------------------------------
 -- PASS 5: Compilation - JS
 --------------------------------------------------------------------------------
+compile2JSpass :: IntState()
+compile2JSpass = do
+    s <- get
+    let lambdas = topLambdas $ currentEnvironment s
+    let allTypes = types $ currentEnvironment s
+    funcsJS <- (traverseWithKey g lambdas)
+    typesJS <- (traverseWithKey f allTypes)
+    let prog = typesJS `union` funcsJS
+    put s{currentEnvironment = (currentEnvironment s) {outProgram = prog} }
+    return ()
+    where f k expr = pure $ compileExprToJS' expr
+          g k lam  = pure $ (compileFunctionToJS "") lam
+
+
 mkConsName :: String -> String -> String
 mkConsName typName consName = "cons_" ++ typName ++ "_" ++ consName
+
+compileExprToJS' :: Expr -> String
+compileExprToJS' e = intercalate ("\n" :: String) (compileExprToJS e) 
 
 compileExprToJS :: Expr -> [String]
 compileExprToJS (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) = 
@@ -217,19 +235,39 @@ argsToTupleFields :: Record -> String
 argsToTupleFields args = showListPlainSep f ", " args
     where f (Var nm tp vl) = nm ++ ": " ++ nm
 
+-- taking out prefix in names for now
 compileConstructorToJS :: String -> Int -> Lambda -> String
-compileConstructorToJS pref i (Lambda nm args ex tp) = "function " ++ pref++nm ++
+compileConstructorToJS pref i (Lambda nm args ex tp) = "function " ++nm ++
                          argsToString args 
                          ++ " { return { __consTag: " ++ (show i) ++ ", "
                          ++ argsToTupleFields args ++ " } } "                         
     
 compileFunctionToJS :: String -> Lambda -> String
-compileFunctionToJS pref (Lambda nm args ex tp) = "function " ++ pref++nm ++
-                         argsToString args 
-                         ++ funBodyToString ex
+compileFunctionToJS pref lam@(Lambda nm args ex tp) = 
+    if (isLambdaConstructor lam) then ""
+    else "function " ++ pref++nm ++ argsToString args ++ funBodyToString ex
 
 -- compiling pattern matches is the most complicated thing as we need to 
 -- consult the environment about the order of constructors etc
 funBodyToString :: Expr -> String
 funBodyToString (Id x) = "{ return " ++ x ++ "; }"
+funBodyToString (App ex exs) = "{ return " 
+    ++ (exprOnlyToString ex) 
+    ++ showListRoBr exprOnlyToString exs
+    ++ "; }"
+funBodyToString (PatternMatches cs) = "{\n" ++ 
+    (showListPlainSep exprOnlyToString ";\n" cs) ++ ";\n}"
 funBodyToString e = " { /* NOT IMPLEMENTED:\n" ++ ppr e ++ "\n*/ }" 
+
+exprOnlyToString :: Expr -> String
+exprOnlyToString (Id x) = x
+exprOnlyToString (App ex exs) = exprOnlyToString ex ++ showListRoBr exprOnlyToString exs
+exprOnlyToString (CaseOf args ex _) = caseToIf args ++ " return " 
+    ++ exprOnlyToString ex
+    where caseToIf vars = "if (" ++ (showListPlainSep ff " and " vars)
+            ++ " )"
+          ff (Var nm tp val) = "(" ++ nm ++ " == " ++ exprOnlyToString val ++ ")"
+          
+exprOnlyToString e = "/* NOT IMPLEMENTED: " ++ ppr e ++ "*/"
+
+    
