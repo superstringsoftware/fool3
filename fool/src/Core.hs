@@ -50,14 +50,15 @@ data Expr =
   | Action Lambda -- Action is simply a list of expressions in order
   | Constructors [Lambda] -- only for constructor list inside sum types
   | App Expr [Expr] -- application
-  | CaseOf Var Expr -- in the course of optimizations we transfer pattern matches
-  -- to the case x of val -> expr statements. Case Var.name of Var.val -> Expr is the format.
-  -- Var.name obviously can only be the one bound by the encompassing function.
-  -- Two and more pattern matches in one statement - (x::xs, Cons x1 x2) etc - 
-  -- are changed into hierarchical cases: case a of x::xs -> case b of Cons x1 x2 -> expr
-  -- this means PatternMatches eventually MUST contain only CaseOf expressions
-  | PatternMatch Expr Expr SourceInfo -- pattern match with source info attached
-  | PatternMatches [Expr] -- only PatternMatch is allowed, need to distinquish with generic tuple
+  | CaseOf Record Expr SourceInfo -- in the course of optimizations we transfer pattern matches
+  -- to the case x of val -> expr statements. However, since we prefer lists vs trees
+  -- in our implementation, we are actually combining function variables with
+  -- the expressions they have to match in the Record, e.g.:
+  -- f(x:t1,y:t2) = { {a,b} -> expr } turns into:
+  -- CaseOf [Var "x" t1 a, Var "y" t2 b] expr!
+  -- this way we can try if else, case of etc approaches depending on the 
+  -- compilation target
+  | PatternMatches [Expr] -- only CaseOf is allowed inside this!!!
   | Tuple [Expr] -- any tuple { ... , ... }, -- only CONSTRUCTORS return it!!!
   | Statements [Expr] -- for Action body, simply a list of statements to execute in order
   | SumType Lambda -- sum type definition, which is also basically a lambda with 
@@ -74,7 +75,33 @@ data Expr =
   -- typ is calculated for type checking. Optional + Explicit params. 
     deriving (Show, Eq)
 
+-- non-monadic traverse
+traverseExpr :: (Expr -> Expr) -> Expr -> Expr
+traverseExpr f UNDEFINED = UNDEFINED
+traverseExpr f e@(Id name) = e
+traverseExpr f e@(Typed e1 e2) = Typed (f e1) (f e2)
+traverseExpr f (App ex exs) = App (f ex) (map f exs)
+traverseExpr f (CaseOf args ex si) = CaseOf args (f ex) si
+traverseExpr f (PatternMatches exs) = PatternMatches (map f exs)
+traverseExpr f (Tuple exs) = Tuple (map f exs)
+traverseExpr f (Statements exs) = Statements (map f exs)
+traverseExpr f (UnaryOp nm ex) = UnaryOp nm (f ex)
+traverseExpr f (BinaryOp nm e1 e2) = BinaryOp nm (f e1) (f e2)
+-- for functions only traversing the body for now:
+-- probably need to add type sig as well???
+traverseExpr f (Function lam) = Function $ lam { body = f (body lam) }
+traverseExpr f (Action lam) = Action $ lam { body = f (body lam) }
+traverseExpr f (SumType lam) = SumType $ lam { body = f (body lam) }
+traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f (body l) } ) lams
 
+-- f(x) = expr, x = val, substituting all x appearances in expr for val
+betaReduce :: Var -> Expr -> Expr
+-- substituting all nm occurences in expr for val
+-- no typechecking whatsoever
+betaReduce (Var nm tp val) expr = traverseExpr subs expr
+  where subs :: Expr -> Expr
+        subs e@(Id name) = if (nm == name) then val else e
+        subs e = e
 
 -- --------------------------------- PRETTY PRINTING --------------------------------------------
 
@@ -89,10 +116,16 @@ pprTyp ex = if (ex == UNDEFINED) then "" else ":" ++ ppr ex
 instance PrettyPrint Var where
   ppr (Var n t _) = as [bold] n ++ if (t == UNDEFINED) then "" else ":" ++ ppr t
 
+ppVarCaseOf :: Var -> String
+ppVarCaseOf (Var n t val) = "case " ++ n ++ " of " ++ ppr val
+
+pprRecordRo :: (Var -> String) -> Record -> String
+pprRecordRo f r = showListRoBr f r
+
 instance PrettyPrint Expr where
   ppr UNDEFINED = ""
   ppr (Id v) = as [bold] v
-  ppr (PatternMatch e1 e2 _) = ppr e1 ++ " -> " ++ ppr e2
+  ppr (CaseOf e1 e2 _) = showListCuBr ppVarCaseOf e1 ++ " -> " ++ ppr e2
   ppr (PatternMatches ps) = showListCuBr ppr ps
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex

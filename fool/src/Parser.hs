@@ -116,8 +116,13 @@ pPatternMatch lam = do
         reservedOp "->"
         ex2 <- pExpr
         -- ok so now we have function variables in (params lam) and 
-        -- respective pattern 
-        return $ PatternMatch (Tuple ex1) ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
+        -- respective pattern matches, we need to convert the expression
+        -- to CaseOf [Var] Expr
+        -- Since Parser has no context, we make a straightforward conversion:
+        -- f(x:t1,y:t2) = { {a,b} -> expr } gets converted into
+        -- CaseOf [Var "x" t1 a, Var "y" t2 b] expr
+        let bnd = zipWith (\arg pat -> arg {val = pat} ) (params lam) ex1
+        return $ CaseOf bnd ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
 
     
     

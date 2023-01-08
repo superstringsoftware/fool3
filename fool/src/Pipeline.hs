@@ -117,8 +117,68 @@ buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) prim
 
 --------------------------------------------------------------------------------
 -- PASS 2: Preliminary Optimizations and basic sanity checks
+-- now that we have built the environment (so top level lambda and types bidnings)
+-- we can start the optimizations
+-- This pass includes proper formation of the Case pattern matches inside
+-- functions
+-- Question: should we forget about the original source program now
+-- and start working with the environment??? If not, we'll need to update
+-- the environment as well as the source program, which seems counterproductive?
+-- For now, choosing to work with the environment.
 --------------------------------------------------------------------------------
+caseOptimizationPass :: IntState()
+caseOptimizationPass = do
+    s <- get
+    let lambdas = topLambdas $ currentEnvironment s
+    lambdas' <- traverseWithKey f lambdas
+    put s{currentEnvironment = (currentEnvironment s) {topLambdas = lambdas'} }
+    where f k lam@(Lambda nm args (PatternMatches exs) tp) = do
+                exs' <- mapM (expandCase lam) exs
+                return lam {body = PatternMatches exs'}
+          f k e = return e
 
+expandCase :: Lambda -> Expr -> IntState Expr 
+-- we need to map over all of the case x of val statements,
+-- check if val has a top level binding and if yes - keep it,
+-- if not - means it's a variable substitution and we need to do a
+-- beta reduction
+expandCase lam cs@(CaseOf recs ex si) = do
+    (recs', ex') <- t recs ex
+    return $ CaseOf recs' ex' si
+    where 
+        t [] expr = return ([], expr)
+        t (v@(Var nm tp val):xs) expr = 
+            case val of 
+                (Id name) -> do 
+                    -- lookup the name in environment, if it exists, keep the case,
+                    -- if not - betaReduce by making the switch
+                    -- eventually need to also add a check for literals
+                    s <- get
+                    let env = currentEnvironment s
+                    let mlam = lookupLambda name env
+                    case mlam of
+                        Nothing -> do
+                            -- nothing found in the environment, let's
+                            -- beta reduce:
+                            -- f (x,y) = case x of Z, y of n -> n
+                            -- in the 2nd case, changing all occurences of n
+                            -- to y
+                            let expr' = betaReduce (Var name UNDEFINED (Id nm)) expr
+                            (lst, expr'') <- t xs expr'
+                            -- EXCLUDING this var from the case array:
+                            return (lst,expr'')
+                        Just lambda -> do
+                            -- found a lambda with a given name, 
+                            -- keeping everything as is
+                            (lst, expr') <- t xs expr
+                            return (v:lst,expr')
+                val' -> do
+                    -- otherwise, simply keep everything as is
+                    (lst, expr') <- t xs expr
+                    return (v:lst,expr')
+
+        
+expandCase lam e = pure e
 
 
 --------------------------------------------------------------------------------
