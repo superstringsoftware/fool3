@@ -143,6 +143,7 @@ expandCase :: Lambda -> Expr -> IntState Expr
 -- if not - means it's a variable substitution and we need to do a
 -- beta reduction
 expandCase lam cs@(CaseOf recs ex si) = do
+    -- liftIO $ putStrLn $ "Analyzing: " ++ ppr cs
     (recs', ex') <- t recs ex
     return $ CaseOf recs' ex' si
     where 
@@ -153,6 +154,7 @@ expandCase lam cs@(CaseOf recs ex si) = do
                     -- lookup the name in environment, if it exists, keep the case,
                     -- if not - betaReduce by making the switch
                     -- eventually need to also add a check for literals
+                    -- liftIO $ putStrLn $ "found Id name case: " ++ ppr v
                     s <- get
                     let env = currentEnvironment s
                     let mlam = lookupLambda name env
@@ -163,7 +165,13 @@ expandCase lam cs@(CaseOf recs ex si) = do
                             -- f (x,y) = case x of Z, y of n -> n
                             -- in the 2nd case, changing all occurences of n
                             -- to y
-                            let expr' = betaReduce (Var name UNDEFINED (Id nm)) expr
+                            -- liftIO $ putStrLn $ "Didnt find in the environment: " ++ name
+                            -- liftIO $ putStrLn $ "Beta reducing!"
+                            -- liftIO $ putStrLn $ "orig expr: " ++ show expr
+                            let vt = Var name UNDEFINED (Id nm)
+                            -- liftIO $ putStrLn $ "Var to reduce to: " ++ show vt
+                            let expr' = betaReduce vt expr
+                            -- liftIO $ putStrLn $ "reduced expr: " ++ show expr'
                             (lst, expr'') <- t xs expr'
                             -- EXCLUDING this var from the case array:
                             return (lst,expr'')

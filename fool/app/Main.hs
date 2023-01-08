@@ -223,11 +223,18 @@ loadFileNew nm = do
                 afterparserPass
                 showAllLogsWSource
                 clearAllLogs
+                processCommand ([":e"])
                 liftIO (putStrLn $ "Executing pass 1: " ++ TC.as [TC.bold, TC.underlined] "initial top level environment building")
                 buildEnvPass
                 showAllLogsWSource
+                processCommand ([":e"])
                 clearAllLogs
-                liftIO (putStrLn $ "Executing pass 2: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
+                liftIO (putStrLn $ "Executing pass 2: " ++ TC.as [TC.bold, TC.underlined] "initial optimizations")
+                caseOptimizationPass
+                showAllLogsWSource
+                processCommand ([":e"])
+                clearAllLogs
+                liftIO (putStrLn $ "Executing pass 3: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
                 -- compile2JSpass
                 -- showAllLogsWSource
                 -- clearAllLogs
