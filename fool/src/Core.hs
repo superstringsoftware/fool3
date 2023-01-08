@@ -82,17 +82,18 @@ traverseExpr f e@(Id name) = f e
 traverseExpr f e@(Typed e1 e2) = Typed (f $ traverseExpr f e1) (f $ traverseExpr f e2)
 traverseExpr f (App ex exs) = App (f $ traverseExpr f ex) (map f (map (traverseExpr f) exs) )
 traverseExpr f (CaseOf args ex si) = CaseOf args (f $ traverseExpr f ex) si
-traverseExpr f (PatternMatches exs) = PatternMatches (map f exs)
-traverseExpr f (Tuple exs) = Tuple (map f exs)
-traverseExpr f (Statements exs) = Statements (map f exs)
-traverseExpr f (UnaryOp nm ex) = UnaryOp nm (f ex)
-traverseExpr f (BinaryOp nm e1 e2) = BinaryOp nm (f e1) (f e2)
+traverseExpr f (PatternMatches exs) = PatternMatches (map f (map (traverseExpr f) exs))
+traverseExpr f (Tuple exs) = Tuple (map f (map (traverseExpr f) exs))
+traverseExpr f (Statements exs) = Statements (map f (map (traverseExpr f) exs))
+traverseExpr f (UnaryOp nm ex) = UnaryOp nm (f $ traverseExpr f ex)
+traverseExpr f (BinaryOp nm e1 e2) = BinaryOp nm (f $ traverseExpr f e1) (f $ traverseExpr f e2)
 -- for functions only traversing the body for now:
 -- probably need to add type sig as well???
-traverseExpr f (Function lam) = Function $ lam { body = f (body lam) }
-traverseExpr f (Action lam) = Action $ lam { body = f (body lam) }
-traverseExpr f (SumType lam) = SumType $ lam { body = f (body lam) }
-traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f (body l) } ) lams
+traverseExpr f (Function lam) = Function $ lam { body = f $ traverseExpr f (body lam) }
+traverseExpr f (Action lam) = Action $ lam { body = f $ traverseExpr f (body lam) }
+traverseExpr f (SumType lam) = SumType $ lam { body = f $ traverseExpr f (body lam) }
+-- TODO: CHECK IF THIS IS THE CORRECT TRAVERSAL: !!!!
+traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f $ traverseExpr f (body l) } ) lams
 
 -- App (Id "Succ") [App (Id "plus") [Id "n",Id "x"]]
 
