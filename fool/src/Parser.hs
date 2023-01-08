@@ -97,13 +97,19 @@ pFuncL = do
 pFunc :: Parser Expr
 pFunc = Function <$> pFuncL
 
+-- eventually to be expanded to literals etc
+-- but in general only Ids and constructor applications Apps should be allowed
+-- in the left part of pattern matches
+pInsideLeftPattern :: Parser Expr
+pInsideLeftPattern = try pApp <|> symbolId <?> "constructor application or a value"
+
 -- pattern match Expr -> Expr
 -- Lambda is given for external context to do some basic error checking,
 -- e.g. # of arguments correspondence etc
 pPatternMatch :: Lambda -> Parser Expr
 pPatternMatch lam = do
     pos <- getPosition
-    ex1 <- braces (sepBy1 pExpr (reservedOp ","))
+    ex1 <- braces (sepBy1 pInsideLeftPattern (reservedOp ","))
     if (length (params lam) /= (length ex1) ) 
     then parserFail $
             "\nWrong number of arguments in a pattern match in a function:\n\n"

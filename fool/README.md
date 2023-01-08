@@ -38,6 +38,98 @@ However, such a simple case is enough to test the whole pipeline, from parsing t
 
 Let's start with this in order - after the program is parsed into Expr via our parser, we need to build an environment for the current "module" so that it's convenient to operate with. If we forget typechecking for a second, the main thing we need to do is extract ALL lambdas to the top level, including constructor functions from the SumTypes. That is done in the **Environment** state.
 
+### Treating cases
+
+This is an interesting and arguably the most complicated issue apart from type-checking. Let's say we have a crazy function like the below:
+
+```typescript
+function tst(x:t1, y:t2) : T = {
+  {Cons (a1,a2, Cell(b1,b2) ), Z} -> g( f(a1,a2), b1, b2 ),
+  {Z, n} -> y
+};
+```
+Let's forget about the trivial second case for now and focus on the first. It should convert into something like
+
+```haskell
+case x:t1 of Cons (a1,a2, Cell(b1,b2) ) -> case y:t2 of Z -> g (...) 
+```
+
+However this is incorrect, since we need to convert all cases left to right, thus the correct conversion would be:
+
+{case x of Cons (a1,a2, Cell(b1,b2) ), case y of Z} ==>
+{case x of Cons (a1,a2, _temp_var_1 ), case _temp_var_1 of Cell(b1,b2), case y of Z} 
+
+So we need to make a temp var substitution to all occurences of the constructor application and make a case analysis of them in turn. Since in the next step we'll also need to make substitutions to get fields access properly:
+
+```typescript
+tupleField : i:Nat -> {t0,...,tn} -> ti
+consTag(x) is Cons ? ->
+let a1 = tupleField(0,x)
+let a2 = tupleField(1,x)
+let _temp_var_1 = tupleField(2,x)
+consTag(_temp_var_1) is Cell ? ->
+let b1 = tupleField(0,_temp_var_1)
+let b2 = tupleField(1,_temp_var_1)
+```
+And then we substitute occurences of a1,a2,b1,b2 in the right side for the field accesses above. Also of note that since we can do dependent types, we can actually define tuple manipulation in our language. So, in essence case analysis is reduced to consTag checks together with beta-reduction for substituted variables for tupleField!
+
+So, function f(x,y,z) = {
+  { n, Z, Cons (a1, Cell (b1, b2) ) } -> g (n,a1,b1,b2)
+}
+
+expands in the first pass into the following case:
+
+{ case x of n, case y of Z, case z of Cons (a1, Cell (b1, b2) ) } 
+  -> g (n,a1,b1,b2)
+
+Algorithm: go left to right inside the Case tuple:
+
+1) n: it's an Id, look it up in the environment. There's nothing, so treat it as a variable and do an n = x beta reduce while killing the case altogether, as it's only purpose is to do such a substitution:
+
+{ case y of Z, case z of Cons (a1, Cell (b1, b2) ) } 
+  -> g (x,a1,b1,b2)
+
+2) Z: it's an Id, look up, find that it's one of Nat constructors. Convert it to either direct comparison or consTag comparison, no beta-reduction:
+
+{ consTag(y) == Z, case z of Cons (a1, Cell (b1, b2) ) } 
+  -> g (x,a1,b1,b2)
+
+3) z is matched to constructor application, the most complex case. First step, add constructor comparison in any case:
+
+{ consTag(y) == Z, consTag(z) == Cons  } 
+  -> g (x,a1,b1,b2)
+  | expand case z of Cons (a1, Cell (b1, b2) ):
+
+App (Id Cons) [Id a1, App (Id Cell) [Id b1, Id b2] ]
+
+so, in the step above we take Id Cons and convert it to consTag(z) == ...
+
+Then we start working with the arguments tuple left to right:
+0: Id a1: beta-reduce a1 = tupleField(0,z) ==>
+
+{ consTag(y) == Z, consTag(z) == Cons  } 
+  -> g (x,tupleField(0,z),b1,b2)
+  | expand Cell (b1, b2):
+
+1: App (Id Cell) [Id b1, Id b2]: add consTag check for the 2nd tuple field:
+
+{ consTag(y) == Z, consTag(z) == Cons, consTag(tupleField(1,z)) == Cell  } 
+  -> g (x,tupleField(0,z),b1,b2)
+  | expand (b1, b2):
+
+now we come to a recursive call inside arguments of a constructor application, falling inside the [Id b1, Id b2] tuple:
+
+2: Id b1: beta-reduce b1 = tupleField(0, tupleField(1,z) ):
+{ consTag(y) == Z, consTag(z) == Cons, consTag(tupleField(1,z)) == Cell  } 
+  -> g (x,tupleField(0,z),tupleField(0, tupleField(1,z) ),b2)
+  | expand (b2):
+
+same as above for b2 and final result:
+{ consTag(y) == Z, consTag(z) == Cons, consTag(tupleField(1,z)) == Cell  } 
+  -> g (x,tupleField(0,z),tupleField(0, tupleField(1,z) ), tupleField(1, tupleField(1,z) ))
+
+Then the thing in {} is joined with "and" and the right part is executed only if it's True. Otherwise we check the next case.
+
 ## Key grammar concepts
 
 ### Sum Types

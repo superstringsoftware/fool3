@@ -2,11 +2,13 @@
 // let's implement it all the way!!! following the MVP principle - do not build wheels for a car,
 // build a scooter first!
 
-type Bool = { True, False };
-type Nat = {
-  Z,
-  Succ (n:Nat)
+
+function f(x,y,z) = {
+  { n, Z, Cons (a1, Cell (b1, b2) ) } -> g (n,a1,b1,b2)
 };
+
+/*
+type Bool = { True, False };
 
 function id (x:a):a = x;
 
@@ -21,13 +23,19 @@ function eq(x:Nat,y:Nat):Bool = {
   {Z,n} -> False,
   {Succ(m),Succ(n)} -> eq(m,n)
 };
+*/
 
-
-function plus (x:Nat,y:Nat):Nat = {
-  {Z, x} -> x, // case x of Z -> case y of x -> x
-  {Succ(n), x} -> Succ (plus(n,x)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
+type Nat = {
+  Z,
+  Succ (n:Nat)
 };
 
+function plus (x:Nat,y:Nat):Nat = {
+  {Z, n} -> n, // case x of Z -> case y of x -> x
+  {Succ(n), m} -> Succ (plus(n,m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
+};
+
+/*
 function plus2 (x:Nat):Nat = plus(x, Succ(Succ(Z)) );
 
 action main = {
@@ -36,3 +44,4 @@ action main = {
   res = plus(three,one),
   print# (res)
 };
+*/

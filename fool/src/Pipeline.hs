@@ -138,8 +138,12 @@ caseOptimizationPass = do
                 return lam {body = PatternMatches exs'}
           f k e = return e
 
+
+-- this function is a mouthful and needs to be refactored A LOT
 expandCase :: Lambda -> Expr -> IntState Expr 
--- we need to map over all of the case x of val statements,
+-- First, we expand nested Constructor applications in the pattern
+-- matches into the flat list, left to right 
+-- Then, we map over all of the case x of val statements,
 -- check if val has a top level binding and if yes - keep it,
 -- if not - means it's a variable substitution and we need to do a
 -- beta reduction
@@ -148,7 +152,9 @@ expandCase lam cs@(CaseOf recs ex si) = do
     (recs', ex') <- t recs ex
     return $ CaseOf recs' ex' si
     where 
+        -- first beta-reduction step
         t [] expr = return ([], expr)
+        -- case nm of val
         t (v@(Var nm tp val):xs) expr = 
             case val of 
                 (Id name) -> do 
@@ -178,11 +184,30 @@ expandCase lam cs@(CaseOf recs ex si) = do
                             return (lst,expr'')
                         Just lambda -> do
                             -- found a lambda with a given name, 
-                            -- keeping everything as is
-                            (lst, expr') <- t xs expr
-                            return (v:lst,expr')
+                            -- check if it's a constructor and then
+                            -- expand it to the proper call
+                            if (isLambdaConstructor lambda)
+                            then do
+                                (lst, expr') <- t xs expr
+                                return ((Var nm tp (App (Id name) [])):lst,expr')
+                            else do
+                                -- this means it's a name of some function
+                                -- or top level binding - does it even 
+                                -- make sense inside a pattern match???
+                                (lst, expr') <- t xs expr
+                                return (v:lst,expr')
+                -- case nm of vval, first level constructor application
+                {- 
+                vval@(App e5 ex5) -> do
+                    -- otherwise, simply keep everything as is
+                    -- TODO: check proper constructor application!!!
+                    let tmpn = (lamName lam) ++ "_tmpvar_" ++ show e5
+                    (lst, expr') <- t xs expr
+                    return ((v {val = Id tmpn}):(Var tmpn UNDEFINED vval):lst,expr')
+                -}
                 val' -> do
                     -- otherwise, simply keep everything as is
+                    -- TODO: check proper constructor application!!!
                     (lst, expr') <- t xs expr
                     return (v:lst,expr')
 
