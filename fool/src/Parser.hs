@@ -46,7 +46,7 @@ dbg msg = liftIO $ putStrLn msg
 pSumType :: Parser Expr
 pSumType = do
     reserved "type"
-    name <- identifier
+    name <- uIdentifier
     args <- try pVars <|> pure []
     ex   <- reservedOp "=" *> (braces (sepBy1 (pConstructor (Id name)) (reservedOp ",") ))
     let lam = Lambda {
@@ -64,7 +64,7 @@ pSumType = do
 -- eventually we'll need to parse the type (for GADT support etc)
 pConstructor :: Expr -> Parser Lambda
 pConstructor tp = do
-    name <- identifier
+    name <- uIdentifier
     args <- try pVars <|> pure []
     return Lambda {
        lamName    = name
@@ -103,18 +103,21 @@ pFunc = Function <$> pFuncL
 pPatternMatch :: Lambda -> Parser Expr
 pPatternMatch lam = do
     pos <- getPosition
-    ex1 <- parens (sepBy1 pExpr (reservedOp ","))
+    ex1 <- braces (sepBy1 pExpr (reservedOp ","))
     if (length (params lam) /= (length ex1) ) 
-        then parserFail $
-                "\nWrong number of arguments in a pattern match in a function:\n\n"
-                ++ (ppr lam) ++ "\n\nThe function expects "
-                ++ show (length (params lam)) ++ " arguments "
-                ++ "but was given " ++ show (length ex1) 
-                ++ " in the pattern match shown above."
-        else do 
-                reservedOp "->"
-                ex2 <- pExpr
-                return $ PatternMatch (Tuple ex1) ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
+    then parserFail $
+            "\nWrong number of arguments in a pattern match in a function:\n\n"
+            ++ (ppr lam) ++ "\n\nThe function expects "
+            ++ show (length (params lam)) ++ " arguments "
+            ++ "but was given " ++ show (length ex1) 
+            ++ " in the pattern match shown above."
+    else 
+      do 
+        reservedOp "->"
+        ex2 <- pExpr
+        -- ok so now we have function variables in (params lam) and 
+        -- respective pattern 
+        return $ PatternMatch (Tuple ex1) ex2 (SourceInfo (sourceLine pos) (sourceColumn pos) "") 
 
     
     

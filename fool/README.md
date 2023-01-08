@@ -57,6 +57,8 @@ type Maybe(a) = {Nothing():Maybe(a) = {}, Just(x:a):Maybe(a) = {x} }
 
 So, it is defined as **type** then name of the type with potential arguments, then list of constructor functions in curly braces.
 
+Type name must start with a capital letter, as well as constructor names.
+
 ### Product Types
 Above sum types are using product types defined with each constructor. Fool supports proper records as well, here are some examples and explanation.
 
