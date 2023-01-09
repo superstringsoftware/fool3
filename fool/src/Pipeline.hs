@@ -138,6 +138,10 @@ caseOptimizationPass = do
                 return lam {body = PatternMatches exs'}
           f k e = return e
 
+-- choose which function to run
+localMaybeAlt :: Maybe a -> IntState b -> (a -> IntState b) -> IntState b
+localMaybeAlt Nothing  f g = f
+localMaybeAlt (Just x) f g = g x
 
 -- this function is a mouthful and needs to be refactored A LOT
 expandCase :: Lambda -> Expr -> IntState Expr 
@@ -165,24 +169,14 @@ expandCase lam cs@(CaseOf recs ex si) = do
                     s <- get
                     let env = currentEnvironment s
                     let mlam = lookupLambda name env
-                    case mlam of
-                        Nothing -> do
-                            -- nothing found in the environment, let's
-                            -- beta reduce:
-                            -- f (x,y) = case x of Z, y of n -> n
-                            -- in the 2nd case, changing all occurences of n
-                            -- to y
-                            -- liftIO $ putStrLn $ "Didnt find in the environment: " ++ name
-                            -- liftIO $ putStrLn $ "Beta reducing!"
-                            -- liftIO $ putStrLn $ "orig expr: " ++ show expr
+                    localMaybeAlt mlam
+                        (do
                             let vt = Var name UNDEFINED (Id nm)
-                            -- liftIO $ putStrLn $ "Var to reduce to: " ++ show vt
                             let expr' = betaReduce vt expr
-                            -- liftIO $ putStrLn $ "reduced expr: " ++ show expr'
                             (lst, expr'') <- t xs expr'
                             -- EXCLUDING this var from the case array:
-                            return (lst,expr'')
-                        Just lambda -> do
+                            return (lst,expr''))
+                        (\lambda -> do
                             -- found a lambda with a given name, 
                             -- check if it's a constructor and then
                             -- expand it to the proper call
@@ -195,16 +189,39 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                 -- or top level binding - does it even 
                                 -- make sense inside a pattern match???
                                 (lst, expr') <- t xs expr
-                                return (v:lst,expr')
-                -- case nm of vval, first level constructor application
-                {- 
-                vval@(App e5 ex5) -> do
-                    -- otherwise, simply keep everything as is
-                    -- TODO: check proper constructor application!!!
-                    let tmpn = (lamName lam) ++ "_tmpvar_" ++ show e5
-                    (lst, expr') <- t xs expr
-                    return ((v {val = Id tmpn}):(Var tmpn UNDEFINED vval):lst,expr')
-                -}
+                                return (v:lst,expr'))
+                    
+                -- case nm of vval, first level constructor application:
+                -- case x of Succ(n) -> App (Id Succ) [Id n]
+                -- here we need to go deep and beta reduce
+                -- n = tupleField(0,x)
+                vval@(App (Id cons) ex5) -> do
+                    -- ok now we need to map over ex5 and run beta-reductions
+                    -- inside expr while doing that, while also amending
+                    -- the arguments list with new cases
+                    (casesToAdd, expr') <- ff ex5 expr
+                    (lst, expr'') <- t xs expr'
+                    return (v:Prelude.concat [casesToAdd,lst],expr'')
+                    where ff [] e8 = pure $ ([], e8)
+                          ff ((Id newvar):ks) e8 = do
+                              -- liftIO $ putStrLn $ "Running case: " ++ ppr vval ++ ", id: " ++ newvar
+                              -- todo: build a sub newvar = tupleField(i,nm) and run beta reduce
+                              let vt = Var newvar UNDEFINED (App (Id "tupleField") [Id nm] )
+                              let e8' = betaReduce vt e8
+                              ff ks e8'
+                              pure $ ([], e8')
+                          ff smth@(k:ks) e8 = do
+                              -- liftIO $ putStrLn $ "Running case: " ++ ppr vval ++ ", but its: " ++ ppr smth
+                              -- error: only Ids are currently supported
+                              -- in ConApp pattern match on the 1st level
+                              let lpl = LogPayload 
+                                            (lineNum si) (colNum si) ""
+                                            ("Only 1st level is currently supported in pattern matches:\n" 
+                                                ++ (ppr vval) ++ "\n")
+                              logError lpl { linePos = (lineNum si), colPos = (colNum si) } 
+                              ff ks e8
+                              pure $ ([], e8)
+
                 val' -> do
                     -- otherwise, simply keep everything as is
                     -- TODO: check proper constructor application!!!

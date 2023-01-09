@@ -3,8 +3,8 @@
 // build a scooter first!
 
 
-function f(x,y,z) = {
-  { n, Z, Cons (a1, Cell (b1, b2) ) } -> g (n,a1,b1,b2)
+function f(x,y,z, h) = {
+  { n, Z, Cons (a1, Cell (b1, b2) ), Succ(Succ(Z)) } -> g (n,a1,b1,b2)
 };
 
 /*

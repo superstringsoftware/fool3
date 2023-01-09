@@ -20,6 +20,9 @@ data Var = Var {
 -- type Tuple a = [a]
 type Record = [Var]
 
+-- constructor tag placeholder type
+data ConsTag = ConsTag Name !Int
+
 arity :: Lambda -> Int
 arity (Lambda _ args _ _) = length args
 
@@ -58,7 +61,13 @@ data Expr =
   -- CaseOf [Var "x" t1 a, Var "y" t2 b] expr!
   -- this way we can try if else, case of etc approaches depending on the 
   -- compilation target
-  | PatternMatches [Expr] -- only CaseOf is allowed inside this!!!
+  {- 
+  | ExpandedCase [ConsTag, Expr] Expr -- this is what CaseOf gets converted
+  -- into in the course of optimizations and expansions - first part 
+  -- is simply a list of comparisons of Expr to specific ConsTag,
+  -- ALL of them need to be True for the case to work.
+  -}
+  | PatternMatches [Expr] -- only CaseOf or ExpandedCase is allowed inside this!!!
   | Tuple [Expr] -- any tuple { ... , ... }, -- only CONSTRUCTORS return it!!!
   | Statements [Expr] -- for Action body, simply a list of statements to execute in order
   | SumType Lambda -- sum type definition, which is also basically a lambda with 
