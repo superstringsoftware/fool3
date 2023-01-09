@@ -61,12 +61,12 @@ data Expr =
   -- CaseOf [Var "x" t1 a, Var "y" t2 b] expr!
   -- this way we can try if else, case of etc approaches depending on the 
   -- compilation target
-  {- 
-  | ExpandedCase [ConsTag, Expr] Expr -- this is what CaseOf gets converted
+  
+  | ExpandedCase [Expr] Expr -- this is what CaseOf gets converted
   -- into in the course of optimizations and expansions - first part 
-  -- is simply a list of comparisons of Expr to specific ConsTag,
+  -- is simply a list of comparisons of Expr to specific ConsTag or a value eventually,
   -- ALL of them need to be True for the case to work.
-  -}
+  
   | PatternMatches [Expr] -- only CaseOf or ExpandedCase is allowed inside this!!!
   | Tuple [Expr] -- any tuple { ... , ... }, -- only CONSTRUCTORS return it!!!
   | Statements [Expr] -- for Action body, simply a list of statements to execute in order
@@ -83,6 +83,11 @@ data Expr =
   -- ^^^ in case of anonymous application, `name` fields will be empty or index; 
   -- typ is calculated for type checking. Optional + Explicit params. 
     deriving (Show, Eq)
+
+-- function that generates built-in operation to access i-th field
+-- in a given tuple
+mkTupleFieldAccessExpr :: Int -> Expr -> Expr
+mkTupleFieldAccessExpr i e = App (Id "getTupleField") [Id $ show i, e]
 
 -- non-monadic traverse
 traverseExpr :: (Expr -> Expr) -> Expr -> Expr

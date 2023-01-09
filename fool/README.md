@@ -130,6 +130,8 @@ same as above for b2 and final result:
 
 Then the thing in {} is joined with "and" and the right part is executed only if it's True. Otherwise we check the next case.
 
+Ok there's lots of complications with parsing and simplifying this thing, so we MUST require that all Constructor calls and Type names are Capitalized.
+
 ## Key grammar concepts
 
 ### Sum Types
