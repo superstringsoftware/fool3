@@ -199,18 +199,23 @@ expandCase lam cs@(CaseOf recs ex si) = do
                     -- ok now we need to map over ex5 and run beta-reductions
                     -- inside expr while doing that, while also amending
                     -- the arguments list with new cases
-                    (casesToAdd, expr') <- ff ex5 expr
-                    (lst, expr'') <- t xs expr'
+                    (casesToAdd, expr11) <- ff 0 ex5 expr
+                    -- liftIO $ putStrLn $ "Expr after running all args: " ++ ppr expr11
+                    (lst, expr'') <- t xs expr11
                     return (v:Prelude.concat [casesToAdd,lst],expr'')
-                    where ff [] e8 = pure $ ([], e8)
-                          ff ((Id newvar):ks) e8 = do
+                    where ff _ [] e7 = do
+                              -- liftIO $ putStrLn $ "Expr inside the terminating case: " ++ ppr e7
+                              pure $ ([], e7)
+                          ff i ((Id newvar):ks) e8 = do
                               -- liftIO $ putStrLn $ "Running case: " ++ ppr vval ++ ", id: " ++ newvar
                               -- todo: build a sub newvar = tupleField(i,nm) and run beta reduce
-                              let vt = Var newvar UNDEFINED (App (Id "tupleField") [Id nm] )
+                              let vt = Var newvar UNDEFINED (App (Id "tupleField") [Id $ show i, Id nm] )
+                              -- liftIO $ putStrLn $ "Expr before reduce: " ++ ppr e8
                               let e8' = betaReduce vt e8
-                              ff ks e8'
-                              pure $ ([], e8')
-                          ff smth@(k:ks) e8 = do
+                              -- liftIO $ putStrLn $ "Expr after reduce: " ++ ppr e8'
+                              ff (i+1) ks e8'
+                              -- pure $ ([], e8')
+                          ff i smth@(k:ks) e9 = do
                               -- liftIO $ putStrLn $ "Running case: " ++ ppr vval ++ ", but its: " ++ ppr smth
                               -- error: only Ids are currently supported
                               -- in ConApp pattern match on the 1st level
@@ -219,8 +224,8 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                             ("Only 1st level is currently supported in pattern matches:\n" 
                                                 ++ (ppr vval) ++ "\n")
                               logError lpl { linePos = (lineNum si), colPos = (colNum si) } 
-                              ff ks e8
-                              pure $ ([], e8)
+                              ff (i+1) ks e9
+                              -- pure $ ([], e9)
 
                 val' -> do
                     -- otherwise, simply keep everything as is

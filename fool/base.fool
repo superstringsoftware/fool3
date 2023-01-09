@@ -2,10 +2,11 @@
 // let's implement it all the way!!! following the MVP principle - do not build wheels for a car,
 // build a scooter first!
 
-
+/*
 function f(x,y,z, h) = {
   { n, Z, Cons (a1, Cell (b1, b2) ), Succ(Succ(Z)) } -> g (n,a1,b1,b2)
 };
+*/
 
 /*
 type Bool = { True, False };
@@ -32,7 +33,7 @@ type Nat = {
 
 function plus (x:Nat,y:Nat):Nat = {
   {Z, n} -> n, // case x of Z -> case y of x -> x
-  {Succ(n), m} -> Succ (plus(n,m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
+  {Succ(n,n1), m} -> Succ (plus(n,n1, m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
 };
 
 /*
