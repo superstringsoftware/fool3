@@ -70,12 +70,22 @@ showHelp = do
     putStrLn ":l[oad] <name>    -- load and interpret file <name>"
     putStrLn ":s[et] <command>  -- set environment flags (:s strict, :s lazy, :s trace on/off)"
     putStrLn ":e[nv]            -- show current environment"
-    putStrLn ":functions        -- list all global functions"
+    putStrLn ":list <types, functions, constructors> [-d] -- list all global functions / types / constructors"
     putStrLn ":i[nfo] <name>    -- find and show a top-level binding with <name>"
     putStrLn ":types            -- list all types"
     putStrLn ":compile          -- compile currently loaded program"
     putStrLn ":r[un] <f name>   -- execute expression with a given name that's already loaded. 'main' by detault."
         
+
+_pprSomethingEnv sel str = do
+    liftIO $ putStrLn str
+    smth <- get >>= \s -> pure ( (sel . currentEnvironment) s)
+    let tkeys = Map.keys smth
+    liftIO $ mapM_ (fenv1 smth) tkeys
+    where fenv1 ts tk = do 
+                        let (Just tt) = Map.lookup tk ts
+                        putStrLn $ (TC.as [bold,green] (tk ++ ":")) ++ "\n  " ++ (ppr tt)
+ 
 
 processCommand :: [String] -> IntState ()
 processCommand (":help":_) = liftIO showHelp
@@ -83,43 +93,49 @@ processCommand (":quit":_) = liftIO $ putStrLn "Goodbye." >> exitSuccess
 processCommand (":load":xs) = loadFileNew (head xs)
 processCommand (":set":s:xs) = processSet s xs
 processCommand (":compile":_) = compile2JSpass
+processCommand (":list":"types":"-d":_) = do
+    liftIO $ putStrLn "\n--------------- TYPES ----------------"
+    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
+    liftIO $ mapM (\t -> pPrint t) types
+    return ()
+processCommand (":list":"functions":"-d":_) = do
+    liftIO $ putStrLn "\n--------------- LAMBDAS ----------------"
+    lambdas <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
+    liftIO $ mapM (\t -> pPrint t) lambdas
+    return ()
+processCommand (":list":"constructors":"-d":_) = do
+    liftIO $ putStrLn "\n--------------- CONSTRUCTORS ----------------"
+    cons <- get >>= \s -> pure ( (constructors . currentEnvironment) s)
+    liftIO $ mapM (\t -> pPrint t) cons
+    return ()
 processCommand (":env":"-d":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
-    liftIO $ putStrLn "\n--------------- TYPES ----------------"
-    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
-    let tkeys = Map.keys types
-    liftIO $ mapM_ (fenv1 types) tkeys
-    liftIO $ putStrLn "\n--------------- LAMBDAS ----------------"
-    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
+    processCommand (":list":"types":"-d":[])
+    processCommand (":list":"constructors":"-d":[])
+    processCommand (":list":"functions":"-d":[])
+
+processCommand (":list":"types":_) = 
+    _pprSomethingEnv types "\n--------------- TYPES ----------------"
+processCommand (":list":"functions":_) = 
+    _pprSomethingEnv topLambdas "\n--------------- LAMBDAS ----------------"    
+processCommand (":list":"constructors":_) = do
+    liftIO $ putStrLn "\n--------------- CONSTRUCTORS ----------------"
+    res <- get >>= \s -> pure ( (constructors . currentEnvironment) s)
     let fkeys = Map.keys res
     liftIO $ mapM_ (fenv1 res) fkeys
-    liftIO $ putStrLn "\n--------------- JS REALM ----------------"
-    jsp <- get >>= \s -> pure ( (outProgram . currentEnvironment) s)
-    liftIO $ mapM_ putStrLn jsp
     where fenv1 ts tk = do 
-                        let (Just tt) = Map.lookup tk ts
-                        putStrLn $ "\n" ++ (TC.as [bold,green] (tk ++ ":"))
-                        pPrint tt
+                        let (Just (tt,constag)) = Map.lookup tk ts
+                        putStrLn $ (TC.as [bold,green] (tk ++ "(" ++ show constag ++ "):")) ++ "\n  " ++ (ppr tt)
+
 
 processCommand (":env":_) = do
     fl <- gets currentFlags
     liftIO $ print fl
-    liftIO $ putStrLn "\n--------------- TYPES ----------------"
-    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
-    let tkeys = Map.keys types
-    liftIO $ mapM_ (fenv1 types) tkeys
-    liftIO $ putStrLn "\n--------------- LAMBDAS ----------------"
-    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
-    let fkeys = Map.keys res
-    liftIO $ mapM_ (fenv1 res) fkeys
-    liftIO $ putStrLn "\n--------------- JS REALM ----------------"
-    jsp <- get >>= \s -> pure ( (outProgram . currentEnvironment) s)
-    liftIO $ mapM_ putStrLn jsp
-    where fenv1 ts tk = do 
-                        let (Just tt) = Map.lookup tk ts
-                        putStrLn $ (TC.as [bold,green] (tk ++ ":")) ++ "\n  " ++ (ppr tt)
-
+    processCommand (":list":"types":[])
+    processCommand (":list":"constructors":[])
+    processCommand (":list":"functions":[])
+    
 processCommand (":all":"-d":_) = do 
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> pPrint ex ) mod )
@@ -128,30 +144,12 @@ processCommand (":all":_) = do
     mod <- get >>= \s -> pure (parsedModule s)
     liftIO (mapM_ (\(ex,_) -> (putStrLn . ppr) ex ) mod )
     
-processCommand (":types":"-d":_) = do
-    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
-    liftIO $ mapM_ pPrint types
-processCommand (":types":_) = do
-    types <- get >>= \s -> pure ( (types . currentEnvironment) s)
-    liftIO $ mapM_ (putStrLn . ppr) types
-    -- liftIO $ mapM_ print (Map.keys types)
+   
 
-processCommand (":functions":"-d":_) = do
-    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
-    let out = foldrWithKey (\n l a -> a ++ n ++ " = " ++ (TL.unpack $ pShow l) ++ "\n") "" res
-    liftIO $ putStrLn out
-    --liftIO $ mapM_ pPrint res
--- processCommand (":functions":_) = do
-    -- res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
-    -- let out = foldrWithKey (\n l a -> a ++ (showLambdaAsLambda n l) ++ "\n") "" res
-    -- liftIO $ putStrLn out
--- find a specifically named binding
-{-
-processCommand (":info":name:_) = do
-    res <- get >>= \s -> pure ( (topLambdas . currentEnvironment) s)
-    let lam = Map.lookup name res
-    let action = maybe (putStrLn "Nothing is found with such name.") (\l -> ( (putStrLn $ showLambdaAsLambda name l) >> pPrint l)) lam
-    liftIO action
+{- 
+liftIO $ putStrLn "\n--------------- JS REALM ----------------"
+    jsp <- get >>= \s -> pure ( (outProgram . currentEnvironment) s)
+    liftIO $ mapM_ putStrLn jsp
 -}
 
 processCommand (":q":_) = processCommand [":quit"]
