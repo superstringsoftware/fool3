@@ -8,9 +8,14 @@ function f(x,y,z, h) = {
 };
 */
 
+function deep(x:a):b = {
+  {Succ(Succ(Z))} -> Z,
+  {y} -> f(y)
+};
 
+
+/*
 type Bool = { True, False };
-
 
 function id (x:a):a = x;
 
@@ -25,7 +30,7 @@ function eq(x:Nat,y:Nat):Bool = {
   {Z,n} -> False,
   {Succ(m),Succ(n)} -> eq(m,n)
 };
-
+*/
 
 type Nat = {
   Z,
@@ -38,7 +43,7 @@ function plus (x:Nat,y:Nat):Nat = {
   {Succ(n), m} -> Succ (plus(n, m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
 };
 
-
+/*
 function plus2 (x:Nat):Nat = plus(x, Succ(Succ(Z)) );
 
 action main = {
@@ -48,3 +53,4 @@ action main = {
   print# (res)
 };
 
+*/

@@ -200,10 +200,10 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                         logError lpl { linePos = (lineNum si), colPos = (colNum si) }
                                         return (cases, expr)
                         Right cs -> do
-                            let newBoundVarExpr = (Id nm)
-                            liftIO $ putStrLn $ "Created field access: " ++ ppr newBoundVarExpr
+                            let newBoundVarExpr = mkTupleFieldAccessExpr i (Id nm)
+                            liftIO $ putStrLn $ "Created field access on top: " ++ ppr newBoundVarExpr
                             -- launching next level of recursion:
-                            (cases',expr', errs') <- caseTransformApp2 0 False env newBoundVarExpr cons ex5 expr [] []
+                            (cases',expr', errs') <- caseTransformApp2 0 True env newBoundVarExpr cons ex5 expr [] []
                     
                             mapM_ (\er -> do
                                             let lpl = LogPayload 
@@ -212,6 +212,7 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                             logError lpl { linePos = (lineNum si), colPos = (colNum si) })
                                 errs'  
                             t (i+1) xs expr' (Prelude.concat[cases,cs,cases'])
+                            -- t (i+1) xs expr' (Prelude.concat[cases,cases'])
                     
 
         
@@ -322,7 +323,7 @@ caseTransformApp2 i isTop env boundVarExpr name ((App (Id cons) exs):xs) expr ca
             -- we moved past a1 and encountered Cell application
             Right cs -> do
                 let newBoundVarExpr = mkTupleFieldAccessExpr i boundVarExpr
-                liftIO $ putStrLn $ "Created field access: " ++ ppr newBoundVarExpr
+                liftIO $ putStrLn $ "Case #: " ++ show i ++ ", Created field access: " ++ ppr newBoundVarExpr
                 -- launching next level of recursion:
                 (cases',expr', errs') <- caseTransformApp2 0 False env newBoundVarExpr cons exs expr [] []
                 -- once we got results of the next level of recursion in ' vars, continue our current recursion:
