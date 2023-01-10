@@ -15,6 +15,7 @@ import Data.Text as L
 import Data.Sequence as S
 
 import Core
+import CLM
 import Data.HashMap.Strict as Map
 -- import Core.Environment
 
@@ -32,6 +33,7 @@ data Environment = Environment {
     constructors :: NameMap (Lambda, Int), 
     -- constructors are stored with their number inside the sum type
     topLambdas   :: NameMap Lambda,
+    clmLambdas   :: NameMap CLMLam,
     outProgram   :: NameMap String
 } deriving Show
 
@@ -39,6 +41,7 @@ initialEnvironment = Environment {
     types       = Map.empty,
     constructors = Map.empty,
     topLambdas  = Map.empty,
+    clmLambdas = Map.empty,
     outProgram   = Map.empty 
 }
 

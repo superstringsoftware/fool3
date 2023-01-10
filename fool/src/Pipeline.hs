@@ -5,12 +5,13 @@ where
 
 import State
 import Core
+import CLM
 import Logs
 
 import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
-import Data.Text as T hiding (intercalate)
+import Data.Text as T hiding (intercalate, map)
 import qualified Data.Text.Lazy as TL
 import Data.List.Index
 import Data.List (intercalate)
@@ -159,15 +160,15 @@ expandCase :: Lambda -> Expr -> IntState Expr
 -- if not - means it's a variable substitution and we need to do a
 -- beta reduction
 expandCase lam cs@(CaseOf recs ex si) = do
-    -- liftIO $ putStrLn $ "Analyzing: " ++ ppr cs
-    (cases, ex') <- (t 0 recs ex ([]))
+    liftIO $ putStrLn $ "Analyzing: " ++ ppr cs
+    (cases, ex') <- (t recs ex ([]))
     return $ ExpandedCase cases ex' si
     where 
-        t i [] expr cases = return (cases, expr)
+        t [] expr cases = return (cases, expr)
         -- case nm of val
-        t i (v@(Var nm tp val):xs) expr cases = do
-            -- liftIO $ putStrLn $ "Processing case of: " ++ ppVarCaseOf v
-            -- liftIO $ putStrLn $ "Current expr is: " ++ ppr expr
+        t (v@(Var nm tp val):xs) expr cases = do
+            liftIO $ putStrLn $ "Processing case of: " ++ ppVarCaseOf v
+            liftIO $ putStrLn $ "Current expr is: " ++ ppr expr
             s <- get
             let env = currentEnvironment s
             case val of 
@@ -181,7 +182,7 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                                 (er    ++ (ppr v) ++ "\n" )
                                     logError lpl { linePos = (lineNum si), colPos = (colNum si) }
                                     return (cases, expr)
-                        Right (cases', expr') -> do t (i+1) xs expr' (Prelude.concat[cases',cases])
+                        Right (cases', expr') -> do t xs expr' (Prelude.concat[cases',cases])
                     
                     
                 -- case nm of vval, first level constructor application:
@@ -189,7 +190,8 @@ expandCase lam cs@(CaseOf recs ex si) = do
                 -- here we need to go deep and beta reduce
                 -- n = tupleField(0,x)
                 vval@(App (Id cons) ex5) -> do
-                    -- (liftIO $ putStrLn $ "App case in t: " ++ cons)
+                    (liftIO $ putStrLn $ "App case in t: \n")
+                    liftIO $ pPrint vval
 
                     let res1 = caseTransformApp1 env (Id nm) cons ex5
                     case res1 of
@@ -201,10 +203,10 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                         logError lpl { linePos = (lineNum si), colPos = (colNum si) }
                                         return (cases, expr)
                         Right cs -> do
-                            let newBoundVarExpr = mkTupleFieldAccessExpr i (Id nm)
-                            -- liftIO $ putStrLn $ "Created field access on top: " ++ ppr newBoundVarExpr
+                            let newBoundVarExpr = (Id nm)
+                            liftIO $ putStrLn $ "Created field access on top: " ++ ppr newBoundVarExpr
                             -- launching next level of recursion:
-                            (cases',expr', errs') <- caseTransformApp2 0 True env newBoundVarExpr cons ex5 expr [] []
+                            (cases',expr', errs') <- caseTransformApp2 0 False env newBoundVarExpr cons ex5 expr [] []
                     
                             mapM_ (\er -> do
                                             let lpl = LogPayload 
@@ -212,7 +214,7 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                                         (er    ++ (ppr v) ++ "\n" )
                                             logError lpl { linePos = (lineNum si), colPos = (colNum si) })
                                 errs'  
-                            t (i+1) xs expr' (Prelude.concat[cases,cs,cases'])
+                            t xs expr' (Prelude.concat[cases,cs,cases'])
                             -- t (i+1) xs expr' (Prelude.concat[cases,cases'])
                     
 
@@ -240,7 +242,7 @@ expandCase lam e = pure e
 -- this one gets passed different functions as the first argument and that's it
 caseTransformId :: (Expr->Expr) -> Environment -> Expr -> Name -> Expr -> IntState (Either String ([Expr],Expr))
 caseTransformId f env boundVarExpr name expr = do
-    -- liftIO $ putStrLn $ "Inside caseTransformId: name = " ++ name ++ " boundVar = " ++ ppr boundVarExpr
+    liftIO $ putStrLn $ "Inside caseTransformId: name = " ++ name ++ " boundVar = " ++ ppr boundVarExpr
     maybeEither (lookupConstructor name env)
             (let vt = Var name UNDEFINED (f boundVarExpr)
                  expr' = betaReduce vt expr
@@ -251,7 +253,7 @@ caseTransformId f env boundVarExpr name expr = do
             -- and returning NOTHING in place of the old case
             -- otherwise checking if it's a constructor and if it is,
             -- returning a correct new "case" expression
-            (\(lambda, i) -> pure $ Right ([App (Id "consTagCheck") [boundVarExpr, Id name] ],expr))
+            (\(lambda, i) -> pure $ Right ([ExprConsTagCheck (ConsTag name i) boundVarExpr ],expr))
                 
 
 -- for top level id, we are passing id as a function
@@ -283,7 +285,7 @@ caseTransformApp1 env boundVarExpr name ex =
             -- otherwise
             (\(lambda, i) -> 
                 if (arity lambda == Prelude.length ex)  
-                then Right [App (Id "consTagCheck") [boundVarExpr, Id name] ]
+                then Right [ExprConsTagCheck (ConsTag name i) boundVarExpr ]
                 else Left ("Error: constructor " ++ name ++ " application expects " ++ show (arity lambda) ++ " arguments and was given " ++ show (Prelude.length ex)))
                 
 
@@ -294,8 +296,8 @@ caseTransformApp2 :: Int -> Bool -> Environment -> Expr -> Name -> [Expr] -> Exp
 caseTransformApp2 i isTop env boundVarExpr name []          expr cases errs = return (cases,expr, errs)
 -- case with ids is pretty straightforward
 caseTransformApp2 i isTop env boundVarExpr name ((Id x):xs) expr cases errs = do
-    -- (liftIO $ putStrLn $ "Id case in caseTransformApp2: " ++ x ++ " name: " ++ name) 
-    -- (liftIO $ putStrLn $ "Bound var expr: " ++ ppr boundVarExpr) 
+    (liftIO $ putStrLn $ "Id case in caseTransformApp2: " ++ x ++ " name: " ++ name) 
+    (liftIO $ putStrLn $ "Bound var expr: " ++ ppr boundVarExpr) 
     res <- if isTop then caseTransformIdTop env boundVarExpr x expr
            else caseTransformIdInternal i env boundVarExpr x expr
     case (res) of
@@ -304,7 +306,7 @@ caseTransformApp2 i isTop env boundVarExpr name ((Id x):xs) expr cases errs = do
             Right (cs, ex) -> caseTransformApp2 (i+1) isTop env boundVarExpr name xs ex (Prelude.concat[cases,cs]) errs
 -- case with App is complex
 caseTransformApp2 i isTop env boundVarExpr name ((App (Id cons) exs):xs) expr cases errs = 
-    -- (liftIO $ putStrLn $ "App case in caseTransformApp2: " ++ cons) >> 
+    (liftIO $ putStrLn $ "App case in caseTransformApp2: " ++ cons) >> 
     -- first, run basic sanity check plus optional cases array expansion:
     let res1 = caseTransformApp1 env boundVarExpr name exs
     in  case res1 of
@@ -339,7 +341,15 @@ caseTransformApp2 i isTop env boundVarExpr name eee expr cases errs =
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- PASS 5: Compilation - JS
+-- PASS 5: Conversion to CLM
+--------------------------------------------------------------------------------
+
+exprToCLM :: Expr -> CLMExpr
+exprToCLM (App ex exs) = CLMAPP (exprToCLM ex) (Prelude.map exprToCLM exs)
+exprToCLM e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ ppr e
+
+--------------------------------------------------------------------------------
+-- PASS 6: Compilation - JS
 --------------------------------------------------------------------------------
 compile2JSpass :: IntState()
 compile2JSpass = do

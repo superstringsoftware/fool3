@@ -2,27 +2,25 @@
 // let's implement it all the way!!! following the MVP principle - do not build wheels for a car,
 // build a scooter first!
 
-
-function f(x,y,z, h) = {
-  { n, Z, Cons (a1, Cell (b1, b2) ), Succ(Succ(Z)) } -> g (n,a1,b1,b2)
+type Nat = {
+  Z,
+  Succ (n:Nat)
 };
-
-
-function deep(x:a):b = {
-  {Succ(Succ(n))} -> f(n),
-  {y} -> f(y)
-};
-
-
 
 type Bool = { True, False };
 
-function id (x:a):a = x;
+type ForF = { Cons(a1:t,a2:t), Cell(a1:t,a2:t) };
 
-function not (b:Bool) : Bool = {
-    {True}  -> False,
-    {False} -> True
-};
+function f(x) = {
+  { Cons (a1, Cell (b1, b2) ) } -> g (a1,b1,b2)
+}; // x is Cons, x.1 is Cell  g (x.0, x.1.0, x.1.1)
+
+
+/*
+function f(x,y,z, h) = {
+  { n, Z, Cons (a1, Cell (b1, b2) ), Succ(Succ(Z)) } -> g (n,a1,b1,b2)
+}; // -> g (x, z.0, z.1.0, z.1.1)
+
 
 
 function eq(x:Nat,y:Nat):Bool = {
@@ -32,17 +30,33 @@ function eq(x:Nat,y:Nat):Bool = {
 };
 
 
-type Nat = {
-  Z,
-  Succ (n:Nat)
-};
-
-
-
 function plus (x:Nat,y:Nat):Nat = {
-  {Z, n} -> n, // case x of Z -> case y of x -> x
-  {Succ(n), m} -> Succ (plus(n, m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
+  {Z, n} -> n, 
+  {Succ(n), m} -> Succ (plus(n, m)) 
 };
+
+
+
+
+function deep(x:a):b = {
+  {Succ(Succ(n))} -> f(n),
+  {y} -> f(y)
+};
+
+
+
+
+
+function id (x:a):a = x;
+
+function not (b:Bool) : Bool = {
+    {True}  -> False,
+    {False} -> True
+};
+
+
+
+
 
 
 function plus2 (x:Nat):Nat = plus(x, Succ(Succ(Z)) );
@@ -53,4 +67,7 @@ action main = {
   res = plus(three,one),
   print# (res)
 };
+*/
+
+
 

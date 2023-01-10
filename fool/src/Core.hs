@@ -21,7 +21,7 @@ data Var = Var {
 type Record = [Var]
 
 -- constructor tag placeholder type
-data ConsTag = ConsTag Name !Int
+data ConsTag = ConsTag Name !Int deriving (Show, Eq)
 
 arity :: Lambda -> Int
 arity (Lambda _ args _ _) = length args
@@ -53,6 +53,8 @@ data Expr =
   | Action Lambda -- Action is simply a list of expressions in order
   | Constructors [Lambda] -- only for constructor list inside sum types
   | App Expr [Expr] -- application
+  | ExprConsTagCheck ConsTag Expr -- check if Expr was created with a given constructor
+  | RecFieldAccess (Name,Int) Expr -- access a field of the Expr by name or index
   | CaseOf Record Expr SourceInfo -- in the course of optimizations we transfer pattern matches
   -- to the case x of val -> expr statements. However, since we prefer lists vs trees
   -- in our implementation, we are actually combining function variables with
@@ -87,7 +89,7 @@ data Expr =
 -- function that generates built-in operation to access i-th field
 -- in a given tuple
 mkTupleFieldAccessExpr :: Int -> Expr -> Expr
-mkTupleFieldAccessExpr i e = App (Id "getTupleField") [Id $ show i, e]
+mkTupleFieldAccessExpr i e = RecFieldAccess ("",i) e
 
 -- non-monadic traverse
 traverseExpr :: (Expr -> Expr) -> Expr -> Expr
@@ -97,6 +99,7 @@ traverseExpr f e@(Typed e1 e2) = Typed (f $ traverseExpr f e1) (f $ traverseExpr
 traverseExpr f (App ex exs) = App (f $ traverseExpr f ex) (map f (map (traverseExpr f) exs) )
 traverseExpr f (CaseOf args ex si) = CaseOf args (f $ traverseExpr f ex) si
 traverseExpr f (PatternMatches exs) = PatternMatches (map f (map (traverseExpr f) exs))
+traverseExpr f (RecFieldAccess a ex) = RecFieldAccess a (f $ traverseExpr f ex)
 traverseExpr f (Tuple exs) = Tuple (map f (map (traverseExpr f) exs))
 traverseExpr f (ExpandedCase exs ex si) = ExpandedCase (map f (map (traverseExpr f) exs)) (f $ traverseExpr f ex) si
 traverseExpr f (Statements exs) = Statements (map f (map (traverseExpr f) exs))
@@ -144,8 +147,11 @@ instance PrettyPrint Expr where
   ppr UNDEFINED = ""
   ppr (Id v) = as [bold] v
   ppr (CaseOf e1 e2 _) = showListCuBr ppVarCaseOf e1 ++ " -> " ++ ppr e2
+  ppr (ExprConsTagCheck (ConsTag nm i) ex) = (as [bold,lblue] "checkConsTag")
+    ++ "(" ++ nm ++ ", " ++ ppr ex ++ ")"
   ppr (ExpandedCase exs ex _) = showListSqBr ppr exs ++ " -> " ++ ppr ex
   ppr (PatternMatches ps) = showListCuBr ppr ps
+  ppr (RecFieldAccess (nm,i) e) = ppr e ++ "." ++ nm ++"("++show i ++")"
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex
   ppr (Statements ex) = showListCuBr ppr ex
