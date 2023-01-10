@@ -200,10 +200,10 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                         logError lpl { linePos = (lineNum si), colPos = (colNum si) }
                                         return (cases, expr)
                         Right cs -> do
-                            let newBoundVarExpr = mkTupleFieldAccessExpr i (Id nm)
+                            let newBoundVarExpr = (Id nm)
                             liftIO $ putStrLn $ "Created field access: " ++ ppr newBoundVarExpr
                             -- launching next level of recursion:
-                            (cases',expr', errs') <- caseTransformApp2 0 True env newBoundVarExpr cons ex5 expr [] []
+                            (cases',expr', errs') <- caseTransformApp2 0 False env newBoundVarExpr cons ex5 expr [] []
                     
                             mapM_ (\er -> do
                                             let lpl = LogPayload 
