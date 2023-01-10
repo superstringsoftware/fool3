@@ -28,13 +28,16 @@ type LTProgram = [(Expr, SourceInfo)]
 -- structure keeping our current environment
 data Environment = Environment {
     -- Map that keeps all our TypeReps in the current environment
-    types       :: NameMap Expr,
-    topLambdas  :: NameMap Lambda,
-    outProgram  :: NameMap String
+    types        :: NameMap Expr,
+    constructors :: NameMap (Lambda, Int), 
+    -- constructors are stored with their number inside the sum type
+    topLambdas   :: NameMap Lambda,
+    outProgram   :: NameMap String
 } deriving Show
 
 initialEnvironment = Environment {
     types       = Map.empty,
+    constructors = Map.empty,
     topLambdas  = Map.empty,
     outProgram   = Map.empty 
 }
@@ -109,6 +112,9 @@ traverseExprM f e = f e
 lookupLambda :: Name -> Environment -> Maybe Lambda
 lookupLambda n env = Map.lookup n (topLambdas env)
 
+lookupConstructor :: Name -> Environment -> Maybe (Lambda, Int)
+lookupConstructor n env = Map.lookup n (constructors env)
+
 addLambda :: Name -> Lambda -> Environment -> Environment
 addLambda n l env = env { topLambdas = Map.insert n l (topLambdas env) }
 
@@ -121,6 +127,16 @@ addNamedLambda l env = env { topLambdas = Map.insert (lamName l) l (topLambdas e
 
 addManyNamedLambdas :: [Lambda] -> Environment -> Environment
 addManyNamedLambdas ls env = env { topLambdas = Prelude.foldl (\acc l1 -> Map.insert (lamName l1) l1 acc) (topLambdas env) ls }
+
+addNamedConstructor :: Int -> Lambda -> Environment -> Environment
+addNamedConstructor i l env = env { constructors = Map.insert (lamName l) (l,i) (constructors env) }
+
+addManyNamedConstructors :: Int -> [Lambda] -> Environment -> Environment
+addManyNamedConstructors i []     env = env
+addManyNamedConstructors i (c:cs) env = addManyNamedConstructors (i+1) cs (addNamedConstructor i c env)
+
+-- addManyNamedConstructors :: [Lambda] -> Environment -> Environment
+-- addManyNamedConstructors ls env = env { constructors = Prelude.foldl (\acc l1 -> Map.insert (lamName l1) l1 acc) (topLambdas env) ls }
 
 addManyLambdas :: [(Name, Lambda)] -> Environment -> Environment
 addManyLambdas ls env = env { topLambdas = Prelude.foldl (\acc (n1,l1) -> Map.insert n1 l1 acc) (topLambdas env) ls }
