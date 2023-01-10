@@ -9,7 +9,7 @@ function f(x,y,z, h) = {
 */
 
 function deep(x:a):b = {
-  {Succ(Succ(Z))} -> Z,
+  {Succ(Succ(n))} -> f(n),
   {y} -> f(y)
 };
 
@@ -38,12 +38,13 @@ type Nat = {
 };
 
 
+/*
 function plus (x:Nat,y:Nat):Nat = {
   {Z, n} -> n, // case x of Z -> case y of x -> x
   {Succ(n), m} -> Succ (plus(n, m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
 };
 
-/*
+
 function plus2 (x:Nat):Nat = plus(x, Succ(Succ(Z)) );
 
 action main = {
