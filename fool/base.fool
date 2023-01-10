@@ -11,12 +11,13 @@ type Bool = { True, False };
 
 type ForF = { Cons(a1:t,a2:t), Cell(a1:t,a2:t) };
 
+/*
 function f(x) = {
   { Cons (a1, Cell (b1, b2) ) } -> g (a1,b1,b2)
 }; // x is Cons, x.1 is Cell  g (x.0, x.1.0, x.1.1)
+*/
 
 
-/*
 function f(x,y,z, h) = {
   { n, Z, Cons (a1, Cell (b1, b2) ), Succ(Succ(Z)) } -> g (n,a1,b1,b2)
 }; // -> g (x, z.0, z.1.0, z.1.1)
@@ -67,7 +68,7 @@ action main = {
   res = plus(three,one),
   print# (res)
 };
-*/
+
 
 
 

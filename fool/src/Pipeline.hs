@@ -193,7 +193,7 @@ expandCase lam cs@(CaseOf recs ex si) = do
                     (liftIO $ putStrLn $ "App case in t: \n")
                     liftIO $ pPrint vval
 
-                    let res1 = caseTransformApp1 env (Id nm) cons ex5
+                    res1 <- caseTransformApp1 env (Id nm) cons ex5
                     case res1 of
                         -- error case is terminating!!!
                         Left er -> do
@@ -277,16 +277,18 @@ caseTransformIdInternal i = caseTransformId (mkTupleFieldAccessExpr i)
 -- so, this first function simply transforms the case statement to the 
 -- constructor check, plus checks for errors if there's no such constructor
 -- in the environment. Thus we don't need to deal with the RHS of this case here.
-caseTransformApp1 :: Environment -> Expr -> Name -> [Expr] -> Either String [Expr]
-caseTransformApp1 env boundVarExpr name ex =
+caseTransformApp1 :: Environment -> Expr -> Name -> [Expr] -> IntState (Either String [Expr])
+caseTransformApp1 env boundVarExpr name ex = do
+    liftIO $ putStrLn $ "Inside caseTransformApp1m name: " ++ name
+    liftIO $ putStrLn $ "Bound var: " ++ ppr boundVarExpr
     maybeEither (lookupConstructor name env)
-            (Left ("Error: constructor " ++ name ++ " is not found in the environment"))
+            (return $ Left ("Error: constructor " ++ name ++ " is not found in the environment"))
             -- ^^^ nothing found in the environment, it's an ERROR!
             -- otherwise
             (\(lambda, i) -> 
                 if (arity lambda == Prelude.length ex)  
-                then Right [ExprConsTagCheck (ConsTag name i) boundVarExpr ]
-                else Left ("Error: constructor " ++ name ++ " application expects " ++ show (arity lambda) ++ " arguments and was given " ++ show (Prelude.length ex)))
+                then return $ Right [ExprConsTagCheck (ConsTag name i) boundVarExpr ]
+                else return $ Left ("Error: constructor " ++ name ++ " application expects " ++ show (arity lambda) ++ " arguments and was given " ++ show (Prelude.length ex)))
                 
 
 -- case boundVar name of (App (Id name) ex) -> exp)r
@@ -305,11 +307,13 @@ caseTransformApp2 i isTop env boundVarExpr name ((Id x):xs) expr cases errs = do
             Left er -> return (cases, expr, er:errs)
             Right (cs, ex) -> caseTransformApp2 (i+1) isTop env boundVarExpr name xs ex (Prelude.concat[cases,cs]) errs
 -- case with App is complex
-caseTransformApp2 i isTop env boundVarExpr name ((App (Id cons) exs):xs) expr cases errs = 
-    (liftIO $ putStrLn $ "App case in caseTransformApp2: " ++ cons) >> 
+caseTransformApp2 i isTop env boundVarExpr name ((App (Id cons) exs):xs) expr cases errs = do
+    liftIO $ putStrLn $ "App case in caseTransformApp2: " ++ cons
+    liftIO $ putStrLn $ "Bound var expr: " ++ ppr boundVarExpr
     -- first, run basic sanity check plus optional cases array expansion:
-    let res1 = caseTransformApp1 env boundVarExpr name exs
-    in  case res1 of
+    let bv = if isTop then boundVarExpr else mkTupleFieldAccessExpr i boundVarExpr
+    res1 <- caseTransformApp1 env bv cons exs
+    case res1 of
             -- error case is terminating!!!
             Left er -> return (cases, expr, er:errs)
             -- in case all seems good and we got additional case expressions
