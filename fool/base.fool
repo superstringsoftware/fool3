@@ -8,7 +8,7 @@ function f(x,y,z, h) = {
 };
 */
 
-/*
+
 type Bool = { True, False };
 
 function id (x:a):a = x;
@@ -24,7 +24,7 @@ function eq(x:Nat,y:Nat):Bool = {
   {Z,n} -> False,
   {Succ(m),Succ(n)} -> eq(m,n)
 };
-*/
+
 
 type Nat = {
   Z,
@@ -33,10 +33,10 @@ type Nat = {
 
 function plus (x:Nat,y:Nat):Nat = {
   {Z, n} -> n, // case x of Z -> case y of x -> x
-  {Succ(n,n1), m} -> Succ (plus(n,n1, m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
+  {Succ(n), m} -> Succ (plus(n, m)) // case x of Succ(n) -> case y of x -> Succ(plus(n,x))
 };
 
-/*
+
 function plus2 (x:Nat):Nat = plus(x, Succ(Succ(Z)) );
 
 action main = {
@@ -45,4 +45,4 @@ action main = {
   res = plus(three,one),
   print# (res)
 };
-*/
+

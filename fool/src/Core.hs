@@ -62,7 +62,7 @@ data Expr =
   -- this way we can try if else, case of etc approaches depending on the 
   -- compilation target
   
-  | ExpandedCase [Expr] Expr -- this is what CaseOf gets converted
+  | ExpandedCase [Expr] Expr SourceInfo -- this is what CaseOf gets converted
   -- into in the course of optimizations and expansions - first part 
   -- is simply a list of comparisons of Expr to specific ConsTag or a value eventually,
   -- ALL of them need to be True for the case to work.
@@ -98,6 +98,7 @@ traverseExpr f (App ex exs) = App (f $ traverseExpr f ex) (map f (map (traverseE
 traverseExpr f (CaseOf args ex si) = CaseOf args (f $ traverseExpr f ex) si
 traverseExpr f (PatternMatches exs) = PatternMatches (map f (map (traverseExpr f) exs))
 traverseExpr f (Tuple exs) = Tuple (map f (map (traverseExpr f) exs))
+traverseExpr f (ExpandedCase exs ex si) = ExpandedCase (map f (map (traverseExpr f) exs)) (f $ traverseExpr f ex) si
 traverseExpr f (Statements exs) = Statements (map f (map (traverseExpr f) exs))
 traverseExpr f (UnaryOp nm ex) = UnaryOp nm (f $ traverseExpr f ex)
 traverseExpr f (BinaryOp nm e1 e2) = BinaryOp nm (f $ traverseExpr f e1) (f $ traverseExpr f e2)
@@ -143,6 +144,7 @@ instance PrettyPrint Expr where
   ppr UNDEFINED = ""
   ppr (Id v) = as [bold] v
   ppr (CaseOf e1 e2 _) = showListCuBr ppVarCaseOf e1 ++ " -> " ++ ppr e2
+  ppr (ExpandedCase exs ex _) = showListSqBr ppr exs ++ " -> " ++ ppr ex
   ppr (PatternMatches ps) = showListCuBr ppr ps
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex
