@@ -22,7 +22,8 @@ import Text.Pretty.Simple (pPrint, pShow)
 import Data.HashMap.Strict as Map
 
 --------------------------------------------------------------------------------
--- PASS 0: initial desugaring etc after parsing
+-- PASS 0: initial desugaring and environment building after parsing - 
+-- combined two passes into 1 for better performance
 --------------------------------------------------------------------------------
 -- this needs to be run right after parsing:
 -- desugaring (changing op calls to App calls etc)
@@ -30,42 +31,12 @@ import Data.HashMap.Strict as Map
 -- reversing the order
 afterparserPass :: IntState ()
 afterparserPass = do
-    s <- get
-    mod <- (runExprPassAndReverse afterparse (parsedModule s))
-    put (s { parsedModule = mod } )
+    -- s <- get
+    -- mod <- (runExprPassAndReverse afterparse (parsedModule s))
+    -- put (s { parsedModule = mod } )
     -- now for more interesting stuff, initial optimizations with error checks
     return ()
 
--- reversal plus a bunch of initial error checks
-runExprPassAndReverse :: (Expr -> IntState Expr) -> LTProgram -> IntState LTProgram
-runExprPassAndReverse f l = rev f l []
-    where rev f [] a = pure a
-          rev f ((ex, srci):xs) a = f ex >>= \ttt -> rev f xs ( (ttt, srci):a )
-
--- initial quick checks and optimizations
-afterparse :: Expr -> IntState Expr
--- sum type - need to map over all constructors and expand them to the full signature form
-afterparse (SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)) = 
-    pure $ SumType lam { body = Constructors $ Prelude.map fixCons cons }
-    where fixCons lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) then lam else lam { body = Tuple $ Prelude.map (\v -> Id $ name v) args}
-
--- function with pattern match - check arity etc
-{- 
-afterparse (Function lam@(Lambda nm args (PatternMatches pms) tp)) = do
-    pms' <- mapM (handlePM lam args) pms
-    return $ Function (lam { body = PatternMatches pms'} )
--}
-afterparse e = pure e
-
-
-
---------------------------------------------------------------------------------
--- PASS 1: building initial typing and top-level lambdas environment
--- This is a pretty important pass - it establishes top-level lambdas, 
--- moves constructor functions from inside Type declarations to the top level,
--- and processes instances of typeclasses (so, applications of typeclass functions to specific types) - 
--- which involves some basic typechecking etc already.
---------------------------------------------------------------------------------
 
 -- Only VarDefinition, Binding and PatternMatch should be seen at the top level
 buildEnvironmentM :: (Expr, SourceInfo) -> IntState ()
@@ -84,9 +55,13 @@ processBinding (Action lam, si) env = pure $ addLambda (lamName lam) lam env
 
 -- now extracting constructors from SumTypes, body is guaranteed to be
 -- a list of Lambdas under Constructors constructor
-processBinding ( tp@(SumType (Lambda typName typArgs (Constructors cons) typTyp)), si) env = do
-    -- pure $ addManyNamedLambdas cons (addNamedSumType tp env)
-    pure $ addManyNamedConstructors 0 cons (addNamedSumType tp env)
+processBinding ( tp@(SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)), si) env = do
+    let newTp = SumType lam { body = Constructors $ imap fixCons cons }
+    pure $ addManyNamedConstructors 0 cons (addNamedSumType newTp env)
+    where fixCons i lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) 
+            then lam 
+            else lam { body = ConTuple (ConsTag nm i) $ Prelude.map (\v -> Id $ name v) args}
+        
 
 processBinding (ex, si) env = do 
     let lpl = LogPayload 
@@ -352,33 +327,34 @@ lamToCLMPass = do
     s <- get
     let env = currentEnvironment s
     let lambdas = topLambdas env
-    let clms = Map.mapWithKey (\n l -> lambdaToCLMLambda l) lambdas
+    let clms = Map.mapWithKey (\n l -> lambdaToCLMLambda env l) lambdas
     let env' = env { clmLambdas = clms }
     let s' = s {currentEnvironment = env'}
     put s'
     
 
-varToCLMVar v = (name v, exprToCLM (val v))
+varToCLMVar e v = (name v, exprToCLM e (val v))
 
-varsToCLMVars vs = Prelude.map varToCLMVar vs
+varsToCLMVars e vs = Prelude.map (varToCLMVar e) vs
 
-consTagCheckToCLM (ExprConsTagCheck ct ex) = (ct, exprToCLM ex)
+consTagCheckToCLM e (ExprConsTagCheck ct ex) = (ct, exprToCLM e ex)
 
-exprToCLM :: Expr -> CLMExpr
-exprToCLM UNDEFINED = CLMEMPTY
-exprToCLM (Id n) = CLMID n
-exprToCLM (Binding v) = CLMBIND (name v) (exprToCLM $ val v)
-exprToCLM (Statements exs) = CLMPROG (Prelude.map exprToCLM exs)
-exprToCLM (RecFieldAccess ac e) = CLMFieldAccess ac (exprToCLM e)
-exprToCLM (App ex exs) = CLMAPP (exprToCLM ex) (Prelude.map exprToCLM exs)
-exprToCLM (ExpandedCase cases ex si) = CLMCASE (Prelude.map consTagCheckToCLM cases) (exprToCLM ex)
-exprToCLM e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ show e
+exprToCLM :: Environment -> Expr -> CLMExpr
+exprToCLM _ UNDEFINED = CLMEMPTY
+exprToCLM _ (Id n) = CLMID n
+exprToCLM env (Binding v) = CLMBIND (name v) (exprToCLM env $ val v)
+exprToCLM env (Statements exs) = CLMPROG (Prelude.map (exprToCLM env) exs)
+exprToCLM env (RecFieldAccess ac e) = CLMFieldAccess ac (exprToCLM env e)
+exprToCLM env (ExpandedCase cases ex si) = CLMCASE (Prelude.map (consTagCheckToCLM env) cases) (exprToCLM env ex)
+-- exprToCLM env (App (Id nm) exs) = CLMAPP (exprToCLM env ex) (Prelude.map (exprToCLM env) exs)
+exprToCLM env (App ex exs) = CLMAPP (exprToCLM env ex) (Prelude.map (exprToCLM env) exs)
+exprToCLM _ e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ show e
 
-lambdaToCLMLambda :: Lambda -> CLMLam
-lambdaToCLMLambda (Lambda nm params (PatternMatches exs) tp) = 
-    CLMLamCases (varsToCLMVars params) (Prelude.map exprToCLM exs)
-lambdaToCLMLambda (Lambda nm params body tp) = 
-    CLMLam (varsToCLMVars params) (exprToCLM body)
+lambdaToCLMLambda :: Environment -> Lambda -> CLMLam
+lambdaToCLMLambda env (Lambda nm params (PatternMatches exs) tp) = 
+    CLMLamCases (varsToCLMVars env params) (Prelude.map (exprToCLM env) exs)
+lambdaToCLMLambda env (Lambda nm params body tp) = 
+    CLMLam (varsToCLMVars env params) (exprToCLM env body)
 
 --------------------------------------------------------------------------------
 -- PASS 6: Compilation - JS

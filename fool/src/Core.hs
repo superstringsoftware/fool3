@@ -70,7 +70,8 @@ data Expr =
   -- ALL of them need to be True for the case to work.
   
   | PatternMatches [Expr] -- only CaseOf or ExpandedCase is allowed inside this!!!
-  | Tuple [Expr] -- any tuple { ... , ... }, -- only CONSTRUCTORS return it!!!
+  | Tuple [Expr] -- any tuple { ... , ... }
+  | ConTuple ConsTag [Expr] -- only CONSTRUCTORS return it - tagged by the constructor tag!
   | Statements [Expr] -- for Action body, simply a list of statements to execute in order
   | SumType Lambda -- sum type definition, which is also basically a lambda with 
   -- body expression being a tuple of Lambdas which are constructors
@@ -102,6 +103,7 @@ traverseExpr f (PatternMatches exs) = PatternMatches (map f (map (traverseExpr f
 traverseExpr f (RecFieldAccess a ex) = RecFieldAccess a (f $ traverseExpr f ex)
 traverseExpr f (ExprConsTagCheck ct ex) = ExprConsTagCheck ct (f $ traverseExpr f ex)
 traverseExpr f (Tuple exs) = Tuple (map f (map (traverseExpr f) exs))
+traverseExpr f (ConTuple ct exs) = ConTuple ct (map f (map (traverseExpr f) exs))
 traverseExpr f (ExpandedCase exs ex si) = ExpandedCase (map f (map (traverseExpr f) exs)) (f $ traverseExpr f ex) si
 traverseExpr f (Statements exs) = Statements (map f (map (traverseExpr f) exs))
 traverseExpr f (UnaryOp nm ex) = UnaryOp nm (f $ traverseExpr f ex)
@@ -155,6 +157,7 @@ instance PrettyPrint Expr where
   ppr (RecFieldAccess (nm,i) e) = ppr e ++ "." ++ nm ++"("++show i ++")"
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex
+  ppr (ConTuple (ConsTag nm i) ex) = (as [bold] nm) ++ " "  ++ show i ++ " " ++ showListCuBr ppr ex
   ppr (Statements ex) = showListCuBr ppr ex
   ppr (Binding (Var nm tp val)) = as [bold] nm ++ pprTyp tp ++ " = " ++ ppr val 
   ppr (Constructors cs) = showListCuBr ppr cs

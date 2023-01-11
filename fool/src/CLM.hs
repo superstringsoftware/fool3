@@ -32,4 +32,6 @@ data CLMExpr =
   | CLMFieldAccess (Name, Int) CLMExpr -- accessing a field of an expr by name or number
   | CLMCASE [CLMConsTagCheck] CLMExpr -- list of constructor checks that must all fold to True bound to an expr
   | CLMPROG [CLMExpr] -- list of expressions, for now used for Action but needs to change
+  | CLMTYPED CLMExpr CLMExpr -- in case we want to give a type to an expression
     deriving (Show, Eq)
+
