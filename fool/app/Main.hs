@@ -17,6 +17,7 @@ import qualified Data.Text.Lazy as TL
 
 import Core
 import Pipeline
+import Interpreter
 import Logs (SourceInfo(..) )
 import Util.PrettyPrinting as TC
 
@@ -43,11 +44,14 @@ processNew line = do
             -- processing parsed input
             liftIO $ putStrLn $ TC.as [TC.bold, TC.underlined] "Received expressions: " -- ++ (show $ length ex)
             liftIO $ putStrLn (show ex) -- show what was parsed first
+            traceExpr ex
+            addBinding ex
             showAllLogs
             clearAllLogs
             -- processSurfaceExpr ex -- processing expressions one by one
         Left err -> do
             -- it's not a top level expression, trying interactive expression
+            liftIO $ putStrLn $ "trying interactive expression"
             res1 <- parseExpr line
             case res1 of
                 Left err1 -> liftIO (print err) >> liftIO (print err1)
@@ -56,6 +60,7 @@ processNew line = do
                     trace (show ex1) -- show what was parsed first
                     showAllLogs
                     clearAllLogs
+                    processInteractive ex1
                     
 
                     

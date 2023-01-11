@@ -25,6 +25,7 @@ data CLMExpr =
     CLMEMPTY
   | CLMERR String
   | CLMID Name
+  | CLMLAM CLMLam
   | CLMBIND Name CLMExpr
   | CLMAPP CLMExpr [CLMExpr] -- saturated application first expr to the tuple of exprs
   | CLMPAP CLMExpr [CLMExpr] -- partial application (When we know the types!)

@@ -11,7 +11,7 @@ import Control.Monad.IO.Class (liftIO)
 -- some info for debugging to attach to initially parsed module expressions
 data SourceInfo = SourceInfo {
     lineNum :: !Int, colNum :: !Int, notes :: Text
-} deriving Eq
+} | SourceInteractive deriving Eq
 
 data LogPayload = LogPayload {
     linePos :: !Int,

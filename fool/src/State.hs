@@ -33,7 +33,9 @@ data Environment = Environment {
     constructors :: NameMap (Lambda, Int), 
     -- constructors are stored with their number inside the sum type
     topLambdas   :: NameMap Lambda,
+    topBindings  :: NameMap Var,
     clmLambdas   :: NameMap CLMLam,
+    clmBindings  :: NameMap CLMVar,
     outProgram   :: NameMap String
 } deriving Show
 
@@ -42,6 +44,8 @@ initialEnvironment = Environment {
     constructors = Map.empty,
     topLambdas  = Map.empty,
     clmLambdas = Map.empty,
+    topBindings = Map.empty,
+    clmBindings = Map.empty,
     outProgram   = Map.empty 
 }
 
