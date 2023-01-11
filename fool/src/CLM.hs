@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, NamedFieldPuns, GADTs #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns, TypeSynonymInstances, FlexibleInstances #-}
 
 -- This is our PRIMARY CORE LANGUAGE, "Core List Machine", 
 -- where we use n-lists for tuples explicitly instead of lambda-applications.
@@ -36,4 +36,32 @@ data CLMExpr =
   | CLMTYPED CLMExpr CLMExpr -- in case we want to give a type to an expression
   | CLMPRIMCALL -- body of the function that is a primitive call
     deriving (Show, Eq)
+
+instance PrettyPrint CLMExpr where
+    ppr (CLMERR err) = (as [bold,red] "ERROR: ") ++ err
+    ppr (CLMID nm) = nm
+    ppr (CLMLAM lam) = ppr lam
+    ppr (CLMCASE cschecks ex ) = showListWFormat ppr "{" "}" " && " "{}" cschecks ++ " -> " ++ ppr ex
+    ppr (CLMCON (ConsTag nm i) exs) = as [bold,red] nm ++ " "
+        ++ showListCuBr ppr exs
+    ppr (CLMAPP ex exs) = as [bold] (ppr ex) ++ " " 
+        ++ showListRoBr ppr exs
+    ppr (CLMFieldAccess ("", i) ex) = ppr ex ++ "." ++ show i
+    ppr (CLMFieldAccess (nm, _) ex) = ppr ex ++ "." ++ nm
+    ppr (CLMPROG exs) = showListWFormat ppr "{\n" "\n}" ",\n" "{}" exs
+    ppr (CLMBIND nm ex) = (as [bold] nm) ++ " = " ++ (ppr ex)
+    ppr e = show e
+
+instance PrettyPrint CLMConsTagCheck where
+    ppr (ConsTag nm i, e) = ppr e ++ (as [bold,yellow] " is ") ++ nm ++ "(" ++ show i ++ ")"
+
+pprVar1 (nm,ex) = nm
+
+instance PrettyPrint CLMVar where
+    ppr (nm,ex) = nm
+
+instance PrettyPrint CLMLam where 
+    ppr (CLMLam args ex) = "λ " ++ (showListRoBr ppr args) ++ ". " ++ ppr ex
+    ppr (CLMLamCases args exs) = "λ " ++ (showListRoBr ppr args) ++ ". "
+        ++ (showListWFormat ppr "{\n" "\n}" ",\n" "{}" exs)
 

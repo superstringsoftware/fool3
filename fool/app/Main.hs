@@ -133,7 +133,7 @@ processCommand (":list":"constructors":_) = do
                         let (Just (tt,constag)) = Map.lookup tk ts
                         putStrLn $ (TC.as [bold,green] (tk ++ "(" ++ show constag ++ "):")) ++ "\n  " ++ (ppr tt)
 
-processCommand (":clm":_) = do
+processCommand (":clm":"-d":_) = do
     liftIO $ putStrLn "\n--------------- CLM LAMBDAS ----------------"
     res <- get >>= \s -> pure ( (clmLambdas . currentEnvironment) s)
     let fkeys = Map.keys res
@@ -142,6 +142,17 @@ processCommand (":clm":_) = do
                         let (Just tt) = Map.lookup tk ts
                         putStrLn $ (TC.as [bold,green] (tk ++ ":")) ++ "\n  "
                         pPrint tt
+
+
+processCommand (":clm":_) = do
+    liftIO $ putStrLn "\n--------------- CLM LAMBDAS ----------------"
+    res <- get >>= \s -> pure ( (clmLambdas . currentEnvironment) s)
+    let fkeys = Map.keys res
+    liftIO $ mapM_ (fenv1 res) fkeys
+    where fenv1 ts tk = do 
+                        let (Just tt) = Map.lookup tk ts
+                        putStrLn $ (TC.as [bold,green] (tk ++ ":"))
+                        putStrLn $ ppr tt
 
 
 processCommand (":env":_) = do
