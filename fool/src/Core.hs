@@ -78,6 +78,8 @@ data Expr =
   | UnaryOp Name Expr
   | BinaryOp Name Expr Expr
   | Type -- U 0 synonim
+  | Prim Lambda -- primitive function that is handled "magically"
+  | PrimCall -- filler for the body of primitive functions
 
   -- | U Int -- universe hierarchy
   -- | Universe -- biggest universe, when we want to refer to any type, kind, etc - see e.g. pifte function!

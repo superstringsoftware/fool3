@@ -33,5 +33,6 @@ data CLMExpr =
   | CLMCASE [CLMConsTagCheck] CLMExpr -- list of constructor checks that must all fold to True bound to an expr
   | CLMPROG [CLMExpr] -- list of expressions, for now used for Action but needs to change
   | CLMTYPED CLMExpr CLMExpr -- in case we want to give a type to an expression
+  | CLMPRIMCALL -- body of the function that is a primitive call
     deriving (Show, Eq)
 

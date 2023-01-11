@@ -52,6 +52,8 @@ processBinding :: (Expr, SourceInfo) -> Environment -> IntState Environment
 processBinding (Function lam, si) env = pure $ addLambda (lamName lam) lam env
 -- treating actions the same way - they will have some proper type eventually anyway
 processBinding (Action lam, si) env = pure $ addLambda (lamName lam) lam env
+-- primitive functions
+processBinding (Prim lam, si) env = pure $ addLambda (lamName lam) lam env
 
 -- now extracting constructors from SumTypes, body is guaranteed to be
 -- a list of Lambdas under Constructors constructor
@@ -80,7 +82,10 @@ buildEnvPass :: IntState ()
 buildEnvPass = buildPrimitivePass >> get >>= pure . parsedModule >>= mapM_ buildEnvironmentM
 
 -- killing primitive bindings for now to test iterative compilation
-primBindings = []    
+-- primBindings = []    
+primBindings = [
+        (Prim $ Lambda "print#" [Var "s" UNDEFINED UNDEFINED] PrimCall UNDEFINED )
+    ]
 {-
 primBindings = [
         Let [(Var "+" ToDerive, Prim PPlus)] EMPTY,
@@ -99,10 +104,6 @@ buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) prim
 -- we can start the optimizations
 -- This pass includes proper formation of the Case pattern matches inside
 -- functions
--- Question: should we forget about the original source program now
--- and start working with the environment??? If not, we'll need to update
--- the environment as well as the source program, which seems counterproductive?
--- For now, choosing to work with the environment.
 --------------------------------------------------------------------------------
 caseOptimizationPass :: IntState()
 caseOptimizationPass = do
@@ -346,7 +347,29 @@ exprToCLM env (Binding v) = CLMBIND (name v) (exprToCLM env $ val v)
 exprToCLM env (Statements exs) = CLMPROG (Prelude.map (exprToCLM env) exs)
 exprToCLM env (RecFieldAccess ac e) = CLMFieldAccess ac (exprToCLM env e)
 exprToCLM env (ExpandedCase cases ex si) = CLMCASE (Prelude.map (consTagCheckToCLM env) cases) (exprToCLM env ex)
--- exprToCLM env (App (Id nm) exs) = CLMAPP (exprToCLM env ex) (Prelude.map (exprToCLM env) exs)
+exprToCLM env PrimCall = CLMPRIMCALL
+-- application of func or cons to an expression: doing a bunch of checks
+-- while converting
+exprToCLM env e@(App (Id nm) exs) = 
+    let newArgs = Prelude.map (exprToCLM env) exs
+        mcons = lookupConstructor nm env
+    in  case mcons of
+            Just (cons, i) -> 
+                  if (Prelude.length (params cons) /= (Prelude.length newArgs) )
+                  then CLMERR $ "ERROR: wrong number of arguments in constructor application: " ++ show e
+                  else CLMCON (ConsTag nm i) newArgs
+            Nothing -> 
+                let mfun = lookupLambda nm env
+                in  case mfun of
+                        Just fun -> 
+                            if (Prelude.length (params fun) > (Prelude.length newArgs) )
+                            then CLMPAP (CLMID nm) newArgs
+                            else if (Prelude.length (params fun) == (Prelude.length newArgs) )
+                                 then CLMAPP (CLMID nm) newArgs
+                                 else CLMERR $ "ERROR: function is given more arguments than it can handle: " ++ show e
+                        Nothing -> CLMERR $ "ERROR: applied unknown function or constructor: " ++ show e
+            
+    
 exprToCLM env (App ex exs) = CLMAPP (exprToCLM env ex) (Prelude.map (exprToCLM env) exs)
 exprToCLM _ e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ show e
 
