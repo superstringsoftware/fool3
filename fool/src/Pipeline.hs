@@ -347,10 +347,38 @@ caseTransformApp2 i isTop env boundVarExpr name eee expr cases errs =
 --------------------------------------------------------------------------------
 -- PASS 5: Conversion to CLM
 --------------------------------------------------------------------------------
+lamToCLMPass :: IntState()
+lamToCLMPass = do
+    s <- get
+    let env = currentEnvironment s
+    let lambdas = topLambdas env
+    let clms = Map.mapWithKey (\n l -> lambdaToCLMLambda l) lambdas
+    let env' = env { clmLambdas = clms }
+    let s' = s {currentEnvironment = env'}
+    put s'
+    
+
+varToCLMVar v = (name v, exprToCLM (val v))
+
+varsToCLMVars vs = Prelude.map varToCLMVar vs
+
+consTagCheckToCLM (ExprConsTagCheck ct ex) = (ct, exprToCLM ex)
 
 exprToCLM :: Expr -> CLMExpr
+exprToCLM UNDEFINED = CLMEMPTY
+exprToCLM (Id n) = CLMID n
+exprToCLM (Binding v) = CLMBIND (name v) (exprToCLM $ val v)
+exprToCLM (Statements exs) = CLMPROG (Prelude.map exprToCLM exs)
+exprToCLM (RecFieldAccess ac e) = CLMFieldAccess ac (exprToCLM e)
 exprToCLM (App ex exs) = CLMAPP (exprToCLM ex) (Prelude.map exprToCLM exs)
-exprToCLM e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ ppr e
+exprToCLM (ExpandedCase cases ex si) = CLMCASE (Prelude.map consTagCheckToCLM cases) (exprToCLM ex)
+exprToCLM e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ show e
+
+lambdaToCLMLambda :: Lambda -> CLMLam
+lambdaToCLMLambda (Lambda nm params (PatternMatches exs) tp) = 
+    CLMLamCases (varsToCLMVars params) (Prelude.map exprToCLM exs)
+lambdaToCLMLambda (Lambda nm params body tp) = 
+    CLMLam (varsToCLMVars params) (exprToCLM body)
 
 --------------------------------------------------------------------------------
 -- PASS 6: Compilation - JS

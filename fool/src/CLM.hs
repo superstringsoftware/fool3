@@ -19,16 +19,17 @@ type CLMVar = (Name, CLMExpr)
 data CLMLam = CLMLam [CLMVar] CLMExpr | CLMLamCases [CLMVar] [CLMExpr]
     deriving (Show, Eq) 
 
-
-
 type CLMConsTagCheck = (ConsTag, CLMExpr) -- check if an expression was constructed with a given constructor tag
 
 data CLMExpr = 
-    CLMERR String
+    CLMEMPTY
+  | CLMERR String
   | CLMID Name
+  | CLMBIND Name CLMExpr
   | CLMAPP CLMExpr [CLMExpr] -- saturated application first expr to the tuple of exprs
   | CLMPAP CLMExpr [CLMExpr] -- partial application (When we know the types!)
   | CLMCON ConsTag [CLMExpr] -- saturated constructor application, value in a sense
-  | CLMFieldAccess (Int, Name) CLMExpr -- accessing a field of an expr by name or number
+  | CLMFieldAccess (Name, Int) CLMExpr -- accessing a field of an expr by name or number
   | CLMCASE [CLMConsTagCheck] CLMExpr -- list of constructor checks that must all fold to True bound to an expr
+  | CLMPROG [CLMExpr] -- list of expressions, for now used for Action but needs to change
     deriving (Show, Eq)

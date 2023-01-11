@@ -128,6 +128,16 @@ processCommand (":list":"constructors":_) = do
                         let (Just (tt,constag)) = Map.lookup tk ts
                         putStrLn $ (TC.as [bold,green] (tk ++ "(" ++ show constag ++ "):")) ++ "\n  " ++ (ppr tt)
 
+processCommand (":clm":_) = do
+    liftIO $ putStrLn "\n--------------- CLM LAMBDAS ----------------"
+    res <- get >>= \s -> pure ( (clmLambdas . currentEnvironment) s)
+    let fkeys = Map.keys res
+    liftIO $ mapM_ (fenv1 res) fkeys
+    where fenv1 ts tk = do 
+                        let (Just tt) = Map.lookup tk ts
+                        putStrLn $ (TC.as [bold,green] (tk ++ ":")) ++ "\n  "
+                        pPrint tt
+
 
 processCommand (":env":_) = do
     fl <- gets currentFlags
@@ -226,7 +236,12 @@ loadFileNew nm = do
                 showAllLogsWSource
                 processCommand ([":e"])
                 clearAllLogs
-                liftIO (putStrLn $ "Executing pass 3: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
+                liftIO (putStrLn $ "Executing pass 3: " ++ TC.as [TC.bold, TC.underlined] "Lambdas to CLM")
+                lamToCLMPass
+                showAllLogsWSource
+                processCommand ([":e"])
+                clearAllLogs
+                liftIO (putStrLn $ "Executing pass 4: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
                 -- compile2JSpass
                 -- showAllLogsWSource
                 -- clearAllLogs

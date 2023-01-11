@@ -121,6 +121,9 @@ lookupConstructor n env = Map.lookup n (constructors env)
 addLambda :: Name -> Lambda -> Environment -> Environment
 addLambda n l env = env { topLambdas = Map.insert n l (topLambdas env) }
 
+addCLMLambda :: Name -> CLMLam -> Environment -> Environment
+addCLMLambda n l env = env { clmLambdas = Map.insert n l (clmLambdas env) }
+
 addNamedSumType :: Expr -> Environment -> Environment
 addNamedSumType tp@(SumType lam) env = env { types = Map.insert (lamName lam) tp (types env) } 
 addNamedSumType e env = env

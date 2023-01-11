@@ -100,6 +100,7 @@ traverseExpr f (App ex exs) = App (f $ traverseExpr f ex) (map f (map (traverseE
 traverseExpr f (CaseOf args ex si) = CaseOf args (f $ traverseExpr f ex) si
 traverseExpr f (PatternMatches exs) = PatternMatches (map f (map (traverseExpr f) exs))
 traverseExpr f (RecFieldAccess a ex) = RecFieldAccess a (f $ traverseExpr f ex)
+traverseExpr f (ExprConsTagCheck ct ex) = ExprConsTagCheck ct (f $ traverseExpr f ex)
 traverseExpr f (Tuple exs) = Tuple (map f (map (traverseExpr f) exs))
 traverseExpr f (ExpandedCase exs ex si) = ExpandedCase (map f (map (traverseExpr f) exs)) (f $ traverseExpr f ex) si
 traverseExpr f (Statements exs) = Statements (map f (map (traverseExpr f) exs))
