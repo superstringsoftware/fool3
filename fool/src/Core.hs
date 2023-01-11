@@ -80,6 +80,7 @@ data Expr =
   | Type -- U 0 synonim
   | Prim Lambda -- primitive function that is handled "magically"
   | PrimCall -- filler for the body of primitive functions
+  | ERROR String
 
   -- | U Int -- universe hierarchy
   -- | Universe -- biggest universe, when we want to refer to any type, kind, etc - see e.g. pifte function!
@@ -117,6 +118,8 @@ traverseExpr f (Action lam) = Action $ lam { body = f $ traverseExpr f (body lam
 traverseExpr f (SumType lam) = SumType $ lam { body = f $ traverseExpr f (body lam) }
 -- TODO: CHECK IF THIS IS THE CORRECT TRAVERSAL: !!!!
 traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f $ traverseExpr f (body l) } ) lams
+traverseExpr f (Binding (Var nm tp val)) = Binding (Var nm (f $ traverseExpr f tp) (f $ traverseExpr f val))
+traverseExpr f e = ERROR $ "Traverse not implemented for: " ++ ppr e
 
 -- App (Id "Succ") [App (Id "plus") [Id "n",Id "x"]]
 

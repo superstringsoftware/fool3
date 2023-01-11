@@ -48,6 +48,7 @@ library
     , hashtables
     , haskeline
     , ilist
+    , indexed-traversable
     , mtl
     , parsec
     , pretty-simple
@@ -73,6 +74,7 @@ executable fool
     , hashtables
     , haskeline
     , ilist
+    , indexed-traversable
     , mtl
     , parsec
     , pretty-simple
@@ -99,6 +101,7 @@ test-suite fool-test
     , hashtables
     , haskeline
     , ilist
+    , indexed-traversable
     , mtl
     , parsec
     , pretty-simple

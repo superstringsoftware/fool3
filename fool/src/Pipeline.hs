@@ -126,6 +126,20 @@ maybeEither :: Maybe a -> b -> (a -> b) -> b
 maybeEither Nothing  d f = d
 maybeEither (Just x) d f = f x
 
+-- this one checks for ids that maybe arg=0 constructor applications
+-- and fixes the expression properly
+fixEmptyConstructor :: Environment -> Expr -> Expr
+fixEmptyConstructor env ex@(Id name) =
+    let mcons = lookupConstructor name env in 
+    case mcons of
+        Nothing -> ex
+        Just (cons,i) -> ConTuple (ConsTag name i) []
+fixEmptyConstructor env e = e 
+
+fixEmptyConstructors ex = do
+    s <- get
+    let env = currentEnvironment s
+    pure $ traverseExpr (fixEmptyConstructor env) ex
 
 -- this function is a mouthful and needs to be refactored A LOT
 expandCase :: Lambda -> Expr -> IntState Expr 
@@ -137,6 +151,7 @@ expandCase :: Lambda -> Expr -> IntState Expr
 -- beta reduction
 expandCase lam cs@(CaseOf recs ex si) = do
     liftIO $ putStrLn $ "Analyzing: " ++ ppr cs
+    -- ex111 <- fixEmptyConstructors ex
     (cases, ex') <- (t recs ex ([]))
     return $ ExpandedCase cases ex' si
     where 
@@ -342,12 +357,21 @@ consTagCheckToCLM e (ExprConsTagCheck ct ex) = (ct, exprToCLM e ex)
 
 exprToCLM :: Environment -> Expr -> CLMExpr
 exprToCLM _ UNDEFINED = CLMEMPTY
-exprToCLM _ (Id n) = CLMID n
 exprToCLM env (Binding v) = CLMBIND (name v) (exprToCLM env $ val v)
 exprToCLM env (Statements exs) = CLMPROG (Prelude.map (exprToCLM env) exs)
 exprToCLM env (RecFieldAccess ac e) = CLMFieldAccess ac (exprToCLM env e)
 exprToCLM env (ExpandedCase cases ex si) = CLMCASE (Prelude.map (consTagCheckToCLM env) cases) (exprToCLM env ex)
 exprToCLM env PrimCall = CLMPRIMCALL
+exprToCLM env (ConTuple cs exs) = CLMCON cs (Prelude.map (exprToCLM env) exs)
+-- have to check for a case when Id in fact refers to an 0-arg constructor call
+-- since we need to change it for a corresponding tuple
+exprToCLM env (Id n) = 
+    case (lookupConstructor n env) of
+        Just (cons, i) ->
+            if ((params cons) == [] )
+            then CLMCON (ConsTag n i) []
+            else CLMID n              
+        Nothing -> CLMID n
 -- application of func or cons to an expression: doing a bunch of checks
 -- while converting
 exprToCLM env e@(App (Id nm) exs) = 
