@@ -1,6 +1,0 @@
-/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/test-apps/test-apps/obj/x86/Debug/test-apps.csprojAssemblyReference.cache
-/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/test-apps/test-apps/obj/x86/Debug/test-apps.csproj.CoreCompileInputs.cache
-/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/test-apps/test-apps/bin/Debug/test-apps.exe
-/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/test-apps/test-apps/bin/Debug/test-apps.pdb
-/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/test-apps/test-apps/obj/x86/Debug/test-apps.exe
-/Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/test-apps/test-apps/obj/x86/Debug/test-apps.pdb
