@@ -150,7 +150,7 @@ expandCase :: Lambda -> Expr -> IntState Expr
 -- if not - means it's a variable substitution and we need to do a
 -- beta reduction
 expandCase lam cs@(CaseOf recs ex si) = do
-    liftIO $ putStrLn $ "Analyzing: " ++ ppr cs
+    -- liftIO $ putStrLn $ "Analyzing: " ++ ppr cs
     -- ex111 <- fixEmptyConstructors ex
     (cases, ex') <- (t recs ex ([]))
     return $ ExpandedCase cases ex' si
@@ -158,8 +158,8 @@ expandCase lam cs@(CaseOf recs ex si) = do
         t [] expr cases = return (cases, expr)
         -- case nm of val
         t (v@(Var nm tp val):xs) expr cases = do
-            liftIO $ putStrLn $ "Processing case of: " ++ ppVarCaseOf v
-            liftIO $ putStrLn $ "Current expr is: " ++ ppr expr
+            -- liftIO $ putStrLn $ "Processing case of: " ++ ppVarCaseOf v
+            -- liftIO $ putStrLn $ "Current expr is: " ++ ppr expr
             s <- get
             let env = currentEnvironment s
             case val of 
@@ -181,8 +181,8 @@ expandCase lam cs@(CaseOf recs ex si) = do
                 -- here we need to go deep and beta reduce
                 -- n = tupleField(0,x)
                 vval@(App (Id cons) ex5) -> do
-                    (liftIO $ putStrLn $ "App case in t: \n")
-                    liftIO $ pPrint vval
+                    -- (liftIO $ putStrLn $ "App case in t: \n")
+                    -- liftIO $ pPrint vval
 
                     res1 <- caseTransformApp1 env (Id nm) cons ex5
                     case res1 of
@@ -195,7 +195,7 @@ expandCase lam cs@(CaseOf recs ex si) = do
                                         return (cases, expr)
                         Right cs -> do
                             let newBoundVarExpr = (Id nm)
-                            liftIO $ putStrLn $ "Created field access on top: " ++ ppr newBoundVarExpr
+                            -- liftIO $ putStrLn $ "Created field access on top: " ++ ppr newBoundVarExpr
                             -- launching next level of recursion:
                             (cases',expr', errs') <- caseTransformApp2 0 False env newBoundVarExpr cons ex5 expr [] []
                     
@@ -233,7 +233,7 @@ expandCase lam e = pure e
 -- this one gets passed different functions as the first argument and that's it
 caseTransformId :: (Expr->Expr) -> Environment -> Expr -> Name -> Expr -> IntState (Either String ([Expr],Expr))
 caseTransformId f env boundVarExpr name expr = do
-    liftIO $ putStrLn $ "Inside caseTransformId: name = " ++ name ++ " boundVar = " ++ ppr boundVarExpr
+    -- liftIO $ putStrLn $ "Inside caseTransformId: name = " ++ name ++ " boundVar = " ++ ppr boundVarExpr
     maybeEither (lookupConstructor name env)
             (let vt = Var name UNDEFINED (f boundVarExpr)
                  expr' = betaReduce vt expr
@@ -270,8 +270,8 @@ caseTransformIdInternal i = caseTransformId (mkTupleFieldAccessExpr i)
 -- in the environment. Thus we don't need to deal with the RHS of this case here.
 caseTransformApp1 :: Environment -> Expr -> Name -> [Expr] -> IntState (Either String [Expr])
 caseTransformApp1 env boundVarExpr name ex = do
-    liftIO $ putStrLn $ "Inside caseTransformApp1m name: " ++ name
-    liftIO $ putStrLn $ "Bound var: " ++ ppr boundVarExpr
+    -- liftIO $ putStrLn $ "Inside caseTransformApp1m name: " ++ name
+    -- liftIO $ putStrLn $ "Bound var: " ++ ppr boundVarExpr
     maybeEither (lookupConstructor name env)
             (return $ Left ("Error: constructor " ++ name ++ " is not found in the environment"))
             -- ^^^ nothing found in the environment, it's an ERROR!
@@ -289,8 +289,8 @@ caseTransformApp2 :: Int -> Bool -> Environment -> Expr -> Name -> [Expr] -> Exp
 caseTransformApp2 i isTop env boundVarExpr name []          expr cases errs = return (cases,expr, errs)
 -- case with ids is pretty straightforward
 caseTransformApp2 i isTop env boundVarExpr name ((Id x):xs) expr cases errs = do
-    (liftIO $ putStrLn $ "Id case in caseTransformApp2: " ++ x ++ " name: " ++ name) 
-    (liftIO $ putStrLn $ "Bound var expr: " ++ ppr boundVarExpr) 
+    -- (liftIO $ putStrLn $ "Id case in caseTransformApp2: " ++ x ++ " name: " ++ name) 
+    -- (liftIO $ putStrLn $ "Bound var expr: " ++ ppr boundVarExpr) 
     res <- if isTop then caseTransformIdTop env boundVarExpr x expr
            else caseTransformIdInternal i env boundVarExpr x expr
     case (res) of
@@ -299,8 +299,8 @@ caseTransformApp2 i isTop env boundVarExpr name ((Id x):xs) expr cases errs = do
             Right (cs, ex) -> caseTransformApp2 (i+1) isTop env boundVarExpr name xs ex (Prelude.concat[cases,cs]) errs
 -- case with App is complex
 caseTransformApp2 i isTop env boundVarExpr name ((App (Id cons) exs):xs) expr cases errs = do
-    liftIO $ putStrLn $ "App case in caseTransformApp2: " ++ cons
-    liftIO $ putStrLn $ "Bound var expr: " ++ ppr boundVarExpr
+    -- liftIO $ putStrLn $ "App case in caseTransformApp2: " ++ cons
+    -- liftIO $ putStrLn $ "Bound var expr: " ++ ppr boundVarExpr
     -- first, run basic sanity check plus optional cases array expansion:
     let bv = if isTop then boundVarExpr else mkTupleFieldAccessExpr i boundVarExpr
     res1 <- caseTransformApp1 env bv cons exs

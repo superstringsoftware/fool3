@@ -28,6 +28,7 @@ function f(x,y,z, h) = {
 function eq(x:Nat,y:Nat):Bool = {
   {Z,Z} -> True,
   {Z,n} -> False,
+  {n,Z} -> False,
   {Succ(m),Succ(n)} -> eq(m,n)
 };
 
@@ -49,7 +50,7 @@ function deep(x:a):b = {
 
 
 
-function id (x:a):a = x;
+// function id (x:a):a = x;
 
 function not (b:Bool) : Bool = {
     {True}  -> False,
@@ -62,14 +63,14 @@ function not (b:Bool) : Bool = {
 
 
 //function plus2 (x:Nat):Nat = plus(x, Succ(Succ(Z)) );
-
+/*
 action main = {
   one = Succ(Z),
   three = Succ(Succ(one)),
   res = plus(three,one),
   print# (res)
 };
-
+*/
 
 
 

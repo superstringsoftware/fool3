@@ -73,13 +73,14 @@ showHelp = do
     putStrLn ":q[uit]           -- quit"
     putStrLn ":a[ll]            -- list everything that was parsed, -d - in core format"
     putStrLn ":l[oad] <name>    -- load and interpret file <name>"
-    putStrLn ":s[et] <command>  -- set environment flags (:s strict, :s lazy, :s trace on/off)"
+    putStrLn ":s[et] <command>  -- set environment flags (:s trace on/off)"
     putStrLn ":e[nv]            -- show current environment"
+    putStrLn ":clm              -- show CLM (core list machine) format functions"
     putStrLn ":list <types, functions, constructors> [-d] -- list all global functions / types / constructors"
-    putStrLn ":i[nfo] <name>    -- find and show a top-level binding with <name>"
-    putStrLn ":types            -- list all types"
-    putStrLn ":compile          -- compile currently loaded program"
-    putStrLn ":r[un] <f name>   -- execute expression with a given name that's already loaded. 'main' by detault."
+    -- putStrLn ":i[nfo] <name>    -- find and show a top-level binding with <name>"
+    -- putStrLn ":types            -- list all types"
+    -- putStrLn ":compile          -- compile currently loaded program"
+    -- putStrLn ":r[un] <f name>   -- execute expression with a given name that's already loaded. 'main' by detault."
         
 
 _pprSomethingEnv sel str = do
@@ -257,7 +258,8 @@ loadFileNew nm = do
                 showAllLogsWSource
                 processCommand ([":e"])
                 clearAllLogs
-                liftIO (putStrLn $ "Executing pass 4: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
+                processCommand([":h"])
+                -- liftIO (putStrLn $ "Executing pass 4: " ++ TC.as [TC.bold, TC.underlined] "javascript code generation")
                 -- compile2JSpass
                 -- showAllLogsWSource
                 -- clearAllLogs

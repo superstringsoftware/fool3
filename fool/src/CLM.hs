@@ -130,7 +130,7 @@ instance PrettyPrint CLMExpr where
     ppr e = show e
 
 instance PrettyPrint CLMConsTagCheck where
-    ppr (ConsTag nm i, e) = ppr e ++ (as [bold,yellow] " is ") ++ nm ++ "(" ++ show i ++ ")"
+    ppr (ConsTag nm i, e) = ppr e ++ (as [bold,yellow] " cons is ") ++ nm ++ "(" ++ show i ++ ")"
 
 pprVar1 (nm,ex) = nm
 
