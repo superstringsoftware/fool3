@@ -26,7 +26,7 @@ data ConsTag = ConsTag Name !Int deriving (Show, Eq)
 arity :: Lambda -> Int
 arity (Lambda _ args _ _) = length args
 
--- data Literal = LInt !Int | LFloat !Double | LChar !Char | LString !String | LList [Expr] | LVec [Expr] deriving (Eq, Show)
+data Literal = LInt !Int | LFloat !Double | LChar !Char | LString !String | LList [Expr] | LVec [Expr] | LTuple [Expr] deriving (Eq, Show)
 
 -- Lambda - represents EVERYTHING pretty much (see README in HoTT folder). Its type signature is
 -- also obvious from the definition, so it encodes Pi types already!
@@ -47,6 +47,7 @@ isLambdaConstructor _ = False
 data Expr =
     UNDEFINED -- used basically instead of Nothing in default values etc
   | Id Name
+  | Lit Literal
   | Typed Expr Expr -- expression with type
   | Binding Var -- Var contains both the name and the expression to be bound to, used inside Actions etc
   | Function Lambda -- defining a function by abstracting a bunch of variables in a tuple
@@ -107,6 +108,9 @@ traverseExpr f e@(Typed e1 e2) = Typed (f $ traverseExpr f e1) (f $ traverseExpr
 traverseExpr f (App ex exs) = App (f $ traverseExpr f ex) (map f (map (traverseExpr f) exs) )
 traverseExpr f (CaseOf args ex si) = CaseOf args (f $ traverseExpr f ex) si
 traverseExpr f (PatternMatches exs) = PatternMatches (map f (map (traverseExpr f) exs))
+traverseExpr f (Lit (LList exs)) = Lit (LList (map f (map (traverseExpr f) exs)))
+traverseExpr f (Lit (LVec exs)) = Lit (LVec (map f (map (traverseExpr f) exs)))
+traverseExpr f (Lit (LTuple exs)) = Lit (LTuple (map f (map (traverseExpr f) exs)))
 traverseExpr f (RecFieldAccess a ex) = RecFieldAccess a (f $ traverseExpr f ex)
 traverseExpr f (ExprConsTagCheck ct ex) = ExprConsTagCheck ct (f $ traverseExpr f ex)
 traverseExpr f (Tuple exs) = Tuple (map f (map (traverseExpr f) exs))

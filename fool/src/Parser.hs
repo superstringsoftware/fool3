@@ -207,6 +207,22 @@ concreteType = do
     return $ Id nm
 
 
+int :: Parser Literal
+int = LInt . fromInteger <$> integer
+
+floating :: Parser Literal
+floating = LFloat <$> float
+
+stringVal :: Parser Literal
+stringVal = LString <$> stringLit
+
+
+pContainers :: Parser Expr
+pContainers = 
+        try (brackets (commaSep pExpr) >>= return . Lit . LList)
+        <|> try (braces (commaSep pExpr) >>= return . Lit . LTuple)
+        <|> (angles (commaSep pExpr) >>= return . Lit . LVec)
+
 {- 
 =====================================================================================
 -}
@@ -217,7 +233,11 @@ pExpr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex
 pFactor :: Parser Expr
 pFactor = try pApp
     <|> try (parens pExpr)
-    <|> symbolId
+    <|> try symbolId
+    <|> try (Lit <$> floating)
+    <|> try (Lit <$> int)
+    <|> try (Lit <$> stringVal)
+    <|> pContainers
     <?> "container, literal, symbol id or parenthesized expression"
 
 symbolId :: Parser Expr
@@ -278,7 +298,7 @@ op = operator
 binops = [[binary "=" Ex.AssocLeft]
         ,[binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft, binary "*#" Ex.AssocLeft, binary "/#" Ex.AssocLeft]
         ,[binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft, binary "+#" Ex.AssocLeft, binary "-#" Ex.AssocLeft]
-        ,[binary "<" Ex.AssocLeft, binary ">" Ex.AssocLeft]]
+        ]
 
     
 -- helper parsers: lower case and upper case

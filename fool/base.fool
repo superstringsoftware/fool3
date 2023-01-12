@@ -9,12 +9,25 @@ type Nat = {
 
 type Bool = { True, False };
 
+function f(x) = [x,18,29];
+
 structure Eq (a:Type) = {
   function (==) (x,y:a) : Bool = not (x != y),
   function (!=) (x,y:a) : Bool = not (x == y)
   // mandatory = { (==) or (!=) }
 };
 
+
+
+/*
+instance Eq(Bool) = {
+  (==) = {
+    {True,True} -> True,
+    {False,False} -> True,
+    {_,_} -> False
+  }
+};
+*/
 /*
 type ForF = { Cons(a1:t,a2:t), Cell(a1:t,a2:t) };
 
