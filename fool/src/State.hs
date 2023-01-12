@@ -132,6 +132,10 @@ addNamedSumType :: Expr -> Environment -> Environment
 addNamedSumType tp@(SumType lam) env = env { types = Map.insert (lamName lam) tp (types env) } 
 addNamedSumType e env = env
 
+addNamedStructure :: Expr -> Environment -> Environment
+addNamedStructure st@(Structure lam nms) env = env { types = Map.insert (lamName lam) st (types env) } 
+addNamedStructure e env = env
+
 addNamedLambda :: Lambda -> Environment -> Environment
 addNamedLambda l env = env { topLambdas = Map.insert (lamName l) l (topLambdas env) }
 

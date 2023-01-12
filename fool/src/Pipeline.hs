@@ -64,7 +64,10 @@ processBinding ( tp@(SumType lam@(Lambda typName typArgs (Constructors cons) typ
     where fixCons i lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) 
             then lam 
             else lam { body = ConTuple (ConsTag nm i) $ Prelude.map (\v -> Id $ name v) args}
-        
+
+processBinding ( st@(Structure lam nm), si) env = do
+    pure $ addNamedStructure st env
+    
 
 processBinding (ex, si) env = do 
     let lpl = LogPayload 

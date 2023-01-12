@@ -167,10 +167,19 @@ instance PrettyPrint Expr where
   ppr (RecFieldAccess (nm,i) e) = ppr e ++ "." ++ nm ++"("++show i ++")"
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex
+  ppr (Structure (Lambda name params body sig) nms) = (as [bold,yellow] "structure ") 
+    ++ name ++ " "
+    ++ showListRoBr ppr params 
+    ++ pprTyp sig ++ " = "
+    ++ ppr body
+  ppr (Function lam) = (as [bold,red] "function ") ++ ppr lam
+  ppr (Action lam) = (as [bold,blue] "action ") ++ ppr lam
   ppr (ConTuple (ConsTag nm i) ex) = (as [bold] nm) ++ " "  ++ show i ++ " " ++ showListCuBr ppr ex
   ppr (Statements ex) = showListCuBr ppr ex
   ppr (Binding (Var nm tp val)) = as [bold] nm ++ pprTyp tp ++ " = " ++ ppr val 
   ppr (Constructors cs) = showListCuBr ppr cs
+  ppr (UnaryOp nm ex) = nm ++ ppr ex
+  ppr (BinaryOp nm e1 e2) = ppr e1 ++ nm ++ (ppr e2)
   ppr (SumType (Lambda name params body sig)) = name ++ " "
     ++ showListRoBr ppr params 
     ++ pprTyp sig ++ " = "
