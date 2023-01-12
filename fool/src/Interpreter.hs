@@ -91,6 +91,10 @@ evalCLM i e@(CLMCON (ConsTag nm k) exs) = do
     trace $ "Step " ++ show i ++ ": encountered CLMCON " ++ ppr e
     exs' <- imapM (\j e1 -> evalCLM (i+j+1) e1) exs
     pure $ CLMCON (ConsTag nm k) exs'
+evalCLM i e@(CLMAPP (CLMLAM lam) exs) = do
+    trace $ "Step " ++ show i ++ ": encountered CLMAPP of lambda" ++ ppr e
+    exs' <- imapM (\j e1 -> evalCLM (i+j+1) e1) exs
+    pure $ applyCLMLam lam exs'
 evalCLM i e@(CLMAPP ex exs) = do
     trace $ "Step " ++ show i ++ ": encountered CLMAPP " ++ ppr e
     exs' <- imapM (\j e1 -> evalCLM (i+j+1) e1) exs

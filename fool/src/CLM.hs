@@ -37,6 +37,56 @@ data CLMExpr =
   | CLMPRIMCALL -- body of the function that is a primitive call
     deriving (Show, Eq)
 
+-- this function applies a lambda to an array of arguments
+-- full application returns body with substituted elements
+-- partial application returns new function with new vars and partially substituted body
+-- if there are more arguments than vars - return the body applied to the remaining vars
+-- do we allow it???
+applyCLMLam :: CLMLam -> [CLMExpr] -> CLMExpr
+-- terminal case: the same number of args, full application:
+applyCLMLam (CLMLam [] body) [] = body
+-- terminal case, vars are still left but no more args - partial application:
+applyCLMLam (CLMLam (v:vs) body) [] = CLMLAM $ CLMLam (v:vs) body
+-- terminal case, no more vars, args remaining - returning body applying to args:
+applyCLMLam (CLMLam [] body) (arg:args) = CLMAPP body (arg:args)
+-- "normal case", beta-reducing:
+applyCLMLam (CLMLam (v:vs) body) (arg:args) = 
+    let body' = betaReduceCLM (fst v, arg) body
+    in  applyCLMLam (CLMLam vs body') args
+-- now the same as above but for more complex "cases" case
+-- terminal case full app, returning a lambda unlike last time!!!
+applyCLMLam (CLMLamCases [] bodies) [] = CLMLAM (CLMLamCases [] bodies)
+applyCLMLam (CLMLamCases (v:vs) bodies) [] = CLMLAM (CLMLamCases (v:vs) bodies)
+applyCLMLam (CLMLamCases [] bodies) (arg:args) = CLMAPP (CLMLAM (CLMLamCases [] bodies)) (arg:args)
+applyCLMLam (CLMLamCases (v:vs) bodies) (arg:args) = 
+    let bodies' = map (betaReduceCLM (fst v, arg)) bodies
+    in  applyCLMLam (CLMLamCases vs bodies') args
+
+-- f(x) = expr, x = val, substituting all x appearances in expr for val
+betaReduceCLM :: CLMVar -> CLMExpr -> CLMExpr
+-- substituting all nm occurences in expr for val
+-- no typechecking whatsoever
+betaReduceCLM (nm,val) expr = traverseCLMExpr subs expr
+  where subs :: CLMExpr -> CLMExpr
+        subs e@(CLMID name) = if (nm == name) then val else e
+        subs e = e
+
+-- (map f (map (traverseCLMExpr f) exs) )
+-- (f $ traverseCLMExpr f ex)
+-- we DO NOT traverse left parts of lambda arguments
+traverseCLMExpr :: (CLMExpr -> CLMExpr) -> CLMExpr -> CLMExpr
+traverseCLMExpr f (CLMLAM (CLMLam args ex)) = (CLMLAM (CLMLam args (f $ traverseCLMExpr f ex)))
+traverseCLMExpr f (CLMLAM (CLMLamCases arg exs)) = CLMLAM (CLMLamCases arg (map f (map (traverseCLMExpr f) exs) ))
+traverseCLMExpr f (CLMBIND nm ex) = CLMBIND nm (f $ traverseCLMExpr f ex)
+traverseCLMExpr f (CLMAPP ex exs) = CLMAPP (f $ traverseCLMExpr f ex) (map f (map (traverseCLMExpr f) exs) )
+traverseCLMExpr f (CLMPAP ex exs) = CLMPAP (f $ traverseCLMExpr f ex) (map f (map (traverseCLMExpr f) exs) )
+traverseCLMExpr f (CLMCON ct exs) = CLMCON ct (map f (map (traverseCLMExpr f) exs) )
+traverseCLMExpr f (CLMFieldAccess ac ex) = CLMFieldAccess ac (f $ traverseCLMExpr f ex)
+traverseCLMExpr f (CLMCASE cts ex) = CLMCASE (map (\(ct,e)-> (ct, f $ traverseCLMExpr f e) ) cts ) (f $ traverseCLMExpr f ex)
+traverseCLMExpr f (CLMPROG exs) = CLMPROG (map f (map (traverseCLMExpr f) exs) )
+traverseCLMExpr f (CLMTYPED ex1 ex2) = CLMTYPED (f $ traverseCLMExpr f ex1) (f $ traverseCLMExpr f ex2)
+traverseCLMExpr f e = f e
+
 instance PrettyPrint CLMExpr where
     ppr (CLMERR err) = (as [bold,red] "ERROR: ") ++ err
     ppr (CLMID nm) = nm
