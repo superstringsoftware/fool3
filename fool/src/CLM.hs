@@ -37,6 +37,30 @@ data CLMExpr =
   | CLMPRIMCALL -- body of the function that is a primitive call
     deriving (Show, Eq)
 
+-- helper function that goes inside all cons tags checks and well checks 
+-- if they evaluate to true
+evalConsTagChecks :: [CLMConsTagCheck] -> Bool
+evalConsTagChecks [] = True
+evalConsTagChecks (ct:cts) = if (runConsTagCheck ct) 
+    then evalConsTagChecks cts else False
+
+runConsTagCheck (ConsTag nm i, CLMCON (ConsTag nm1 i1) _) = (i == i1)
+runConsTagCheck _ = False
+
+resolveCase :: CLMExpr -> Maybe CLMExpr
+resolveCase (CLMCASE cts ex) = if evalConsTagChecks cts then Just ex else Nothing
+resolveCase e = Nothing
+
+-- this goes through all the cases in a function body and finds the first
+-- one that evaluates fully
+resolveCases :: CLMLam -> Either String CLMExpr
+resolveCases lam@(CLMLamCases vars []) = Left $ "ERROR: No case resolved to an expression in " ++ ppr lam
+resolveCases (CLMLamCases vars ((cs@(CLMCASE ctc ex)):cases) ) = 
+    case resolveCase cs of
+        Nothing -> resolveCases (CLMLamCases vars cases)
+        Just e  -> Right e
+resolveCases l = Left $ "ERROR: Unexpected expression among the cases in a function " ++ ppr l
+
 -- this function applies a lambda to an array of arguments
 -- full application returns body with substituted elements
 -- partial application returns new function with new vars and partially substituted body
@@ -55,7 +79,10 @@ applyCLMLam (CLMLam (v:vs) body) (arg:args) =
     in  applyCLMLam (CLMLam vs body') args
 -- now the same as above but for more complex "cases" case
 -- terminal case full app, returning a lambda unlike last time!!!
-applyCLMLam (CLMLamCases [] bodies) [] = CLMLAM (CLMLamCases [] bodies)
+applyCLMLam l@(CLMLamCases [] bodies) [] = 
+    case (resolveCases l) of
+        Left err -> CLMERR err
+        Right ex -> ex
 applyCLMLam (CLMLamCases (v:vs) bodies) [] = CLMLAM (CLMLamCases (v:vs) bodies)
 applyCLMLam (CLMLamCases [] bodies) (arg:args) = CLMAPP (CLMLAM (CLMLamCases [] bodies)) (arg:args)
 applyCLMLam (CLMLamCases (v:vs) bodies) (arg:args) = 

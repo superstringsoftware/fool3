@@ -99,6 +99,11 @@ evalCLM i e@(CLMAPP ex exs) = do
     trace $ "Step " ++ show i ++ ": encountered CLMAPP " ++ ppr e
     exs' <- imapM (\j e1 -> evalCLM (i+j+1) e1) exs
     (CLMAPP <$> (evalCLM (i+(length exs)+1) ex) <*> pure exs')
+evalCLM i e@(CLMFieldAccess ("", fnum) (CLMCON ct tuple)) = do
+    -- should we eval inside tuple first here or it's already done??
+    trace $ "Step " ++ show i ++ ": encountered CLMFieldAccess " ++ ppr e
+    if (fnum > Prelude.length tuple) then pure $ CLMERR $ "ERROR: tried to access field beyond tuple index in " ++ ppr e
+    else pure (tuple Prelude.!! fnum)
 evalCLM i e = do
     trace $ "Unimplemented eval for expr " ++ show e
     pure e
