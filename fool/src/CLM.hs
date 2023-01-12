@@ -9,7 +9,7 @@ where
 
 import Util.PrettyPrinting
 import Logs
-import Core
+import Surface
 
 type CLMVar = (Name, CLMExpr) 
 

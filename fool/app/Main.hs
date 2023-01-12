@@ -15,7 +15,7 @@ import qualified Data.Text.IO as T (readFile)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 
-import Core
+import Surface
 import Pipeline
 import Interpreter
 import Logs (SourceInfo(..) )

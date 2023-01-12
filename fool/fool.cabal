@@ -26,13 +26,13 @@ source-repository head
 library
   exposed-modules:
       CLM
-      Core
       Interpreter
       Lexer
       Logs
       Parser
       Pipeline
       State
+      Surface
       Util.IOLogger
       Util.Logger
       Util.PrettyPrinting

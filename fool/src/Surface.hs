@@ -3,7 +3,7 @@
 -- This is our PRIMARY CORE LANGUAGE, based on HoTT with some changes and extensions, notably - 
 -- we are using N-tuples explicitly, but there's more.
 
-module Core
+module Surface
 where
 
 import Util.PrettyPrinting
@@ -52,6 +52,10 @@ data Expr =
   | Function Lambda -- defining a function by abstracting a bunch of variables in a tuple
   | Action Lambda -- Action is simply a list of expressions in order
   | Constructors [Lambda] -- only for constructor list inside sum types
+  | Structure Lambda [Name] -- storing type classes / type families etc.
+  -- the body of lambda is a list of functions / items that are part of the 
+  -- structure
+  -- second [Name] list is a list of functions mandatory for the implementation
   | App Expr [Expr] -- application
   | ExprConsTagCheck ConsTag Expr -- check if Expr was created with a given constructor
   | RecFieldAccess (Name,Int) Expr -- access a field of the Expr by name or index
@@ -115,6 +119,7 @@ traverseExpr f (BinaryOp nm e1 e2) = BinaryOp nm (f $ traverseExpr f e1) (f $ tr
 -- probably need to add type sig as well???
 traverseExpr f (Function lam) = Function $ lam { body = f $ traverseExpr f (body lam) }
 traverseExpr f (Action lam) = Action $ lam { body = f $ traverseExpr f (body lam) }
+traverseExpr f (Structure lam nm) = Structure (lam { body = f $ traverseExpr f (body lam) }) nm
 traverseExpr f (SumType lam) = SumType $ lam { body = f $ traverseExpr f (body lam) }
 -- TODO: CHECK IF THIS IS THE CORRECT TRAVERSAL: !!!!
 traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f $ traverseExpr f (body l) } ) lams

@@ -3,7 +3,7 @@
 module Interpreter
 where
 
-import Core
+import Surface
 import CLM
 import State
 import Pipeline

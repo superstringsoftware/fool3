@@ -32,7 +32,7 @@ import qualified Data.Vector.Unboxed as U
 
 import State
 import Lexer
-import Core
+import Surface
 import Logs
 import Util.PrettyPrinting
 
@@ -73,11 +73,28 @@ pConstructor tp = do
      , lamType    = tp 
     }
 
+-- STRUCTURES ---------------------------------------------------------
+pStructure :: Parser Expr
+pStructure = do
+    reserved "structure"
+    name <- identifier
+    args <- try pVars <|> pure []
+    tp <- typeSignature
+    let str = Lambda {
+       lamName    = name
+     , params = args
+     , body       = UNDEFINED
+     , lamType    = tp 
+    }
+    reservedOp "="
+    exs <- braces (sepBy (try pSumType <|> try pFunc <|> pAction ) (reservedOp ",") )
+    return $ Structure (str{body = Tuple exs}) []
+
 -- FUNCTIONS ---------------------------------------------------------
 pFuncHeader :: Parser Lambda
 pFuncHeader = do
     reserved "function"
-    name <- identifier
+    name <- try identifier <|> (parens operator)
     args <- try pVars <|> pure []
     tp <- typeSignature
     return Lambda {
@@ -218,6 +235,7 @@ pApp = do
 -- Building top level parsers
 pDef :: Parser Expr
 pDef =  try pSumType 
+        <|> try pStructure
         <|> try pFunc
         <|> try pAction
         <|> pBinding

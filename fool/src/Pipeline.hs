@@ -4,7 +4,7 @@ module Pipeline
 where
 
 import State
-import Core
+import Surface
 import CLM
 import Logs
 
@@ -58,8 +58,9 @@ processBinding (Prim lam, si) env = pure $ addLambda (lamName lam) lam env
 -- now extracting constructors from SumTypes, body is guaranteed to be
 -- a list of Lambdas under Constructors constructor
 processBinding ( tp@(SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)), si) env = do
-    let newTp = SumType lam { body = Constructors $ imap fixCons cons }
-    pure $ addManyNamedConstructors 0 cons (addNamedSumType newTp env)
+    let newCons = imap fixCons cons
+    let newTp = SumType lam { body = Constructors newCons }
+    pure $ addManyNamedConstructors 0 newCons (addNamedSumType newTp env)
     where fixCons i lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) 
             then lam 
             else lam { body = ConTuple (ConsTag nm i) $ Prelude.map (\v -> Id $ name v) args}

@@ -14,7 +14,7 @@ import Data.Text as L
 
 import Data.Sequence as S
 
-import Core
+import Surface
 import CLM
 import Data.HashMap.Strict as Map
 -- import Core.Environment
