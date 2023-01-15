@@ -19,6 +19,13 @@ data Var = Var {
 
 -- type Tuple a = [a]
 type Record = [Var]
+-- using this cover type in the arguments for lambdas
+-- to take care of the dependent functions with implicit arguments
+-- they are usually created from "structures" (typeclasses),
+-- but may be defined explicitly as well, e.g.:
+-- structure Show(a:Type) { function show(x:a):String } =>
+-- show [a:Type] (x:a) -- where [a:Type] is implicit first record
+data LamArgs = LamArgs Record | LamArgsImpl Record Record
 
 -- constructor tag placeholder type
 data ConsTag = ConsTag Name !Int deriving (Show, Eq)
@@ -85,6 +92,9 @@ data Expr =
   | Type -- U 0 synonim
   | Prim Lambda -- primitive function that is handled "magically"
   | PrimCall -- filler for the body of primitive functions
+  | Implicit Expr -- current solution for implicit parameter functions
+  -- that result e.g. from structure (typeclass) expansions -
+  -- only used in the TYPE place!!!
   | ERROR String
 
   -- | U Int -- universe hierarchy
@@ -94,6 +104,13 @@ data Expr =
   -- ^^^ in case of anonymous application, `name` fields will be empty or index; 
   -- typ is calculated for type checking. Optional + Explicit params. 
     deriving (Show, Eq)
+
+{-
+We will also handle types via Expr quite easily:
+- Id Name - concrete
+- App Expr [Expr] - type constructor (Maybe a etc) or a function calculating type
+- Function Lambda - arrow type
+-}
 
 -- function that generates built-in operation to access i-th field
 -- in a given tuple

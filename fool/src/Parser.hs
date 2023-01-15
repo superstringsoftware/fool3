@@ -80,9 +80,12 @@ pStructure = do
     name <- identifier
     args <- try pVars <|> pure []
     tp <- typeSignature
+    -- making structure arguments Implicit for easier manipulation during
+    -- pipeline stages
+    let args' = map (\x@(Var nm tp val) -> Var nm (Implicit tp) val) args
     let str = Lambda {
        lamName    = name
-     , params = args
+     , params = args'
      , body       = UNDEFINED
      , lamType    = tp 
     }

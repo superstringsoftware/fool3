@@ -9,6 +9,7 @@ import CLM
 import Logs
 
 import Control.Monad.Trans.State.Strict
+import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
 import Data.Text as T hiding (intercalate, map)
@@ -65,8 +66,54 @@ processBinding ( tp@(SumType lam@(Lambda typName typArgs (Constructors cons) typ
             then lam 
             else lam { body = ConTuple (ConsTag nm i) $ Prelude.map (\v -> Id $ name v) args}
 
+-- so, structures (typeclasses) are very interesting.
+-- what we do here is extract all the functions inside the typeclass
+-- and turn them into functions dependent on type which they are
+-- then we instantiate type from implicit arguments (type of the arguments)
+-- and ask environment for a specific function.
+-- When there's instance of some typeclass - our functions in the env
+-- are updated with functions for a certain type!
+-- E.g., for Eq class (==) is really is a func:
+{- (==) (a:Type, x:a, y:a) : Bool = {
+   {Bool} -> function(x,y) = ...,
+   {Nat} -> function(x,y) = ...
+},
+i.e. it can be represented as 
+CaseOf [(Var "a") (Id "Bool")] Lam $ Lambda {...}
+then, we encounter something like 4 == plus(x,y) and go through:
+lookup ==: (==) (a,x:a,y:a) (4:Int, plus(x,y):Int) ->
+    deduce from this that a = Int
+    apply (==) (Int) to hopefully get a function
+    if we get it - all ok, if we don't - ERROR
+
+Another consideration: for compilation we will actually want
+separate functions for each concrete type, so when a structure is 
+instanctiated to a type, we need to create all the needed functions
+on the top level and then look them up in 2 steps
+-}
 processBinding ( st@(Structure lam nm), si) env = do
-    pure $ addNamedStructure st env
+    let env' = addNamedStructure st env
+    -- s <- get
+    -- put s{currentEnvironment = env'}
+    case (body lam) of
+        Tuple exs -> do
+            -- going over all members of a structure and making needed
+            -- bindings / transformations
+            env'' <- foldM fixStr env' exs
+            -- pure $ currentEnvironment s
+            pure env''
+        _ -> do
+                let lpl = LogPayload 
+                            (lineNum si) (colNum si) ""
+                            ("Encountered wrong Structure expressions:\n" ++ (ppr st) ++ "\n")
+                logError lpl { linePos = (lineNum si), colPos = (colNum si) } 
+                pure env'
+    where fixStr env1 ee@(Function l@(Lambda nm args body tp)) = do
+            -- liftIO $ putStrLn $ "Fixing structure lam: " ++ ppr l
+            let res = Lambda nm (params lam) (Function l) (Function l)
+            -- liftIO $ putStrLn $ "Fixed lam: " ++ ppr res
+            let env1' = addNamedLambda res env1
+            return env1'
     
 
 processBinding (ex, si) env = do 
