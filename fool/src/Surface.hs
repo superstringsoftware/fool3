@@ -30,6 +30,8 @@ data LamArgs = LamArgs Record | LamArgsImpl Record Record
 -- constructor tag placeholder type
 data ConsTag = ConsTag Name !Int deriving (Show, Eq)
 
+-- this is "naive" arity as it does not take into account functions
+-- that return other functions as a result
 arity :: Lambda -> Int
 arity (Lambda _ args _ _) = length args
 
@@ -157,6 +159,22 @@ betaReduce (Var nm tp val) expr = traverseExpr subs expr
   where subs :: Expr -> Expr
         subs e@(Id name) = if (nm == name) then val else e
         subs e = e
+
+-- --------------------------------- IMPLICIT / STRUCTURE LAMBDAS --------------------------------------------
+{-
+Since we are representing functions inside structures as functions with implicit
+type parameters, we need some helper methods to manipulate them
+-}
+-- first, identifying such a function:
+hasImplicit :: Lambda -> Bool
+hasImplicit (Lambda _ ((Var _ (Implicit _) _):xs) _ _) = True
+hasImplicit _ = False
+
+-- getting "default" case from inside any function that has cases:
+getDefaultCase :: Lambda -> Expr
+getDefaultCase (Lambda _ _ (PatternMatches ( (CaseOf [] ex _):xs ) ) _) = ex
+getDefaultCase (Lambda _ _ (PatternMatches ( (ExpandedCase [] ex _):xs ) ) _) = ex
+getDefaultCase (Lambda _ _ b _) = b
 
 -- --------------------------------- PRETTY PRINTING --------------------------------------------
 

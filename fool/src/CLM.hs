@@ -30,6 +30,8 @@ data CLMExpr =
   | CLMAPP CLMExpr [CLMExpr] -- saturated application first expr to the tuple of exprs
   | CLMPAP CLMExpr [CLMExpr] -- partial application (When we know the types!)
   | CLMCON ConsTag [CLMExpr] -- saturated constructor application, value in a sense
+  | CLMIAP CLMExpr [CLMExpr] -- application of a function with implicit params,
+  -- most often - part of a structure. For further type checking!
   | CLMFieldAccess (Name, Int) CLMExpr -- accessing a field of an expr by name or number
   | CLMCASE [CLMConsTagCheck] CLMExpr -- list of constructor checks that must all fold to True bound to an expr
   | CLMPROG [CLMExpr] -- list of expressions, for now used for Action but needs to change
@@ -122,6 +124,8 @@ instance PrettyPrint CLMExpr where
     ppr (CLMCON (ConsTag nm i) exs) = as [bold,red] nm ++ " "
         ++ showListCuBr ppr exs
     ppr (CLMAPP ex exs) = as [bold] (ppr ex) ++ " " 
+        ++ showListRoBr ppr exs
+    ppr (CLMIAP ex exs) = as [bold,yellow] (ppr ex) ++ " [?] " 
         ++ showListRoBr ppr exs
     ppr (CLMFieldAccess ("", i) ex) = ppr ex ++ "." ++ show i
     ppr (CLMFieldAccess (nm, _) ex) = ppr ex ++ "." ++ nm

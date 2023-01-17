@@ -451,11 +451,14 @@ exprToCLM env e@(App (Id nm) exs) =
                 let mfun = lookupLambda nm env
                 in  case mfun of
                         Just fun -> 
-                            if (Prelude.length (params fun) > (Prelude.length newArgs) )
-                            then CLMPAP (CLMID nm) newArgs
-                            else if (Prelude.length (params fun) == (Prelude.length newArgs) )
-                                 then CLMAPP (CLMID nm) newArgs
-                                 else CLMERR $ "ERROR: function is given more arguments than it can handle: " ++ show e
+                            if (hasImplicit fun)
+                            then CLMIAP (CLMID nm) newArgs
+                            else
+                                if (Prelude.length (params fun) > (Prelude.length newArgs) )
+                                then CLMPAP (CLMID nm) newArgs
+                                else if (Prelude.length (params fun) == (Prelude.length newArgs) )
+                                    then CLMAPP (CLMID nm) newArgs
+                                    else CLMERR $ "ERROR: function is given more arguments than it can handle: " ++ show e
                         Nothing -> CLMERR $ "ERROR: applied unknown function or constructor: " ++ show e
             
     
