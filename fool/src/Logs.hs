@@ -45,6 +45,7 @@ showErrorWithSource s err' = L.unpack $ L.unlines [
 
 instance Show SourceInfo where
     show (SourceInfo l c note) = "At line " ++ show l ++ ", column " ++ show c ++ ": " ++ L.unpack note
+    show SourceInteractive = "GENERATED"
 
 instance PrettyPrint LogPayload where
     ppr (LogPayload lin col fname msg) = "At line " ++ show lin ++ ", column " ++ show col ++ ": " ++ msg

@@ -265,6 +265,13 @@ function show [a:Type] (x:a) : String = {
   String -> showString
   ... etc
 }
+
+show : PI a:Type -> (a -> String)
+(+) : {a:Type, x:a, y:a} : a
+show : {a:Type, x:a} : String
+
+4:Int + 5:Int
+show 23.4:Double
 ```
 
 Then the algo becomes: 
@@ -367,3 +374,21 @@ same as above for b2 and final result:
 Then the thing in {} is joined with "and" and the right part is executed only if it's True. Otherwise we check the next case.
 
 Ok there's lots of complications with parsing and simplifying this thing, so we MUST require that all Constructor calls and Type names are Capitalized.
+
+## Implementation notes 2
+
+Ok, so after reflections on the first iteration and first attempt to create structure handling it becomes apparent we need to redesign how we handle lambdas and start paying attention to types from the very beginning, since they become important for structures from the get go.
+
+E.g., in the current implementation arity is calculated plain wrong, since we are now simply checking the size of the arguments tuple - but a function may return another function, so we CAN give such a function MORE arguments than its straightforward arity etc. All of this needs to be taken care of and thought through.
+
+Also the question of implicit functions is still not clear enough.
+
+```typescript
+function (+) (a:Type) : {a,a} -> a = {
+  {Int} -> plusInt#,
+  {Float} -> plusFloat#,
+  ... etc
+}
+```
+
+Based on the above, typeclass transformation is very straightforward. To help us at compile time, one early idea of making a of some specific type that makes it implicit - `a:Impl Type` - or something, may prove also productive as well as easy to implement: then after lookup of (+) in the env and checking its expected argument, we see that it's type is "implicit" - which tells us we need to check the other arguments and try to instantiate the implicit parameters.

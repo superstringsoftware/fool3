@@ -32,11 +32,24 @@ import Data.HashMap.Strict as Map
 -- reversing the order
 afterparserPass :: IntState ()
 afterparserPass = do
-    -- s <- get
-    -- mod <- (runExprPassAndReverse afterparse (parsedModule s))
-    -- put (s { parsedModule = mod } )
+    s <- get
+    let mod = (runExprPassAndReverse (traverseExpr afterparse) (parsedModule s))
+    put (s { parsedModule = mod } )
     -- now for more interesting stuff, initial optimizations with error checks
     return ()
+
+-- the only reason we need this is because parser reverses the order of the program while parsing,
+-- so we need to reverse it again first before we start mapping stuff    
+runExprPassAndReverse :: (Expr -> Expr) -> LTProgram -> LTProgram
+runExprPassAndReverse f l = rev f l []
+    where rev f [] a = a
+          rev f ((ex, srci):xs) a = rev f xs ( (f ex, srci):a )
+
+
+afterparse :: Expr -> Expr
+afterparse (BinaryOp n e1 e2) = App (Id n) ( e1:e2:[])
+afterparse (UnaryOp n e) = App (Id n) ( e:[])
+afterparse e = e
 
 
 -- Only VarDefinition, Binding and PatternMatch should be seen at the top level
@@ -110,7 +123,8 @@ processBinding ( st@(Structure lam nm), si) env = do
                 pure env'
     where fixStr env1 ee@(Function l@(Lambda nm args body tp)) = do
             -- liftIO $ putStrLn $ "Fixing structure lam: " ++ ppr l
-            let res = Lambda nm (params lam) (Function l) (Function l)
+            let body = CaseOf [] (Function l) SourceInteractive
+            let res = Lambda nm (params lam) (PatternMatches [body]) (Function l)
             -- liftIO $ putStrLn $ "Fixed lam: " ++ ppr res
             let env1' = addNamedLambda res env1
             return env1'
@@ -446,6 +460,7 @@ exprToCLM env e@(App (Id nm) exs) =
             
     
 exprToCLM env (App ex exs) = CLMAPP (exprToCLM env ex) (Prelude.map (exprToCLM env) exs)
+exprToCLM env (Function lam) = CLMLAM $ lambdaToCLMLambda env lam
 exprToCLM _ e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ show e
 
 lambdaToCLMLambda :: Environment -> Lambda -> CLMLam
