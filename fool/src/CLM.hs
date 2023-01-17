@@ -37,6 +37,7 @@ data CLMExpr =
   | CLMPROG [CLMExpr] -- list of expressions, for now used for Action but needs to change
   | CLMTYPED CLMExpr CLMExpr -- in case we want to give a type to an expression
   | CLMPRIMCALL -- body of the function that is a primitive call
+  | CLMLIT Literal
     deriving (Show, Eq)
 
 -- helper function that goes inside all cons tags checks and well checks 

@@ -464,6 +464,7 @@ exprToCLM env e@(App (Id nm) exs) =
     
 exprToCLM env (App ex exs) = CLMAPP (exprToCLM env ex) (Prelude.map (exprToCLM env) exs)
 exprToCLM env (Function lam) = CLMLAM $ lambdaToCLMLambda env lam
+exprToCLM env (Lit l) = CLMLIT l
 exprToCLM _ e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ show e
 
 lambdaToCLMLambda :: Environment -> Lambda -> CLMLam

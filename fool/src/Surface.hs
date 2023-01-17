@@ -130,6 +130,7 @@ traverseExpr f (PatternMatches exs) = PatternMatches (map f (map (traverseExpr f
 traverseExpr f (Lit (LList exs)) = Lit (LList (map f (map (traverseExpr f) exs)))
 traverseExpr f (Lit (LVec exs)) = Lit (LVec (map f (map (traverseExpr f) exs)))
 traverseExpr f (Lit (LTuple exs)) = Lit (LTuple (map f (map (traverseExpr f) exs)))
+traverseExpr f (Lit e) = Lit e
 traverseExpr f (RecFieldAccess a ex) = RecFieldAccess a (f $ traverseExpr f ex)
 traverseExpr f (ExprConsTagCheck ct ex) = ExprConsTagCheck ct (f $ traverseExpr f ex)
 traverseExpr f (Tuple exs) = Tuple (map f (map (traverseExpr f) exs))
