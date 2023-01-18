@@ -60,3 +60,56 @@ type Bool = True:::False:::{}
 ```
 
 etc! It's merely a tuple of constructors!
+
+### ConsTag issue
+
+Different product types inside a top-level Sum Type are distinguished by the constructor tag. Haskell (GHC) elegantly addresses the issue in their *tagless* g-machine by simply calling corresponding closures, but since we plan to compile to .Net and javascript, we will most likely have no way around having constructor tags - they map quite nicely into underlying machinery of .Net (e.g., as child classes of a parent Sum Type class). This means we do need a function that checks what the constructor tag of a given tuple is, but what is the elegant way to define it?
+
+We either have to make it "magical" and be able to give any tuple to it, OR - we are completely transparent but then we are storing the constructor tag somewhere along with the tuple. 
+
+For consistency, the second way is probably preferable, but then our definition of a tuple will have to change into something like:
+
+```typescript
+// tuple internal representation:
+{ x1:t1, ..., xn:tn } ConsTag
+
+// then, constag check function can be defined explicitly:
+function getConsTag ( { x1:t1, ..., xn:tn } ct ) : ConsTag = ct
+```
+
+The above is a working solution, but I don't like it.
+
+### Tuple manipulation
+
+Then we can adopt the usual list manipulation functions to our tuples, while being careful to write the types correctly of course. First attempt, capturing the idea, but not necesserily strict:
+
+```typescript
+// projection / field access:
+function project(forall (i,n:Nat, i<=n, t1,..,tn : Type) => i:Nat, x:{t1,...,tn}):ti = {
+    {i, {x1:t1, ..., xn:tn} } -> xi:ti
+}
+
+// map:
+function tmap( f: {t1->t1', ..., tn->tn'} , {x1:t1, ..., xn:tn} ) : {t1', ..., tn'} = {
+    {f, {} } -> {},
+    {f, x:::xs} -> f(x) ::: tmap(f, xs)
+}
+```
+
+Map is pretty straightforward and practically the same as map for list, however the type of the mapping function is crazy, as we need to somehow capture that it changes specific types into other specific types - how do we even write it down? Possible with the help of additional typing function in any case.
+
+Why is the above important? Because we want to provide meta-programming capabilities to the language users with as much flexibility as possible. E.g., this way we can define "deriving" functions in structures (typeclasses), the simplest example being equality. For one value of the type to be equal to another - we need to check that their constructors are the same and then map over elements of their tuples and compare them one by one. If at least one is not equal - they are not equal. Attempt to write it down:
+
+```typescript
+// generic equality:
+function genEq (x:a, y:a) : Bool = 
+    if getConsTag(x) /= getConsTag(y) then False
+    else _genEq (x,y)
+
+function _genEq(x:a, y:a) : Bool = {
+    { {}, {} } -> True,
+    { x:::xs, y:::ys } -> if not(genEq (x,y)) then False else _genEq(xs,ys) 
+}
+```
+
+The above definition returns `False` as soon as any two members are not equal, and `True` only if all of them are equal. Something similar to the above will be used in the deriving of the (==) in the Eq structure.
