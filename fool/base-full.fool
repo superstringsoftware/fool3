@@ -1,6 +1,5 @@
-// below is a minimal definition of something we can work with - Nat and summation on it!
-// let's implement it all the way!!! following the MVP principle - do not build wheels for a car,
-// build a scooter first!
+// we need to start with functions that allow us to manipulate types
+// and tuples in general
 
 type Nat = {
   Z,
@@ -8,9 +7,6 @@ type Nat = {
 };
 
 type ConstructorTag = { ConstructorTag (n:Nat) };
-
-function typeOf(ex:tp) : Type = tp;
-function consOf(ex:tp) : ConstructorTag = primop#;
 
 type Bool = { True, False };
 
