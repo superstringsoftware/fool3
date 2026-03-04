@@ -1,8 +1,10 @@
-# FOOL3: Functional Object-oriented low-level language
+# tulam
+
+A type-theory based functional language built on two primitives: tuples and lambdas.
 
 ## Documentation
 
-- **[Language Reference](doc/LanguageReference.md)** — Comprehensive end-user guide to FOOL3 syntax and semantics. Covers all implemented features: types, records, functions, pattern matching, structures, instances, if/then/else, let/in, and more.
+- **[Language Reference](doc/LanguageReference.md)** — Comprehensive end-user guide to tulam syntax and semantics. Covers all implemented features: types, records, functions, pattern matching, structures, instances, if/then/else, let/in, and more.
 - `doc/CategoricalDesign.md` — Categorical type system design: algebras, morphisms, functors, natural transformations, monads, categories, arrows.
 - `doc/ImplementationPlan.md` — 9-phase incremental implementation roadmap from current state to full categorical type system.
 

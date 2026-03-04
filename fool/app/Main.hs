@@ -33,7 +33,7 @@ type InputTState = InputT IntState
 -- needs to go to settings!!!
 -- baseLibPath = "prog1.fool.hs" -- "base.fool.hs"
 --baseLibPath = "base.thask.hs"
-baseLibPath = "base.fool"
+baseLibPath = "base.tl"
 -- baseLibPath = "parsertests.fool"
 
 processNew :: T.Text -> IntState ()
@@ -270,7 +270,7 @@ loadFileNew nm = do
 -- Haskeline loop stacked into 3-monad stack
 loop :: InputTState ()
 loop = do
-        minput <- getInputLine  (TC.as [TC.bold] "λfool3. ")
+        minput <- getInputLine  (TC.as [TC.bold] "λtulam. ")
         case minput of
             Nothing -> outputStrLn "Goodbye."
             Just input -> case input of
@@ -294,10 +294,10 @@ main = do
     greetings
     -- setting up Haskeline loop
     -- getting to the right monad in our crazy monad stack
-    initializeInterpreter >>= (runIntState (runInputT defaultSettings {historyFile=Just "./.fool_history"} runInterpreter))
+    initializeInterpreter >>= (runIntState (runInputT defaultSettings {historyFile=Just "./.tulam_history"} runInterpreter))
 
 greetings = do
-    putStrLn "Welcome to the Ultimate Fool!"
+    putStrLn "Welcome to tulam!"
     putStrLn "Version 0.0.9"
     putStrLn "(c) Copyright 2016-2023 by Anton Antich (a@s3.ag)\n"
     putStrLn "Type :help for help on commands or :load a file.\n"

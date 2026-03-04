@@ -1,4 +1,4 @@
-name:                fool
+name:                tulam
 version:             0.1.0.0
 github:              "githubuser/fool"
 license:             BSD3
@@ -51,7 +51,7 @@ library:
   source-dirs: src
 
 executables:
-  fool:
+  tulam:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -59,10 +59,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - fool
+    - tulam
 
 tests:
-  fool-test:
+  tulam-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -70,4 +70,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - fool
+    - tulam

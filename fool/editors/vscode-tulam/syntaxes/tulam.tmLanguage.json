@@ -1,0 +1,248 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "tulam",
+  "scopeName": "source.tulam",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#type-declaration" },
+    { "include": "#record-declaration" },
+    { "include": "#function-declaration" },
+    { "include": "#action-declaration" },
+    { "include": "#structure-declaration" },
+    { "include": "#instance-declaration" },
+    { "include": "#law-declaration" },
+    { "include": "#keywords" },
+    { "include": "#operators" },
+    { "include": "#universe-types" },
+    { "include": "#type-names" },
+    { "include": "#primitive-calls" },
+    { "include": "#identifiers" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.tulam",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.tulam",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.tulam",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.tulam",
+              "match": "\\\\[nrt\\\\\"0]"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.tulam",
+          "match": "\\b[0-9]+\\.[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.tulam",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+    "type-declaration": {
+      "patterns": [
+        {
+          "match": "\\b(type)\\s+([A-Z][a-zA-Z0-9_']*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.type.tulam" },
+            "2": { "name": "entity.name.type.tulam" }
+          }
+        }
+      ]
+    },
+    "record-declaration": {
+      "patterns": [
+        {
+          "match": "\\b(record)\\s+([A-Z][a-zA-Z0-9_']*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.record.tulam" },
+            "2": { "name": "entity.name.type.tulam" }
+          }
+        }
+      ]
+    },
+    "function-declaration": {
+      "patterns": [
+        {
+          "comment": "function with operator name in parens: function (+)(x, y)",
+          "match": "\\b(function)\\s+(\\([^)]+\\))",
+          "captures": {
+            "1": { "name": "keyword.declaration.function.tulam" },
+            "2": { "name": "entity.name.function.operator.tulam" }
+          }
+        },
+        {
+          "comment": "function with regular name: function foo(x, y)",
+          "match": "\\b(function)\\s+([a-zA-Z_][a-zA-Z0-9_'#]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.function.tulam" },
+            "2": { "name": "entity.name.function.tulam" }
+          }
+        }
+      ]
+    },
+    "action-declaration": {
+      "patterns": [
+        {
+          "match": "\\b(action)\\s+([a-zA-Z_][a-zA-Z0-9_'#]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.action.tulam" },
+            "2": { "name": "entity.name.function.tulam" }
+          }
+        }
+      ]
+    },
+    "structure-declaration": {
+      "patterns": [
+        {
+          "match": "\\b(structure|algebra|trait|morphism|bridge)\\s+([A-Z][a-zA-Z0-9_']*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.structure.tulam" },
+            "2": { "name": "entity.name.type.structure.tulam" }
+          }
+        }
+      ]
+    },
+    "instance-declaration": {
+      "patterns": [
+        {
+          "match": "\\b(instance)\\s+([A-Z][a-zA-Z0-9_']*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.instance.tulam" },
+            "2": { "name": "entity.name.type.tulam" }
+          }
+        }
+      ]
+    },
+    "law-declaration": {
+      "patterns": [
+        {
+          "match": "\\b(law)\\s+([a-zA-Z_][a-zA-Z0-9_']*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.law.tulam" },
+            "2": { "name": "entity.name.function.law.tulam" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.tulam",
+          "match": "\\b(if|then|else|let|in|case|of|where)\\b"
+        },
+        {
+          "name": "keyword.other.tulam",
+          "match": "\\b(extends|requires)\\b"
+        },
+        {
+          "name": "keyword.other.quantifier.tulam",
+          "match": "\\b(forall|exists)\\b|[∀∃]"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.propositional.tulam",
+          "match": "===|==>"
+        },
+        {
+          "name": "keyword.operator.arrow.tulam",
+          "match": "->|=>"
+        },
+        {
+          "name": "keyword.operator.spread.tulam",
+          "match": "\\.\\."
+        },
+        {
+          "name": "keyword.operator.assignment.tulam",
+          "match": "(?<!=|!)=(?!=|>)"
+        },
+        {
+          "name": "keyword.operator.comparison.tulam",
+          "match": "==|!=|<=|>=|<:|<(?!-)|>"
+        },
+        {
+          "name": "keyword.operator.arithmetic.tulam",
+          "match": "[+\\-*/]#?|%"
+        },
+        {
+          "name": "keyword.operator.misc.tulam",
+          "match": "\\||\\?|\\\\|\\."
+        }
+      ]
+    },
+    "universe-types": {
+      "patterns": [
+        {
+          "name": "support.type.universe.tulam",
+          "match": "\\b(Type[0-9]*)\\b"
+        }
+      ]
+    },
+    "type-names": {
+      "patterns": [
+        {
+          "name": "entity.name.type.tulam",
+          "match": "\\b[A-Z][a-zA-Z0-9_']*\\b"
+        }
+      ]
+    },
+    "primitive-calls": {
+      "patterns": [
+        {
+          "name": "support.function.primitive.tulam",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_']*#\\b"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.tulam",
+          "match": "\\b[a-z_][a-zA-Z0-9_']*\\b"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.tulam",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.tulam",
+          "match": ","
+        },
+        {
+          "name": "punctuation.type-annotation.tulam",
+          "match": ":"
+        }
+      ]
+    }
+  }
+}

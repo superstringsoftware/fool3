@@ -1,33 +1,33 @@
-# FOOL3 Language Reference
+# tulam Language Reference
 
 ## Introduction
 
-FOOL3 (Functional Object-Oriented Low-level Language) is a type-theory based functional language compiler/interpreter written in Haskell. It targets JavaScript, .NET, and potentially x86 native code.
+tulam (Functional Object-Oriented Low-level Language) is a type-theory based functional language compiler/interpreter written in Haskell. It targets JavaScript, .NET, and potentially x86 native code.
 
-FOOL3 is built on two primitives: **tuples** and **lambdas**. Everything else — sum types, product types, structures (typeclasses), records — is derived from these two building blocks.
+tulam is built on two primitives: **tuples** and **lambdas**. Everything else — sum types, product types, structures (typeclasses), records — is derived from these two building blocks.
 
 ### Building and Running
 
 ```bash
 stack build              # Build the project
-stack exec fool          # Start the REPL (loads base.fool automatically)
+stack exec tulam          # Start the REPL (loads base.tl automatically)
 stack test               # Run tests
 stack clean              # Clean build artifacts
 ```
 
-The project uses Stack with Hpack. Edit `package.yaml` for dependency changes (not `fool.cabal`).
+The project uses Stack with Hpack. Edit `package.yaml` for dependency changes (not `tulam.cabal`).
 
 ---
 
 ## Getting Started: The REPL
 
-When you run `stack exec fool`, you enter the interactive REPL. It automatically loads `base.fool`, which provides basic types like `Nat` and `Bool`.
+When you run `stack exec tulam`, you enter the interactive REPL. It automatically loads `base.tl`, which provides basic types like `Nat` and `Bool`.
 
 ### REPL Commands
 
 | Command           | Description                              |
 |-------------------|------------------------------------------|
-| `:load <file>`    | Load and compile a `.fool` source file   |
+| `:load <file>`    | Load and compile a `.tl` source file   |
 | `:list types`     | Show all defined types                   |
 | `:list functions` | Show all defined functions               |
 | `:env`            | Show the current environment             |
@@ -41,7 +41,7 @@ You can also type expressions directly to evaluate them, or enter top-level decl
 
 ## Comments
 
-FOOL3 supports two styles of comments:
+tulam supports two styles of comments:
 
 ```
 // This is a single-line comment
@@ -107,7 +107,7 @@ Curly braces with comma-separated elements:
 {True, Z}
 ```
 
-Tuples are one of the two fundamental primitives in FOOL3.
+Tuples are one of the two fundamental primitives in tulam.
 
 ### Vectors
 
@@ -152,9 +152,26 @@ f:Type          // f is a type
 
 Type annotations appear in function parameters, variable bindings, and return types.
 
+### Rich Type Expressions
+
+Type annotations support the full type expression syntax:
+
+- **Simple names**: `Nat`, `Bool`, `a`
+- **Type application**: `Vec(a, n)`, `Maybe(a)`, `Pair(Nat, Bool)`
+- **Arrow types** (right-associative): `Nat -> Bool`, `a -> b -> c`, `(a -> b) -> c`
+- **Universes**: `Type`, `Type1`, `Type2`, `Type3`
+- **Parenthesized**: `(a -> b) -> c`
+
+Arrow types represent non-dependent function types. They are right-associative, so `a -> b -> c` means `a -> (b -> c)`.
+
+```
+function apply(f: Nat -> Bool, x:Nat) : Bool = f(x);
+function compose(f: b -> c, g: a -> b, x:a) : c = f(g(x));
+```
+
 ### Universe Hierarchy
 
-FOOL3 has a universe hierarchy for classifying types:
+tulam has a universe hierarchy for classifying types:
 
 | Name     | Universe Level | Description                     |
 |----------|----------------|---------------------------------|
@@ -170,7 +187,7 @@ Most user code only needs `Type`. Higher universes are used for type-level progr
 
 ## Sum Types (Algebraic Data Types)
 
-Sum types define a type as a choice between multiple constructors. This is FOOL3's equivalent of Haskell's `data` declarations or Rust's `enum`.
+Sum types define a type as a choice between multiple constructors. This is tulam's equivalent of Haskell's `data` declarations or Rust's `enum`.
 
 ### Syntax
 
@@ -208,6 +225,35 @@ type ConstructorTag = { ConstructorTag(n:Nat) };
 ### How It Works
 
 Under the hood, constructors create tagged tuples. Each constructor in a sum type gets an integer tag, which is used for pattern matching. This is essential for compilation to targets like .NET and JavaScript.
+
+### GADTs (Generalized Algebraic Data Types)
+
+Constructors can specify their own return type, which may be more specific than the parent type. This is done with a `: ReturnType` annotation after the constructor:
+
+```
+type Vec(a:Type, n:Nat) = {
+    VNil : Vec(a, Z),
+    VCons(head:a, tail:Vec(a, n)) : Vec(a, Succ(n))
+};
+```
+
+Here `VNil` returns `Vec(a, Z)` (a vector of length zero) while `VCons` returns `Vec(a, Succ(n))` (a vector one longer). Without the `: ReturnType` annotation, the constructor's return type defaults to the parent type with its parameters (e.g., `Vec(a, n)`).
+
+GADTs enable encoding type-level invariants directly in the type system, such as length-indexed vectors, balanced trees, and propositional equality.
+
+### Propositional Equality (`PropEqT`)
+
+The standard library defines propositional equality as a GADT:
+
+```
+type PropEqT(a:Type, x:a, y:a) = {
+    Refl : PropEqT(a, x, x)
+};
+```
+
+The `Refl` constructor can only produce `PropEqT(a, x, x)` — both indices must be the same value. This is the type-theoretic equality witness: a value of type `PropEqT(a, x, y)` is proof that `x` and `y` are equal.
+
+Note: This is distinct from `===` in law declarations, which is a syntactic marker for documentation. `PropEqT` is a first-class value type that can be constructed, pattern-matched, and passed as an argument.
 
 ---
 
@@ -249,7 +295,7 @@ This expands to include all fields from `Point` (`x:Nat`, `y:Nat`) plus the new 
 
 ## Functions
 
-Functions are the primary way to define computations in FOOL3.
+Functions are the primary way to define computations in tulam.
 
 ### Basic Function
 
@@ -421,7 +467,7 @@ Parentheses can be used for grouping:
 
 ## Structures (Typeclasses)
 
-Structures are FOOL3's equivalent of Haskell's typeclasses. They define a set of functions that can be implemented for different types.
+Structures are tulam's equivalent of Haskell's typeclasses. They define a set of functions that can be implemented for different types.
 
 ### Syntax
 
@@ -432,16 +478,46 @@ structure Name(args) = {
 };
 ```
 
+### Categorical Keywords
+
+tulam provides specialized keywords for classifying structures by their categorical role. Each has both a mathematical and a programmer-friendly alias:
+
+| Math keyword | Friendly keyword | Meaning | Use when |
+|---|---|---|---|
+| `algebra` | `trait` | Single-type operations | Eq, Monoid, Ord, etc. |
+| `morphism` | `bridge` | Multi-type relations | Convertible, Iso, etc. |
+| `structure` | — | General-purpose (no alias) | Everything else |
+
+Both forms are fully interchangeable:
+
+```
+// Math style:
+algebra Semigroup(a:Type) = { function combine(x:a, y:a) : a };
+
+// Programmer-friendly style (identical semantics):
+trait Semigroup(a:Type) = { function combine(x:a, y:a) : a };
+
+// Multi-type:
+morphism Convertible(a:Type, b:Type) = { function convert(x:a) : b };
+bridge Convertible(a:Type, b:Type) = { function convert(x:a) : b };
+```
+
+The compiler issues a warning (not an error) if:
+- An `algebra`/`trait` has more or fewer than 1 type parameter
+- A `morphism`/`bridge` has fewer than 2 type parameters
+
 ### Example
 
 ```
-structure Eq(a:Type) = {
+algebra Eq(a:Type) = {
   function (==)(x, y:a) : Bool = not(x != y),
-  function (!=)(x, y:a) : Bool = not(x == y)
+  function (!=)(x, y:a) : Bool = not(x == y),
+  law reflexivity(x:a) = (x == x) === True,
+  law symmetry(x:a, y:a) = (x == y) === (y == x)
 };
 ```
 
-This defines an `Eq` structure with two functions: `==` and `!=`. Each provides a default implementation in terms of the other, so instances only need to implement one of them.
+This defines an `Eq` algebra with two functions and two law declarations. Laws are desugared into proof-returning functions (see Law Declarations below).
 
 ### How Structures Work
 
@@ -455,6 +531,124 @@ The `[a:Type]` is an implicit parameter that gets resolved at compile time based
 
 ---
 
+## Law Declarations
+
+Laws declare expected properties of structure functions. They use the `law` keyword as syntactic sugar, but are **desugared into real functions** returning `PropEqT` proof terms via the Curry-Howard correspondence: propositions are types, proofs are programs.
+
+### Syntax
+
+```
+law name(params) = lawBody
+```
+
+Law bodies use two special operators:
+
+| Operator | Meaning | Desugars to |
+|----------|---------|-------------|
+| `===` | Propositional equality | `PropEqT` return type |
+| `==>` | Implication (right-associative) | Extra proof parameter |
+
+### Desugaring Rules
+
+A law is desugared into a function returning a `PropEqT` proof:
+
+```
+// Source:
+law reflexivity(x:a) = (x == x) === True
+
+// Desugars to:
+function reflexivity(x:a) : PropEqT(_, x == x, True) = Refl
+```
+
+Implications (`==>`) become additional proof parameters:
+
+```
+// Source:
+law transitivity(x:a, y:a, z:a) =
+    ((x == y) == True) ==> ((y == z) == True) ==> ((x == z) === True)
+
+// Desugars to:
+function transitivity(x:a, y:a, z:a,
+    __proof0: PropEqT(_, (x == y) == True, True),
+    __proof1: PropEqT(_, (y == z) == True, True))
+    : PropEqT(_, x == z, True) = Refl
+```
+
+A bare expression without `===` is treated as `expr === True`. A premise with `===` (e.g., `a === b ==> ...`) becomes `PropEqT(_, a, b)`.
+
+### Examples
+
+```
+law reflexivity(x:a) = (x == x) === True;
+
+law symmetry(x:a, y:a) = (x == y) === (y == x);
+
+law transitivity(x:a, y:a, z:a) =
+    ((x == y) == True) ==> ((y == z) == True) ==> ((x == z) === True);
+```
+
+Laws can only appear inside structure/algebra/morphism declarations. After desugaring, they become regular functions with implicit structure parameters, just like other structure functions.
+
+---
+
+## Structure Inheritance (`extends`)
+
+A structure can inherit functions and laws from parent structures using `extends`.
+
+### Syntax
+
+```
+algebra Child(a:Type) extends Parent1(a), Parent2(a) = {
+  function childFunc(x:a) : a
+};
+```
+
+### Behavior
+
+- All functions and laws from parent structures are automatically included in the child
+- The child can override inherited functions by declaring a function with the same name
+- When an `instance` is declared for the child, its function implementations are **propagated to parent structures** as well, so dispatch works through both child and parent
+
+### Example
+
+```
+algebra Semigroup(a:Type) = {
+    function combine(x:a, y:a) : a,
+    law associativity(x:a, y:a, z:a) =
+        combine(x, combine(y, z)) === combine(combine(x, y), z)
+};
+
+algebra Monoid(a:Type) extends Semigroup(a) = {
+    function empty() : a
+};
+
+instance Monoid(Nat) = {
+    function combine(x:Nat, y:Nat) : Nat = plus(x, y),
+    function empty() : Nat = Z
+};
+// combine is now available via both Semigroup(Nat) and Monoid(Nat)
+```
+
+---
+
+## External Constraints (`requires`)
+
+Structures and instances can declare external constraints using `requires`. These are validated at declaration time (the required structure must exist) but runtime resolution is deferred to the type checker.
+
+### Syntax
+
+```
+morphism MonoidHom(a:Type, b:Type) requires Monoid(a), Monoid(b) = {
+    function hom(x:a) : b
+};
+
+instance SomeStruct(Nat) requires Eq(Nat) = {
+    function foo(x:Nat) : Bool = (x == Z)
+};
+```
+
+---
+
 ## Instance Declarations
 
 Instances provide implementations of structure functions for specific types.
@@ -463,6 +657,14 @@ Instances provide implementations of structure functions for specific types.
 
 ```
 instance StructureName(TypeArgs) = {
+  function fn1(params) : ReturnType = implementation
+};
+```
+
+Instances can also declare constraints:
+
+```
+instance StructureName(TypeArgs) requires Constraint1(Type), Constraint2(Type) = {
   function fn1(params) : ReturnType = implementation
 };
 ```
@@ -525,7 +727,7 @@ Bindings inside an action are evaluated in order. Each binding makes a name avai
 
 ## Built-in Operations
 
-FOOL3 provides several primitive operations, identified by the `#` suffix:
+tulam provides several primitive operations, identified by the `#` suffix:
 
 | Operation  | Description                     |
 |------------|---------------------------------|
@@ -541,7 +743,7 @@ These operations bypass the normal type system and are handled specially by the 
 
 ---
 
-## Standard Library (base.fool)
+## Standard Library (base.tl)
 
 The standard library is loaded automatically when you start the REPL. It provides the foundational types and functions.
 
@@ -592,14 +794,16 @@ function not(b:Bool) : Bool = {
 };
 ```
 
-### Eq Structure
+### Eq Algebra
 
-The `Eq` structure provides overloaded equality:
+The `Eq` algebra provides overloaded equality with law declarations:
 
 ```
-structure Eq(a:Type) = {
+algebra Eq(a:Type) = {
   function (==)(x, y:a) : Bool = not(x != y),
-  function (!=)(x, y:a) : Bool = not(x == y)
+  function (!=)(x, y:a) : Bool = not(x == y),
+  law reflexivity(x:a) = (x == x) === True,
+  law symmetry(x:a, y:a) = (x == y) === (y == x)
 };
 
 instance Eq(Nat) = {
@@ -629,13 +833,13 @@ function consOf(ex:tp) : ConstructorTag = primop#;  // Returns the constructor t
 
 The following words are reserved and cannot be used as identifiers:
 
-`type`, `function`, `if`, `then`, `else`, `in`, `action`, `structure`, `instance`, `let`, `case`, `of`, `where`, `exists`, `forall`, `record`
+`type`, `function`, `if`, `then`, `else`, `in`, `action`, `structure`, `instance`, `let`, `case`, `of`, `where`, `exists`, `forall`, `record`, `algebra`, `trait`, `morphism`, `bridge`, `law`, `extends`, `requires`
 
 The Unicode symbols `∃` and `∀` are also reserved (for future quantifier support).
 
 ### Reserved Operators
 
-`;` `=` `,` `.` `..` `:` `->` `=>` `|` `?` `<:` `\`
+`;` `=` `,` `.` `..` `:` `->` `=>` `|` `?` `<:` `\` `===` `==>`
 
 ---
 
@@ -661,6 +865,9 @@ Within pattern match cases, cases are separated by commas (`,`), not semicolons.
 | Feature | Syntax |
 |---------|--------|
 | Sum type | `type Name = { Con1, Con2(args) };` |
+| GADT constructor | `Con(args) : ReturnType` (inside sum type) |
+| Arrow type | `a -> b`, `(a -> b) -> c` (in type position) |
+| Type application | `Vec(a, n)`, `Maybe(a)` (in type position) |
 | Record | `record Name = { field:Type };` |
 | Record spread | `record Name = { ..Other, field:Type };` |
 | Parameterized record | `record Name(a:Type) = { field:a };` |
@@ -670,6 +877,11 @@ Within pattern match cases, cases are separated by commas (`,`), not semicolons.
 | If/then/else | `if cond then e1 else e2` |
 | Let/in | `let x = e1, y = e2 in body` |
 | Structure | `structure Name(a:Type) = { functions };` |
+| Algebra/Trait | `algebra Name(a:Type) = { ... };` or `trait Name(a:Type) = { ... };` |
+| Morphism/Bridge | `morphism Name(a:Type, b:Type) = { ... };` or `bridge ...` |
+| Extends | `algebra Child(a:Type) extends Parent(a) = { ... };` |
+| Requires | `morphism M(a,b) requires X(a), Y(b) = { ... };` |
+| Law | `law name(params) = lhs === rhs` |
 | Instance | `instance Name(Type) = { functions };` |
 | Action | `action name = { stmts };` |
 | Application | `f(x, y)` |

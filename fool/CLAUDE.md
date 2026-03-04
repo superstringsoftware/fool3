@@ -4,18 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FOOL3 (Functional Object-oriented Low-level Language) is a type-theory based functional language compiler/interpreter written in Haskell. It targets JavaScript, .NET, and potentially x86 native. The language is built on two primitives: **tuples** and **lambdas** — everything else (sum types, product types, structures/typeclasses) is derived from these.
+tulam is a type-theory based functional language compiler/interpreter written in Haskell. It targets JavaScript, .NET, and potentially x86 native. The language is built on two primitives: **tuples** and **lambdas** — everything else (sum types, product types, structures/typeclasses) is derived from these.
 
 ## Build & Run
 
 ```bash
 stack build              # Build
-stack exec fool          # Run the REPL (loads base.fool automatically)
+stack exec tulam         # Run the REPL (loads base.tl automatically)
 stack test               # Run tests (test/Spec.hs)
 stack clean              # Clean build artifacts
 ```
 
-The project uses Stack with Hpack (`package.yaml` generates `fool.cabal`). Edit `package.yaml` for dependency changes, not `fool.cabal` directly.
+The project uses Stack with Hpack (`package.yaml` generates `tulam.cabal`). Edit `package.yaml` for dependency changes, not `tulam.cabal` directly.
 
 ## REPL Commands
 
@@ -26,7 +26,7 @@ Once in the REPL: `:load <file>`, `:list types`, `:list functions`, `:env`, `:al
 ### Compilation Pipeline (6 passes)
 
 ```
-Source (.fool) → Lexer/Parser → Surface AST (Expr/Lambda)
+Source (.tl) → Lexer/Parser → Surface AST (Expr/Lambda)
   → Pass 1: Environment Building (extract types, constructors, top-level lambdas)
   → Pass 2: Case Optimization (beta reduction, pattern expansion)
   → Pass 3: CLM Conversion (Surface AST → Core List Machine IR)
@@ -72,8 +72,8 @@ type LambdaLoggerMonad = LoggerMonadIO LogPayload          -- Logging layer
 
 ### Data Files
 
-- `base.fool` — Standard library (Nat, Bool, Eq structure). Loaded automatically by the REPL.
-- `parsertests.fool` — Parser test cases.
+- `base.tl` — Standard library (Nat, Bool, Eq structure). Loaded automatically by the REPL.
+- `parsertests.tl` — Parser test cases.
 
 ## Language Conventions
 

@@ -1,0 +1,36 @@
+{
+  "name": "tulam",
+  "displayName": "tulam",
+  "description": "Syntax highlighting for the tulam programming language (.tl, .tulam)",
+  "version": "0.1.0",
+  "publisher": "tulam-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "tulam",
+        "aliases": [
+          "tulam",
+          "Tulam"
+        ],
+        "extensions": [
+          ".tl",
+          ".tulam"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tulam",
+        "scopeName": "source.tulam",
+        "path": "./syntaxes/tulam.tmLanguage.json"
+      }
+    ]
+  }
+}

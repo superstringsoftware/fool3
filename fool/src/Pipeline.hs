@@ -63,7 +63,44 @@ afterparse (LetIn [(v, val)] bdy) =
     App (Function (Lambda "" [v] bdy UNDEFINED)) [val]
 afterparse (LetIn ((v,val):rest) bdy) =
     App (Function (Lambda "" [v] (afterparse (LetIn rest bdy)) UNDEFINED)) [val]
+-- Law desugaring: law declarations become functions returning PropEqT proof terms
+-- Curry-Howard: propositions are types, proofs are programs
+--   law name(params) = lhs === rhs
+--     ==> function name(params) : PropEqT(_, lhs, rhs) = Refl
+--   law name(params) = P ==> lhs === rhs
+--     ==> function name(params, __proof0: PropEqT(_, P, True)) : PropEqT(_, lhs, rhs) = Refl
+afterparse (Law lam lawBody) = desugarLaw lam lawBody
 afterparse e = e
+
+-- Desugar a law declaration into a function returning a PropEqT proof term
+desugarLaw :: Lambda -> Expr -> Expr
+desugarLaw lam lawBody =
+    let (premises, conclusion) = collectImplies lawBody
+        (retLhs, retRhs) = case conclusion of
+            PropEq l r -> (l, r)
+            other      -> (other, Id "True")  -- bare expr treated as === True
+        proofParams = imap mkProofParam premises
+        returnType = App (Id "PropEqT") [UNDEFINED, retLhs, retRhs]
+        allParams = params lam ++ proofParams
+    in Function (lam { params = allParams, body = Id "Refl", lamType = returnType })
+
+-- Collect premises from nested Implies: P ==> Q ==> R  ->  ([P, Q], R)
+collectImplies :: Expr -> ([Expr], Expr)
+collectImplies (Implies premise rest) =
+    let (prems, concl) = collectImplies rest
+    in (premise : prems, concl)
+collectImplies e = ([], e)
+
+-- Create a proof parameter from a premise expression
+-- If premise is PropEq l r, proof type is PropEqT(_, l, r)
+-- If premise is a bare expression, proof type is PropEqT(_, expr, True)
+mkProofParam :: Int -> Expr -> Var
+mkProofParam i premise =
+    let (lhs, rhs) = case premise of
+            PropEq l r -> (l, r)
+            other      -> (other, Id "True")
+        proofType = App (Id "PropEqT") [UNDEFINED, lhs, rhs]
+    in Var ("__proof" ++ show i) proofType UNDEFINED
 
 
 -- Resolve spread fields (..Name) in a constructor lambda's params
@@ -139,35 +176,57 @@ separate functions for each concrete type, so when a structure is
 instanctiated to a type, we need to create all the needed functions
 on the top level and then look them up in 2 steps
 -}
-processBinding ( st@(Structure lam nm), si) env = do
-    let env' = addNamedStructure st env
-    -- s <- get
-    -- put s{currentEnvironment = env'}
-    case (body lam) of
+processBinding ( st@(Structure lam sinfo), si) env = do
+    -- Validate param count for algebra/morphism (warning only)
+    case structKind sinfo of
+        SAlgebra  -> when (Prelude.length (params lam) /= 1) $
+            logWarning (LogPayload (lineNum si) (colNum si) ""
+                ("algebra " ++ lamName lam ++ " should have exactly 1 type parameter, has "
+                    ++ show (Prelude.length (params lam)) ++ "\n"))
+        SMorphism -> when (Prelude.length (params lam) < 2) $
+            logWarning (LogPayload (lineNum si) (colNum si) ""
+                ("morphism " ++ lamName lam ++ " should have 2+ type parameters, has "
+                    ++ show (Prelude.length (params lam)) ++ "\n"))
+        SGeneral  -> pure ()
+
+    -- Resolve extends: inherit parent functions and laws
+    lam' <- resolveExtends env lam (structExtends sinfo)
+
+    -- Register inheritance
+    let parentNames = [n | ext <- structExtends sinfo, let n = extractStructRefName ext, n /= ""]
+    let env0 = registerInheritance (lamName lam') parentNames env
+
+    -- Validate requires
+    validateRequires env0 (structRequires sinfo) si
+
+    let st' = Structure lam' sinfo
+    let env' = addNamedStructure st' env0
+    case (body lam') of
         Tuple exs -> do
             -- going over all members of a structure and making needed
             -- bindings / transformations
             env'' <- foldM fixStr env' exs
-            -- pure $ currentEnvironment s
             pure env''
         _ -> do
-                let lpl = LogPayload 
+                let lpl = LogPayload
                             (lineNum si) (colNum si) ""
-                            ("Encountered wrong Structure expressions:\n" ++ (ppr st) ++ "\n")
-                logError lpl { linePos = (lineNum si), colPos = (colNum si) } 
+                            ("Encountered wrong Structure expressions:\n" ++ (ppr st') ++ "\n")
+                logError lpl { linePos = (lineNum si), colPos = (colNum si) }
                 pure env'
-    where fixStr env1 ee@(Function l@(Lambda nm args body tp)) = do
-            -- liftIO $ putStrLn $ "Fixing structure lam: " ++ ppr l
-            let body = CaseOf [] (Function l) SourceInteractive
-            let res = Lambda nm (params lam) (PatternMatches [body]) (Function l)
-            -- liftIO $ putStrLn $ "Fixed lam: " ++ ppr res
+    where fixStr env1 (Function l@(Lambda nm args body tp)) = do
+            let body' = CaseOf [] (Function l) SourceInteractive
+            let res = Lambda nm (params lam) (PatternMatches [body']) (Function l)
             let env1' = addNamedLambda res env1
             return env1'
+          fixStr env1 (Law _ _) = pure env1  -- skip law declarations
+          fixStr env1 _ = pure env1
     
 
 -- instance declaration processing
 -- instance Eq(Nat) = { function (==)(x:Nat,y:Nat):Bool = eq(x,y) }
-processBinding (Instance structName typeArgs impls, si) env = do
+processBinding (Instance structName typeArgs impls reqs, si) env = do
+    -- Validate requires
+    validateRequires env reqs si
     -- extract the type name from the first type arg (e.g., Id "Nat")
     let typeName = case typeArgs of
             (Id nm : _) -> nm
@@ -182,11 +241,12 @@ processBinding (Instance structName typeArgs impls, si) env = do
     else do
         -- for each function in the instance, store a specialized lambda
         env' <- foldM (addInstanceFunc typeName) env impls
-        pure env'
+        -- propagate instance functions to parent structures
+        env'' <- propagateToParent env' structName typeName impls si
+        pure env''
     where
         addInstanceFunc typeNm env1 (Function lam) = do
             let funcNm = lamName lam
-            -- liftIO $ putStrLn $ "Adding instance " ++ funcNm ++ " for " ++ typeNm
             pure $ addInstanceLambda funcNm typeNm lam env1
         addInstanceFunc _ env1 e = do
             let lpl = LogPayload (lineNum si) (colNum si) ""
@@ -227,6 +287,79 @@ primBindings = [
 
 buildPrimitivePass :: IntState ()
 buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) primBindings
+
+-- Extract structure name from a structure reference (Id "Eq" or App (Id "Eq") [Id "a"])
+extractStructRefName :: Expr -> Name
+extractStructRefName (Id nm)       = nm
+extractStructRefName (App (Id nm) _) = nm
+extractStructRefName _             = ""
+
+-- Resolve extends: inherit parent functions and laws into child structure
+resolveExtends :: Environment -> Lambda -> [Expr] -> IntState Lambda
+resolveExtends _   lam [] = pure lam
+resolveExtends env lam extends = do
+    parentMembers <- Prelude.concat <$> mapM getParentMembers extends
+    case body lam of
+        Tuple childMembers -> do
+            -- Only add parent members that child doesn't override
+            let childNames = [lamName l | Function l <- childMembers]
+                            ++ [lamName l | Law l _ <- childMembers]
+            let newMembers = Prelude.filter (notOverridden childNames) parentMembers
+            pure lam { body = Tuple (newMembers ++ childMembers) }
+        _ -> pure lam
+  where
+    getParentMembers ref = do
+        let parentName = extractStructRefName ref
+        case lookupType parentName env of
+            Just (Structure parentLam _) -> case body parentLam of
+                Tuple exs -> pure exs
+                _         -> pure []
+            _ -> do
+                logWarning (LogPayload 0 0 ""
+                    ("extends: parent structure " ++ parentName ++ " not found in environment\n"))
+                pure []
+    notOverridden childNames (Function l) = lamName l `Prelude.notElem` childNames
+    notOverridden childNames (Law l _)    = lamName l `Prelude.notElem` childNames
+    notOverridden _ _                     = True
+
+-- When instance Child(T) is declared, also register functions for parent structures
+propagateToParent :: Environment -> Name -> Name -> [Expr] -> SourceInfo -> IntState Environment
+propagateToParent env structName typeName impls si = do
+    let allParents = getAllParents structName env
+    -- filter out the structure itself from parents list
+    let parents = Prelude.filter (/= structName) allParents
+    if Prelude.null parents then pure env
+    else do
+        -- For each parent, for each impl function, check if function belongs to parent
+        foldM (propagateOne impls) env parents
+  where
+    propagateOne impls' env1 parentName = do
+        -- Look up the parent structure to find its function names
+        case lookupType parentName env1 of
+            Just (Structure parentLam _) -> case body parentLam of
+                Tuple exs -> do
+                    let parentFuncNames = [lamName l | Function l <- exs]
+                    -- For each impl that's a parent function, also add to parent
+                    foldM (addIfParent parentFuncNames) env1 impls'
+                _ -> pure env1
+            _ -> pure env1
+    addIfParent parentFuncNames env1 (Function lam)
+      | lamName lam `Prelude.elem` parentFuncNames =
+          pure $ addInstanceLambda (lamName lam) typeName lam env1
+      | otherwise = pure env1
+    addIfParent _ env1 _ = pure env1
+
+-- Validate that required structures exist in the environment
+validateRequires :: Environment -> [Expr] -> SourceInfo -> IntState ()
+validateRequires _   []   _  = pure ()
+validateRequires env reqs si = mapM_ checkReq reqs
+  where
+    checkReq ref = do
+        let reqName = extractStructRefName ref
+        case lookupType reqName env of
+            Just (Structure _ _) -> pure ()
+            _ -> logWarning (LogPayload (lineNum si) (colNum si) ""
+                    ("requires: structure " ++ reqName ++ " not found in environment\n"))
 
 --------------------------------------------------------------------------------
 -- PASS 2: Preliminary Optimizations and basic sanity checks

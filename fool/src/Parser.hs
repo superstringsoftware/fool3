@@ -48,12 +48,16 @@ pSumType = do
     reserved "type"
     name <- uIdentifier
     args <- try pVars <|> pure []
-    ex   <- reservedOp "=" *> (braces (sepBy1 (pConstructor (Id name)) (reservedOp ",") ))
+    -- Default return type for constructors: Name(arg1, arg2, ...) or just Name
+    let defaultTp = if null args
+            then Id name
+            else App (Id name) (map (\v -> Id (Surface.name v)) args)
+    ex   <- reservedOp "=" *> (braces (sepBy1 (pConstructor defaultTp) (reservedOp ",") ))
     let lam = Lambda {
        lamName    = name
      , params = args
      , body       = Constructors ex
-     , lamType    = Type 
+     , lamType    = Type
     }
     return $ SumType lam
 
@@ -62,24 +66,30 @@ pSumType = do
 -- For now, simple constructors as in haskell (eventually for dependent types we'll need others)
 -- passing the name of the SumType to set type of the constructors --
 -- eventually we'll need to parse the type (for GADT support etc)
+-- Constructor parser with optional GADT return type annotation
+-- e.g. VNil : Vec(a, Z)  or  VCons(head:a, tail:Vec(a,n)) : Vec(a, Succ(n))
 pConstructor :: Expr -> Parser Lambda
-pConstructor tp = do
+pConstructor defaultTp = do
     name <- uIdentifier
     args <- try pVars <|> pure []
+    -- GADT: optional explicit return type  "Con(args) : ReturnType"
+    tp <- try (reservedOp ":" >> concreteType) <|> pure defaultTp
     return Lambda {
        lamName    = name
      , params = args
      , body       = UNDEFINED
-     , lamType    = tp 
+     , lamType    = tp
     }
 
 -- STRUCTURES ---------------------------------------------------------
-pStructure :: Parser Expr
-pStructure = do
-    reserved "structure"
+pStructureWith :: String -> StructKind -> Parser Expr
+pStructureWith keyword kind = do
+    reserved keyword
     name <- identifier
     args <- try pVars <|> pure []
     tp <- typeSignature
+    extends <- parseExtends
+    requires <- parseRequires
     -- making structure arguments Implicit for easier manipulation during
     -- pipeline stages
     let args' = map (\x@(Var nm tp val) -> Var nm (Implicit tp) val) args
@@ -87,11 +97,53 @@ pStructure = do
        lamName    = name
      , params = args'
      , body       = UNDEFINED
-     , lamType    = tp 
+     , lamType    = tp
     }
     reservedOp "="
-    exs <- braces (sepBy (try pSumType <|> try pFunc <|> pAction ) (reservedOp ",") )
-    return $ Structure (str{body = Tuple exs}) []
+    exs <- braces (sepBy (try pSumType <|> try pLaw <|> try pFuncOrDecl <|> pAction ) (reservedOp ",") )
+    let si = StructInfo {
+        structKind      = kind,
+        structExtends   = extends,
+        structRequires  = requires,
+        structMandatory = []
+    }
+    return $ Structure (str{body = Tuple exs}) si
+
+pStructure :: Parser Expr
+pStructure = pStructureWith "structure" SGeneral
+
+pAlgebra :: Parser Expr
+pAlgebra = pStructureWith "algebra" SAlgebra
+
+pTrait :: Parser Expr
+pTrait = pStructureWith "trait" SAlgebra
+
+pMorphism :: Parser Expr
+pMorphism = pStructureWith "morphism" SMorphism
+
+pBridge :: Parser Expr
+pBridge = pStructureWith "bridge" SMorphism
+
+-- Parse extends clause: extends Parent1(a), Parent2(a, b)
+parseExtends :: Parser [Expr]
+parseExtends = try (do
+    reserved "extends"
+    sepBy1 pStructRef (reservedOp ",")
+    ) <|> pure []
+
+-- Parse requires clause: requires Struct1(a), Struct2(a, b)
+parseRequires :: Parser [Expr]
+parseRequires = try (do
+    reserved "requires"
+    sepBy1 pStructRef (reservedOp ",")
+    ) <|> pure []
+
+-- Parse a structure reference like Eq(a) or Monoid(a)
+pStructRef :: Parser Expr
+pStructRef = do
+    name <- identifier
+    args <- try (parens (sepBy1 concreteType (reservedOp ","))) <|> pure []
+    return $ if null args then Id name else App (Id name) args
 
 -- RECORDS ----------------------------------------------------------
 -- record Point = { x:Nat, y:Nat };
@@ -140,9 +192,10 @@ pInstance = do
     reserved "instance"
     name <- identifier
     targs <- parens (sepBy1 concreteType (reservedOp ","))
+    reqs <- parseRequires
     reservedOp "="
     exs <- braces (sepBy (try pFunc) (reservedOp ","))
-    return $ Instance name targs exs
+    return $ Instance name targs exs reqs
 
 -- FUNCTIONS ---------------------------------------------------------
 pFuncHeader :: Parser Lambda
@@ -165,8 +218,65 @@ pFuncL = do
     ex <- try (PatternMatches <$> braces (sepBy (pPatternMatch lam) (reservedOp ",") ) ) <|> pExpr
     return $ lam { body = ex }
 
+-- Function declaration: with body (= expr) or without (abstract, for structures)
+pFuncDecl :: Parser Lambda
+pFuncDecl = do
+    lam <- pFuncHeader
+    mbody <- optionMaybe (reservedOp "=" >> (try (PatternMatches <$> braces (sepBy (pPatternMatch lam) (reservedOp ",") ) ) <|> pExpr))
+    case mbody of
+        Just ex -> return $ lam { body = ex }
+        Nothing -> return lam  -- abstract: body stays UNDEFINED
+
 pFunc :: Parser Expr
 pFunc = Function <$> pFuncL
+
+-- pFuncOrDecl: allows bodyless function declarations (for use inside structures)
+pFuncOrDecl :: Parser Expr
+pFuncOrDecl = Function <$> pFuncDecl
+
+-- LAW declarations (inside structures) ---------------------------------
+-- law reflexivity(x:a) = (x == x) === True
+pLaw :: Parser Expr
+pLaw = do
+    reserved "law"
+    name <- identifier
+    args <- try pVars <|> pure []
+    tp <- typeSignature
+    let lam = Lambda {
+       lamName    = name
+     , params = args
+     , body       = UNDEFINED
+     , lamType    = tp
+    }
+    reservedOp "="
+    lawBody <- pLawExpr
+    return $ Law lam lawBody
+
+-- Parse law body expressions with === and ==> operators
+-- ==> binds loosest (right-associative), === binds tighter
+pLawExpr :: Parser Expr
+pLawExpr = do
+    parts <- sepBy1 pLawAtom (reservedOp "==>")
+    return $ foldr1 Implies parts
+
+pLawAtom :: Parser Expr
+pLawAtom = try pParenLawAtom <|> pPlainLawAtom
+
+-- Parenthesized law atom: (expr === expr) — only matches if === is inside the parens
+pParenLawAtom :: Parser Expr
+pParenLawAtom = parens $ do
+    lhs <- pExpr
+    reservedOp "==="
+    rhs <- pExpr
+    return (PropEq lhs rhs)
+
+pPlainLawAtom :: Parser Expr
+pPlainLawAtom = do
+    lhs <- pExpr
+    mRhs <- optionMaybe (reservedOp "===" >> pExpr)
+    case mRhs of
+        Nothing  -> return lhs
+        Just rhs -> return (PropEq lhs rhs)
 
 -- eventually to be expanded to literals etc
 -- but in general only Ids and constructor applications Apps should be allowed
@@ -255,13 +365,23 @@ strictTypeSignature =
        
 typeSignature = try strictTypeSignature <|> pure UNDEFINED
 
+-- Full type expression parser: handles application, arrows, parens, universes
+-- Examples: Nat, Vec(a, Succ(n)), a -> b, (a -> b) -> c, Type
 concreteType :: Parser Expr
-concreteType = try parseUniverse <|> do
-    nm <- identifier
-    return $ Id nm
+concreteType = pTypeArrow
 
-parseUniverse :: Parser Expr
-parseUniverse = do
+-- Arrow types: a -> b -> c (right-associative)
+pTypeArrow :: Parser Expr
+pTypeArrow = do
+    lhs <- pTypeApp
+    rest <- optionMaybe (reservedOp "->" >> pTypeArrow)
+    case rest of
+        Nothing  -> return lhs
+        Just rhs -> return $ ArrowType lhs rhs
+
+-- Type application: Vec(a, n), Maybe(a), or bare name/universe
+pTypeApp :: Parser Expr
+pTypeApp = try (do
     nm <- identifier
     case nm of
       "Type"  -> return (U 0)
@@ -269,7 +389,14 @@ parseUniverse = do
       "Type1" -> return (U 1)
       "Type2" -> return (U 2)
       "Type3" -> return (U 3)
-      _       -> fail "not a universe"
+      _ -> do
+        margs <- optionMaybe (parens (sepBy1 concreteType (reservedOp ",")))
+        case margs of
+            Nothing   -> return $ Id nm
+            Just args -> return $ App (Id nm) args
+    )
+    <|> try (Lit . LTuple <$> braces (sepBy1 concreteType (reservedOp ",")))  -- tuple types {a, b}
+    <|> parens concreteType
 
 
 int :: Parser Literal
@@ -293,7 +420,8 @@ pContainers =
 -}
 -- Building expression parser - for RIGHT HAND SIDE ONLY!!!
 pExpr :: Parser Expr
-pExpr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) pFactor
+pExpr = try (Lit . LVec <$> angles (commaSep pFactor))  -- vector literals <1, 2, 3> (use pFactor to avoid > consumed as operator)
+    <|> Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) pFactor
 
 pIfThenElse :: Parser Expr
 pIfThenElse = do
@@ -326,6 +454,7 @@ pFactor = try pIfThenElse
     <|> try pLetIn
     <|> try pApp
     <|> try (parens pExpr)
+    <|> try (Id <$> parens operator)   -- (op) as value: (+), (!=), etc.
     <|> try symbolId
     <|> try (Lit <$> floating)
     <|> try (Lit <$> int)
@@ -341,7 +470,7 @@ symbolId = do
 -- Clear function application
 pApp :: Parser Expr
 pApp = do
-    func <- try (parens pExpr) <|> (Id <$> identifier)
+    func <- try (parens pExpr) <|> try (Id <$> parens operator) <|> (Id <$> identifier)
     args <- parens (sepBy pExpr (reservedOp ",") )
     return $ App func args
 
@@ -349,6 +478,10 @@ pApp = do
 pDef :: Parser Expr
 pDef =  try pSumType
         <|> try pRecord
+        <|> try pAlgebra
+        <|> try pTrait
+        <|> try pMorphism
+        <|> try pBridge
         <|> try pStructure
         <|> try pInstance
         <|> try pFunc

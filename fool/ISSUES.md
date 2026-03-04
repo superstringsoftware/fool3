@@ -1,4 +1,4 @@
-# fool
+# tulam
 
 This is a from scratch implementation of the type-theory based functional language with flexible compilation targets (initially - javascript, .Net, potentially x86 native) based on the learnings of the last 6 years.
 

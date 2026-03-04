@@ -16,16 +16,23 @@ type Bool = { True, False };
 
 function f(x) = [x,18,29];
 
-structure Eq (a:Type) = {
+algebra Eq (a:Type) = {
   function (==) (x,y:a) : Bool = not (x != y),
-  function (!=) (x,y:a) : Bool = not (x == y)
-  // mandatory = { (==) or (!=) }
+  function (!=) (x,y:a) : Bool = not (x == y),
+  law reflexivity(x:a) = (x == x) === True,
+  law symmetry(x:a, y:a) = (x == y) === (y == x)
 };
 
 
 
 instance Eq(Nat) = {
   function (==) (x:Nat,y:Nat) : Bool = eq(x,y)
+};
+
+// Propositional equality as a GADT
+// Refl can only construct PropEqT(a, x, x) — both indices must be the same
+type PropEqT(a:Type, x:a, y:a) = {
+    Refl : PropEqT(a, x, x)
 };
 
 instance Eq(Bool) = {

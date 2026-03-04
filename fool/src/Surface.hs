@@ -19,6 +19,20 @@ data Var = Var {
 
 -- type Tuple a = [a]
 type Record = [Var]
+
+-- Classification of structures (typeclasses)
+data StructKind = SGeneral | SAlgebra | SMorphism deriving (Show, Eq)
+
+-- Extended structure metadata
+data StructInfo = StructInfo {
+    structKind      :: StructKind,
+    structExtends   :: [Expr],
+    structRequires  :: [Expr],
+    structMandatory :: [Name]
+} deriving (Show, Eq)
+
+defaultStructInfo :: StructInfo
+defaultStructInfo = StructInfo SGeneral [] [] []
 -- using this cover type in the arguments for lambdas
 -- to take care of the dependent functions with implicit arguments
 -- they are usually created from "structures" (typeclasses),
@@ -62,10 +76,10 @@ data Expr =
   | Function Lambda -- defining a function by abstracting a bunch of variables in a tuple
   | Action Lambda -- Action is simply a list of expressions in order
   | Constructors [Lambda] -- only for constructor list inside sum types
-  | Structure Lambda [Name] -- storing type classes / type families etc.
-  -- the body of lambda is a list of functions / items that are part of the 
+  | Structure Lambda StructInfo -- storing type classes / type families etc.
+  -- the body of lambda is a list of functions / items that are part of the
   -- structure
-  -- second [Name] list is a list of functions mandatory for the implementation
+  -- StructInfo carries classification (algebra/morphism/general), extends, requires, mandatory names
   | App Expr [Expr] -- application
   | ExprConsTagCheck ConsTag Expr -- check if Expr was created with a given constructor
   | RecFieldAccess (Name,Int) Expr -- access a field of the Expr by name or index
@@ -97,9 +111,13 @@ data Expr =
   | Implicit Expr -- current solution for implicit parameter functions
   -- that result e.g. from structure (typeclass) expansions -
   -- only used in the TYPE place!!!
-  | Instance Name [Expr] [Expr] -- Instance structureName [typeArgs] [function implementations]
+  | Instance Name [Expr] [Expr] [Expr] -- Instance structureName [typeArgs] [function implementations] [requires]
   | IfThenElse Expr Expr Expr -- if cond then e1 else e2 (desugared in afterparse)
   | LetIn [(Var, Expr)] Expr -- let x = e1, y = e2 in body (desugared in afterparse)
+  | Law Lambda Expr -- law declaration: law name(params) = lawBody
+  | PropEq Expr Expr -- propositional equality: lhs === rhs
+  | Implies Expr Expr -- implication: premise ==> conclusion
+  | ArrowType Expr Expr -- non-dependent function type: a -> b
   | ERROR String
 
   
@@ -147,15 +165,23 @@ traverseExpr f (BinaryOp nm e1 e2) = BinaryOp nm (f $ traverseExpr f e1) (f $ tr
 -- probably need to add type sig as well???
 traverseExpr f (Function lam) = Function $ lam { body = f $ traverseExpr f (body lam) }
 traverseExpr f (Action lam) = Action $ lam { body = f $ traverseExpr f (body lam) }
-traverseExpr f (Structure lam nm) = Structure (lam { body = f $ traverseExpr f (body lam) }) nm
+traverseExpr f (Structure lam si) = Structure (lam { body = f $ traverseExpr f (body lam) }) si
 traverseExpr f (SumType lam) = SumType $ lam { body = f $ traverseExpr f (body lam) }
 -- TODO: CHECK IF THIS IS THE CORRECT TRAVERSAL: !!!!
 traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f $ traverseExpr f (body l) } ) lams
 traverseExpr f (Binding (Var nm tp val)) = Binding (Var nm (f $ traverseExpr f tp) (f $ traverseExpr f val))
 traverseExpr _ e@(U _) = e
-traverseExpr f (Instance nm targs impls) = Instance nm (map (traverseExpr f) targs) (map (traverseExpr f) impls)
+traverseExpr f (Instance nm targs impls reqs) = Instance nm (map (traverseExpr f) targs) (map (traverseExpr f) impls) (map (traverseExpr f) reqs)
 traverseExpr f (IfThenElse c t e) = IfThenElse (f $ traverseExpr f c) (f $ traverseExpr f t) (f $ traverseExpr f e)
 traverseExpr f (LetIn binds body) = LetIn (map (\(v,ex) -> (v, f $ traverseExpr f ex)) binds) (f $ traverseExpr f body)
+traverseExpr f (Law lam ex) = Law (lam { body = f $ traverseExpr f (body lam) }) (f $ traverseExpr f ex)
+traverseExpr f (PropEq e1 e2) = PropEq (f $ traverseExpr f e1) (f $ traverseExpr f e2)
+traverseExpr f (Implies e1 e2) = Implies (f $ traverseExpr f e1) (f $ traverseExpr f e2)
+traverseExpr f (ArrowType e1 e2) = ArrowType (f $ traverseExpr f e1) (f $ traverseExpr f e2)
+traverseExpr f (Implicit e) = Implicit (f $ traverseExpr f e)
+traverseExpr _ e@(Prim _) = e
+traverseExpr _ PrimCall = PrimCall
+traverseExpr _ e@(ERROR _) = e
 traverseExpr f e = ERROR $ "Traverse not implemented for: " ++ ppr e
 
 -- App (Id "Succ") [App (Id "plus") [Id "n",Id "x"]]
@@ -215,10 +241,13 @@ instance PrettyPrint Expr where
   ppr (RecFieldAccess (nm,i) e) = ppr e ++ "." ++ nm ++"("++show i ++")"
   ppr (App e ex) = (ppr e) ++ showListRoBr ppr ex
   ppr (Tuple ex) = showListCuBr ppr ex
-  ppr (Structure (Lambda name params body sig) nms) = (as [bold,yellow] "structure ") 
+  ppr (Structure (Lambda name params body sig) si) = (as [bold,yellow] (pprStructKind (structKind si) ++ " "))
     ++ name ++ " "
-    ++ showListRoBr ppr params 
-    ++ pprTyp sig ++ " = "
+    ++ showListRoBr ppr params
+    ++ pprTyp sig
+    ++ pprExtends (structExtends si)
+    ++ pprRequires (structRequires si)
+    ++ " = "
     ++ ppr body
   ppr (Function lam) = (as [bold,red] "function ") ++ ppr lam
   ppr (Action lam) = (as [bold,blue] "action ") ++ ppr lam
@@ -232,13 +261,36 @@ instance PrettyPrint Expr where
     ++ showListRoBr ppr params 
     ++ pprTyp sig ++ " = "
     ++ ppr body
-  ppr (Instance nm targs impls) = (as [bold,green] "instance ") ++ nm
-    ++ showListRoBr ppr targs ++ " = "
+  ppr (Instance nm targs impls reqs) = (as [bold,green] "instance ") ++ nm
+    ++ showListRoBr ppr targs
+    ++ pprRequires reqs
+    ++ " = "
     ++ showListCuBr ppr impls
   ppr (IfThenElse c t e) = "if " ++ ppr c ++ " then " ++ ppr t ++ " else " ++ ppr e
   ppr (LetIn binds body) = "let " ++ showListPlainSep (\(v,ex) -> ppr v ++ " = " ++ ppr ex) ", " binds ++ " in " ++ ppr body
   ppr (Implicit e) = "Implicit (" ++ ppr e ++ ")"
+  ppr (Law lam ex) = (as [bold,cyan] "law ") ++ ppr lam ++ " = " ++ ppr ex
+  ppr (PropEq e1 e2) = ppr e1 ++ " === " ++ ppr e2
+  ppr (Implies e1 e2) = ppr e1 ++ " ==> " ++ ppr e2
+  ppr (ArrowType e1 e2) = pprArrowLhs e1 ++ " -> " ++ ppr e2
   ppr (U 0) = "Type"
   ppr (U n) = "Type" ++ show n
   ppr e = show e
   -- λ
+
+pprArrowLhs :: Expr -> String
+pprArrowLhs e@(ArrowType _ _) = "(" ++ ppr e ++ ")"
+pprArrowLhs e = ppr e
+
+pprStructKind :: StructKind -> String
+pprStructKind SGeneral  = "structure"
+pprStructKind SAlgebra  = "trait"
+pprStructKind SMorphism = "bridge"
+
+pprExtends :: [Expr] -> String
+pprExtends [] = ""
+pprExtends es = " extends " ++ showListPlainSep ppr ", " es
+
+pprRequires :: [Expr] -> String
+pprRequires [] = ""
+pprRequires es = " requires " ++ showListPlainSep ppr ", " es

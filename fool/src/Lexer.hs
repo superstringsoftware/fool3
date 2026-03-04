@@ -65,9 +65,10 @@ emptyDef    = Tok.LanguageDef
 lexer :: TokenParserIS ParserState
 lexer = Tok.makeTokenParser style
     where
-    ops = [";","=",",",".","..",":", "->", "=>", "|", "?", "<:", "\\"]
+    ops = [";","=",",",".","..",":", "->", "=>", "|", "?", "<:", "\\", "===", "==>"]
     names = ["type","function","if","then","else","in","action","structure","instance",
-            "let", "case", "of", "where", "∃", "∀", "exists", "forall", "record"]
+            "let", "case", "of", "where", "∃", "∀", "exists", "forall", "record",
+            "algebra", "trait", "morphism", "bridge", "law", "extends", "requires"]
     style = emptyDef {
                 Tok.commentStart   = "/*"
                 , Tok.commentEnd     = "*/"

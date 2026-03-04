@@ -1,10 +1,10 @@
-# Record System Design for FOOL3
+# Record System Design for tulam
 
 ## Core Insight: Functions Are Values
 
-In FOOL3, everything is tuples + lambdas. A lambda is a value. Therefore a record with function fields is just a record — no special mechanism needed. This unifies three concepts that other languages treat separately:
+In tulam, everything is tuples + lambdas. A lambda is a value. Therefore a record with function fields is just a record — no special mechanism needed. This unifies three concepts that other languages treat separately:
 
-| Concept | Other languages | FOOL3 |
+| Concept | Other languages | tulam |
 |---------|----------------|-------|
 | Data record | `struct`, `data class` | `record` with value fields |
 | Typeclass dictionary | `interface`, `trait` | `structure`/`algebra` (record parameterized over types, with laws) |
@@ -18,7 +18,7 @@ All three are products with named projections. The keyword tells you what *kind*
 
 ### Declaration
 
-```fool
+```tulam
 record Point = { x:Nat, y:Nat };
 ```
 
@@ -29,14 +29,14 @@ This creates:
 
 ### Parameterized records
 
-```fool
+```tulam
 record Pair(a:Type, b:Type) = { fst:a, snd:b };
 record Tagged(a:Type) = { tag:String, value:a };
 ```
 
 ### Construction syntax
 
-```fool
+```tulam
 let p = Point { x = Z, y = Succ(Z) };
 // or positional (when unambiguous):
 let p = Point(Z, Succ(Z));
@@ -46,7 +46,7 @@ Named construction `Point { x = Z, y = Succ(Z) }` is preferred — it's self-doc
 
 ### Field access
 
-```fool
+```tulam
 p.x       // Succ(Z)
 p.fst     // for Pair
 ```
@@ -55,7 +55,7 @@ p.fst     // for Pair
 
 A named record desugars to a single-constructor sum type:
 
-```fool
+```tulam
 record Point = { x:Nat, y:Nat };
 // compiles identically to:
 type Point = { Point(x:Nat, y:Nat) };
@@ -69,7 +69,7 @@ This means records go through the existing pipeline — constructor extraction, 
 
 Since functions are first-class values, any record can contain function fields:
 
-```fool
+```tulam
 record Counter = {
     count : Nat,
     step  : Nat
@@ -84,9 +84,9 @@ function reset(self:Counter) : Counter =
 
 ### Why explicit `self` (not implicit `this`)
 
-FOOL3 is a functional language. Methods are just functions that happen to take a record as an argument. There is no hidden state, no implicit `this`, no mutation. This keeps the language honest:
+tulam is a functional language. Methods are just functions that happen to take a record as an argument. There is no hidden state, no implicit `this`, no mutation. This keeps the language honest:
 
-```fool
+```tulam
 // These are equivalent:
 increment(myCounter)       // function call style
 myCounter.increment        // if we add method syntax later, it's sugar for the above
@@ -96,7 +96,7 @@ myCounter.increment        // if we add method syntax later, it's sugar for the 
 
 Functions can also be fields of the record itself, creating "object-like" records:
 
-```fool
+```tulam
 record Widget = {
     label : String,
     render(self:Widget) : String,
@@ -119,7 +119,7 @@ This is dynamic dispatch — the function is stored in the record, not resolved 
 
 ### In declarations
 
-```fool
+```tulam
 record Point = { x:Nat, y:Nat };
 record Point3D = { ..Point, z:Nat };
 // expands to: { x:Nat, y:Nat, z:Nat }
@@ -127,14 +127,14 @@ record Point3D = { ..Point, z:Nat };
 
 `..Name` spreads all fields of the named record. Fields can be overridden:
 
-```fool
+```tulam
 record FloatPoint = { ..Point, x:Float, y:Float };
 // fields x and y overridden from Nat to Float
 ```
 
 ### Multiple spread
 
-```fool
+```tulam
 record HasName = { name:String };
 record HasAge  = { age:Nat };
 record Person  = { ..HasName, ..HasAge, email:String };
@@ -151,7 +151,7 @@ Spread is resolved at parse time. `record Point3D = { ..Point, z:Nat }` looks up
 
 ## 4. Record Update Syntax
 
-```fool
+```tulam
 let p = Point { x = Z, y = Succ(Z) };
 let p2 = p { x = Succ(Z) };
 // p2 = Point { x = Succ(Z), y = Succ(Z) }
@@ -163,7 +163,7 @@ let p2 = p { x = Succ(Z) };
 
 Record update desugars to a new constructor call with field access for unchanged fields:
 
-```fool
+```tulam
 p { x = Succ(Z) }
 // desugars to:
 Point(Succ(Z), p.y)
@@ -177,7 +177,7 @@ Point(Succ(Z), p.y)
 
 Anonymous records don't need a `record` declaration. The type IS the record:
 
-```fool
+```tulam
 function origin() : {x:Nat, y:Nat} = {x = Z, y = Z};
 ```
 
@@ -185,7 +185,7 @@ function origin() : {x:Nat, y:Nat} = {x = Z, y = Z};
 
 The `..` in type position is a **row variable** — it captures "whatever other fields exist":
 
-```fool
+```tulam
 // Works on ANY record with at least field "name" of type String
 function greet(thing : {name:String, ..}) : String =
     concat#("Hello, ", thing.name);
@@ -200,7 +200,7 @@ greet(Person {name = "Bob", email = "bob@example.com"});
 
 ### Row polymorphism in function types
 
-```fool
+```tulam
 // Extract a field from any record that has it
 function getX(p : {x:a, ..}) : a = p.x;
 
@@ -214,7 +214,7 @@ In `mapX`, the row variable `r` is named — the output record has the same "res
 
 A named record `Point` with fields `{x:Nat, y:Nat}` is compatible with the anonymous type `{x:Nat, y:Nat, ..}`:
 
-```fool
+```tulam
 record Point = { x:Nat, y:Nat };
 let p = Point { x = Z, y = Z };
 greet_x(p);  // works — Point has field x
@@ -252,7 +252,7 @@ All uses relate to "the rest of the fields" — spread includes them, update pre
 
 Structures and records are the same underlying concept at different levels:
 
-```fool
+```tulam
 // A record: product of VALUES with named fields
 record Point = { x:Nat, y:Nat };
 
@@ -283,7 +283,7 @@ This unification means:
 
 Records support pattern matching just like sum types:
 
-```fool
+```tulam
 record Point = { x:Nat, y:Nat };
 
 function isOrigin(p:Point) : Bool = {

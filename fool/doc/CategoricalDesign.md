@@ -1,10 +1,10 @@
-# Categorical Type System Design for FOOL3
+# Categorical Type System Design for tulam
 
 ## Motivation
 
-FOOL3 is built on two primitives: **tuples** and **lambdas**. Category theory provides the natural mathematical framework for understanding how types and functions compose. Rather than bolting on categorical concepts after the fact (as Haskell does with its typeclass hierarchy), FOOL3 has the opportunity to make categorical structure explicit in the surface language from the beginning.
+tulam is built on two primitives: **tuples** and **lambdas**. Category theory provides the natural mathematical framework for understanding how types and functions compose. Rather than bolting on categorical concepts after the fact (as Haskell does with its typeclass hierarchy), tulam has the opportunity to make categorical structure explicit in the surface language from the beginning.
 
-This document describes a layered vocabulary of categorical constructs, how they map to existing FOOL3 infrastructure, and a practical implementation roadmap.
+This document describes a layered vocabulary of categorical constructs, how they map to existing tulam infrastructure, and a practical implementation roadmap.
 
 ---
 
@@ -12,7 +12,7 @@ This document describes a layered vocabulary of categorical constructs, how they
 
 ### 1.1 Core Insight
 
-FOOL3's `structure` keyword currently serves as a catch-all for typeclasses. But structures that depend on different numbers and kinds of type parameters are categorically *different things*:
+tulam's `structure` keyword currently serves as a catch-all for typeclasses. But structures that depend on different numbers and kinds of type parameters are categorically *different things*:
 
 | Parameters | Categorical concept | What it does | Example |
 |---|---|---|---|
@@ -22,7 +22,7 @@ FOOL3's `structure` keyword currently serves as a catch-all for typeclasses. But
 | 2 type constructors | **Natural transformation** | Morphism between functors | `safeHead : List ~> Maybe` |
 | Morphisms + composition | **Category** | Universe of composable arrows | `Category(arr)` |
 
-All of these compile down to the same implicit-parameter functions that FOOL3 already supports. The categorical vocabulary is a *surface* distinction that enables better error messages, automatic derivation, and principled composition.
+All of these compile down to the same implicit-parameter functions that tulam already supports. The categorical vocabulary is a *surface* distinction that enables better error messages, automatic derivation, and principled composition.
 
 ### 1.2 Design Principle
 
@@ -42,13 +42,13 @@ class (Monad m, MonadIO m) => App m    -- App NEEDS these (same param, but const
 class Container f a where ...          -- f and a are different shapes entirely
 ```
 
-FOOL3 distinguishes these with two keywords: **`extends`** and **`requires`**.
+tulam distinguishes these with two keywords: **`extends`** and **`requires`**.
 
 ### 2.2 `extends` — Same-shape refinement
 
 `extends` means "this structure is a refinement of that one." Both structures share the same parameter(s) in the same positions. The child adds new operations to the parent's operations.
 
-```fool
+```tulam
 algebra Semigroup(a:Type) = {
     function combine(x:a, y:a) : a,
     law associativity(x:a, y:a, z:a) = combine(x, combine(y,z)) === combine(combine(x,y), z)
@@ -80,7 +80,7 @@ algebra Group(a:Type) extends Monoid(a) = {
 
 `requires` means "this structure needs evidence that some other structure is satisfied, but the other structure may have different parameters or a different shape."
 
-```fool
+```tulam
 morphism Convertible(a:Type, b:Type) = {
     function convert(x:a) : b
 };
@@ -141,7 +141,7 @@ instance Category(Kleisli(m)) requires Monad(m) = {
 
 Laws are declared inside structures using the `law` keyword. They express equalities that instances should satisfy.
 
-```fool
+```tulam
 law <name>(<params>) = <LHS> === <RHS>
 ```
 
@@ -150,7 +150,7 @@ law <name>(<params>) = <LHS> === <RHS>
 
 ### 3.2 Examples
 
-```fool
+```tulam
 algebra Semigroup(a:Type) = {
     function combine(x:a, y:a) : a,
     law associativity(x:a, y:a, z:a) =
@@ -218,7 +218,7 @@ An algebra equips a single carrier type with operations and laws.
 
 ### Syntax
 
-```fool
+```tulam
 algebra Monoid(a:Type) = {
     function empty() : a,
     function combine(x:a, y:a) : a,
@@ -249,7 +249,7 @@ Identical to current `structure` compilation. `algebra` is sugar that tells the 
 
 ### Examples
 
-```fool
+```tulam
 algebra Eq(a:Type) = {
     function (==)(x:a, y:a) : Bool = not(x != y),
     function (!=)(x:a, y:a) : Bool = not(x == y),
@@ -286,7 +286,7 @@ A morphism establishes a directed relationship between two (or more) types. This
 
 ### Syntax
 
-```fool
+```tulam
 morphism Convertible(a:Type, b:Type) = {
     function convert(x:a) : b
 };
@@ -314,7 +314,7 @@ Same as multi-parameter `structure`. The compiler additionally registers composa
 
 On .NET, `Convertible(A,B)` maps to implicit conversion operators. Composition means the compiler can chain conversions automatically:
 
-```fool
+```tulam
 instance Convertible(Int, Float) = { function convert(x:Int):Float = intToFloat#(x) };
 instance Convertible(Float, String) = { function convert(x:Float):String = showFloat#(x) };
 
@@ -325,7 +325,7 @@ instance Convertible(Float, String) = { function convert(x:Float):String = showF
 
 Structures can also depend on values, creating *indexed* or *parameterized* morphisms:
 
-```fool
+```tulam
 morphism LinearMap(k:Type, v:Type, w:Type) requires Field(k) = {
     function apply(f:v -> w, x:v) : w,
     function scale(s:k, x:v) : v,
@@ -346,7 +346,7 @@ A functor is a type constructor `F : Type -> Type` that also maps functions: if 
 
 **Option A: Functor as a declaration that combines type + mapping**
 
-```fool
+```tulam
 functor Maybe(a:Type) : Type = { Just(x:a), Nothing };
 // This BOTH defines the sum type AND declares fmap exists.
 // fmap must be provided or derived.
@@ -356,7 +356,7 @@ functor List(a:Type) : Type = { Nil, Cons(head:a, tail:List(a)) };
 
 **Option B: Functor as an algebra on type constructors**
 
-```fool
+```tulam
 type Maybe(a:Type) = { Just(x:a), Nothing };
 
 algebra Functor(f:Type1) = {
@@ -381,11 +381,11 @@ instance Functor(Maybe) = {
 1. Not every type constructor should be a functor (e.g., `Set` requires `Ord` on elements)
 2. Separating the type definition from the functor instance is cleaner -- you can define types without committing to functoriality
 3. It's consistent: `Functor` is just another algebra, but on `Type1` (kinds) instead of `Type`
-4. Option A conflates two things (data definition + structure instance) which violates FOOL3's design of keeping things orthogonal
+4. Option A conflates two things (data definition + structure instance) which violates tulam's design of keeping things orthogonal
 
 However, we could add `functor` as **sugar** that expands to Option B:
 
-```fool
+```tulam
 // this:
 functor Maybe(a:Type) : Type = { Just(x:a), Nothing };
 // expands to:
@@ -411,7 +411,7 @@ A natural transformation is a family of functions `F(a) -> G(a)` that is *unifor
 
 ### Syntax
 
-```fool
+```tulam
 natural safeHead : List ~> Maybe = {
     function transform(xs:List(a)) : Maybe(a) = {
         {Nil} -> Nothing,
@@ -444,7 +444,7 @@ By marking these as `natural`, the compiler knows they compose and can optimize 
 ### Implementation
 
 A `natural` declaration compiles to a rank-2 polymorphic function internally:
-```fool
+```tulam
 // natural safeHead : List ~> Maybe compiles to:
 function safeHead [a:Type] (xs:List(a)) : Maybe(a) = ...
 ```
@@ -457,7 +457,7 @@ The `natural` keyword is a *contract* that this function doesn't inspect `a`, wh
 
 ### 8.1 The Default Category
 
-FOOL3 programs live in a default category implicitly:
+tulam programs live in a default category implicitly:
 - **Objects** = types (inhabitants of `Type`)
 - **Morphisms** = functions (`a -> b`)
 - **Composition** = function composition (`.` or `compose`)
@@ -469,7 +469,7 @@ This is **Type**, the category of types and functions. We don't need to declare 
 
 Other categories can be defined as structures. A category needs:
 
-```fool
+```tulam
 // A category is parameterized by its morphism type
 // Objects are implicit (they're the types that arr connects)
 algebra Category(arr: Type -> Type -> Type) = {
@@ -494,7 +494,7 @@ Note: `Category` takes `arr : Type -> Type -> Type` -- a two-parameter type cons
 
 Every monad gives rise to a category -- the Kleisli category. This is where monads connect to the categorical framework:
 
-```fool
+```tulam
 // Kleisli arrow: a function a -> m(b) for some monad m
 type Kleisli(m: Type -> Type, a:Type, b:Type) = a -> m(b);
 
@@ -513,7 +513,7 @@ This is extremely powerful: it means **every monad automatically gives you a cat
 
 Arrows generalize both functions and monadic computations. An Arrow is a Category with additional structure:
 
-```fool
+```tulam
 algebra Arrow(arr: Type -> Type -> Type) extends Category(arr) = {
     function arr(f: a -> b) : arr(a, b),           // lift a function
     function first(f:arr(a,b)) : arr({a,c}, {b,c}), // process first component
@@ -537,7 +537,7 @@ Reasoning:
 - The interesting thing about categories is not their definition but their *use* -- composition operators, do-notation, arrow notation
 - What we DO want is **syntactic sugar** that works with any Category instance (see Section 10)
 
-However, `Category` and `Arrow` should be **built-in structures** in the standard library (like `base.fool`), not user-defined, because the compiler needs to know about them for:
+However, `Category` and `Arrow` should be **built-in structures** in the standard library (like `base.tl`), not user-defined, because the compiler needs to know about them for:
 - Optimizing composition chains
 - Providing do-notation and arrow-notation
 - Deriving Kleisli categories from monads automatically
@@ -552,7 +552,7 @@ A monad is a functor with extra algebraic structure. In categorical terms:
 
 > A monad on a category C is an endofunctor `M : C -> C` together with two natural transformations: `return : Id ~> M` and `join : M . M ~> M`, satisfying associativity and unit laws.
 
-In FOOL3 terms, this translates to: **a Monad is an algebra on a Functor**.
+In tulam terms, this translates to: **a Monad is an algebra on a Functor**.
 
 ### 9.2 Should Monad be a keyword or a structure?
 
@@ -574,7 +574,7 @@ Reasoning:
 
 ### 9.3 The Monad Hierarchy
 
-```fool
+```tulam
 // Functor: can map over contents
 algebra Functor(f:Type1) = {
     function fmap(g: a -> b, x:f(a)) : f(b),
@@ -613,7 +613,7 @@ instance Monad(Maybe) = {
 
 The `do`-notation desugars into `bind` calls, working with anything that has a `Monad` instance:
 
-```fool
+```tulam
 // this:
 action main : IO(Unit) = {
     name <- readLine(),
@@ -628,13 +628,13 @@ function main() : IO(Unit) =
     });
 ```
 
-Since FOOL3 already has `action` as a keyword for sequential computation, this is a natural fit: **`action` IS do-notation**. The action body is a sequence of statements that desugar into monadic bind chains.
+Since tulam already has `action` as a keyword for sequential computation, this is a natural fit: **`action` IS do-notation**. The action body is a sequence of statements that desugar into monadic bind chains.
 
 ### 9.5 Monad gives you a Category for free
 
 As shown in Section 8.3, every `Monad(m)` automatically gives `Category(Kleisli(m))`. The compiler should derive this automatically:
 
-```fool
+```tulam
 // The compiler generates this whenever it sees Monad(m):
 instance Category(Kleisli(m)) = { ... }  // derived from Monad(m)
 ```
@@ -728,7 +728,7 @@ The hierarchy tells the compiler what *extra things* it can derive and optimize.
 - [x] Universe hierarchy (`U Int`, `Type`, `Type1`, ...)
 - [x] Instance declarations: parse, process, case-optimize, CLM-convert, interpret
 - [x] Instance dispatch via constructor tag type inference
-- [x] `base.fool` with `Eq(Nat)`, `Eq(Bool)` instances
+- [x] `base.tl` with `Eq(Nat)`, `Eq(Bool)` instances
 
 ### Phase 2: Basic language completeness
 - [ ] `if/then/else` expression
@@ -786,7 +786,7 @@ The hierarchy tells the compiler what *extra things* it can derive and optimize.
 
 ---
 
-## 14. Relation to Existing FOOL3 Concepts
+## 14. Relation to Existing tulam Concepts
 
 ### How this fits with "everything is tuples + lambdas"
 
@@ -809,7 +809,7 @@ All of these are still tuples and lambdas internally. The categorical keywords a
 ### How this fits with the pipeline
 
 ```
-Source (.fool)
+Source (.tl)
   -> Parser (recognizes algebra/morphism/structure/law keywords)
   -> Surface AST (Expr nodes carry the categorical classification + laws)
   -> Pass 1: Environment building (registers algebras, morphisms, extends/requires)

@@ -39,6 +39,8 @@ data Environment = Environment {
     -- instance-specialized functions: key is "funcName\0typeName"
     instanceLambdas :: NameMap Lambda,
     clmInstances    :: NameMap CLMLam,
+    -- structure inheritance: maps child structure name to list of parent names
+    structInheritance :: NameMap [Name],
     outProgram   :: NameMap String
 } deriving Show
 
@@ -51,6 +53,7 @@ initialEnvironment = Environment {
     clmBindings = Map.empty,
     instanceLambdas = Map.empty,
     clmInstances = Map.empty,
+    structInheritance = Map.empty,
     outProgram   = Map.empty
 }
 
@@ -142,8 +145,24 @@ addNamedSumType tp@(SumType lam) env = env { types = Map.insert (lamName lam) tp
 addNamedSumType e env = env
 
 addNamedStructure :: Expr -> Environment -> Environment
-addNamedStructure st@(Structure lam nms) env = env { types = Map.insert (lamName lam) st (types env) } 
+addNamedStructure st@(Structure lam _si) env = env { types = Map.insert (lamName lam) st (types env) }
 addNamedStructure e env = env
+
+-- Register structure inheritance: child extends parents
+registerInheritance :: Name -> [Name] -> Environment -> Environment
+registerInheritance child parents env =
+    env { structInheritance = Map.insert child parents (structInheritance env) }
+
+-- Get all transitive parents of a structure
+getAllParents :: Name -> Environment -> [Name]
+getAllParents name env = go [name] []
+  where
+    go [] visited = visited
+    go (n:ns) visited
+      | n `Prelude.elem` visited = go ns visited
+      | otherwise = case Map.lookup n (structInheritance env) of
+          Nothing      -> go ns (visited ++ [n])
+          Just parents -> go (parents ++ ns) (visited ++ [n])
 
 addNamedLambda :: Lambda -> Environment -> Environment
 addNamedLambda l env = env { topLambdas = Map.insert (lamName l) l (topLambdas env) }

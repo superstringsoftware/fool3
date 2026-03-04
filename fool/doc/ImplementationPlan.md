@@ -1,4 +1,4 @@
-# FOOL3 Implementation Plan
+# tulam Implementation Plan
 
 Incremental roadmap from current state to categorical type system. Each step is testable independently and unlocks the next.
 
@@ -31,7 +31,7 @@ This is the single most important missing piece. Everything in the categorical d
 
 `instance` is not currently a reserved word. Add it to the lexer, then add a parser rule:
 
-```fool
+```tulam
 instance Eq(Nat) = {
     function ==(x:Nat, y:Nat) : Bool = eq(x,y),
     function !=(x:Nat, y:Nat) : Bool = not(eq(x,y))
@@ -56,7 +56,7 @@ When we encounter `instance Eq(Nat)`:
 
 This is the mechanism already sketched in the structure processing code -- `fixStr` in Pipeline.hs creates the initial `CaseOf [] (Function l)` with empty cases. Instance processing *adds* concrete cases.
 
-**Test:** Load base.fool with uncommented `instance Eq(Nat)`. Check that `==` function in `:list functions` now has a `{Nat} -> ...` case alongside the default.
+**Test:** Load base.tl with uncommented `instance Eq(Nat)`. Check that `==` function in `:list functions` now has a `{Nat} -> ...` case alongside the default.
 
 ### Step 1.3: Complete interpreter evaluation
 
@@ -72,20 +72,20 @@ Start with CLMLIT and CLMPROG (trivial), then CLMCASE (needed for pattern matchi
 
 **Test:** In REPL, evaluate `not(True)` and get `False`. Evaluate `plus(Succ(Z), Succ(Z))` and get `Succ(Succ(Z))`. Then with instances working, evaluate `==(Z, Z)` and get `True`.
 
-### Step 1.4: Uncomment and fix base.fool instances
+### Step 1.4: Uncomment and fix base.tl instances
 
-**Files:** base.fool
+**Files:** base.tl
 
 Uncomment the `instance Eq(Nat)` and `instance Eq(Bool)` declarations. Verify they load and work.
 
 Add a simple test:
-```fool
+```tulam
 instance Eq(Nat) = {
     function ==(x:Nat, y:Nat) : Bool = eq(x,y)
 };
 ```
 
-**Test:** `:load base.fool` succeeds, `==(Z, Z)` evaluates to `True`, `==(Z, Succ(Z))` evaluates to `False`.
+**Test:** `:load base.tl` succeeds, `==(Z, Z)` evaluates to `True`, `==(Z, Succ(Z))` evaluates to `False`.
 
 **Milestone: Structures work end-to-end.** This is the foundation for everything that follows.
 
@@ -101,7 +101,7 @@ instance Eq(Nat) = {
 
 4. **Interactive desugaring**: The `afterparse` pass (BinaryOp->App desugaring) only runs on file loads. Interactive REPL expressions need manual desugaring in `processInteractive`. Note: `traverseExpr f` transforms children but NOT the root node -- must apply `f` to root separately.
 
-5. **What the plan got right**: The step ordering was correct. Instance parsing -> processing -> interpreter -> base.fool was the right sequence. The "instance processing adds cases to PatternMatches" approach from the original plan was wrong though -- direct instance maps turned out to be cleaner.
+5. **What the plan got right**: The step ordering was correct. Instance parsing -> processing -> interpreter -> base.tl was the right sequence. The "instance processing adds cases to PatternMatches" approach from the original plan was wrong though -- direct instance maps turned out to be cleaner.
 
 6. **What to watch for next**: The implicit-param function `== [a:Type]` still exists with its default body. Currently the default path (no instance found) falls through to the general function's `PatternMatches` body, which has only a default case that returns another function. This works but is fragile. Future: type checker should validate instance coverage.
 
@@ -249,12 +249,12 @@ fieldToVar (nm, tp) = Var nm tp UNDEFINED
 Add `try pRecord` to `pDef` before `pSumType`.
 
 **Test:**
-```fool
+```tulam
 record Point = { x:Nat, y:Nat };
 record Pair(a:Type, b:Type) = { fst:a, snd:b };
 ```
 ```
-> :load test.fool
+> :load test.tl
 > Point(Z, Succ(Z))
 Point(Z, Succ(Z))
 > let p = Point(Succ(Z), Z) in p.x
@@ -279,7 +279,7 @@ pRecordField =
 When a spread `..Point` is encountered, look up `Point` in the parsed types, extract its constructor fields, and splice them into the field list. Duplicate field names from later in the list override spread fields.
 
 **Test:**
-```fool
+```tulam
 record Point = { x:Nat, y:Nat };
 record Point3D = { ..Point, z:Nat };
 // expands to: type Point3D = { Point3D(x:Nat, y:Nat, z:Nat) }
@@ -329,7 +329,7 @@ Allow `expr { field = newValue }` to create a copy with fields changed.
 **Parser.hs:** Parse `pExpr { field = val, ... }` as `RecordUpdate Expr [(Name, Expr)]`.
 
 **Pipeline.hs — desugar:** Given record type info, expand to positional constructor call:
-```fool
+```tulam
 p { x = Succ(Z) }
 // desugars to:
 Point(Succ(Z), p.y)   // changed fields from update, unchanged from field access
@@ -371,7 +371,7 @@ Steps 2.1 and 2.2 are quick wins. Step 2.3 is the core record feature. Step 2.4 
 
 Add `extends` as reserved word. Modify structure/algebra parsing:
 
-```fool
+```tulam
 structure Ord(a:Type) extends Eq(a) = {
     function compare(x:a, y:a) : Ordering,
     function <(x:a, y:a) : Bool = ...
@@ -397,7 +397,7 @@ When building environment for a structure with `extends`:
 When `instance Ord(Nat)` is declared, the compiler should also require/verify `instance Eq(Nat)` exists (or generate an error).
 
 **Test:**
-```fool
+```tulam
 structure Eq(a:Type) = { function ==(x:a,y:a):Bool };
 structure Ord(a:Type) extends Eq(a) = { function <(x:a,y:a):Bool };
 instance Eq(Nat) = { ... };
@@ -432,7 +432,7 @@ In Pass 1, when processing an algebra, verify exactly one type parameter. When p
 When two morphism instances exist -- `Convertible(A,B)` and `Convertible(B,C)` -- the compiler can automatically derive `Convertible(A,C)`. This is an environment-building step in Pass 1.
 
 **Test:**
-```fool
+```tulam
 morphism Convertible(a:Type, b:Type) = { function convert(x:a):b };
 instance Convertible(Nat, Bool) = { function convert(x) = not(eq(x,Z)) };
 instance Convertible(Bool, Nat) = { function convert(x) = { {True} -> Succ(Z), {False} -> Z } };
@@ -453,7 +453,7 @@ instance Convertible(Bool, Nat) = { function convert(x) = { {True} -> Succ(Z), {
 
 Currently `a:Type` parses the type as `U 0`. We need `f:Type1` to mean "f is a type constructor" (a function from Type to Type).
 
-```fool
+```tulam
 algebra Functor(f:Type1) = {
     function fmap(g: a -> b, x:f(a)) : f(b)
 };
@@ -492,7 +492,7 @@ When `instance Functor(Maybe)` is declared, `f` is instantiated to `Maybe`, and 
 Type-level application (`f(a)` where `f` is a type variable) needs representation in CLM for the transition period before type erasure. This may just be `CLMAPP` applied to type arguments, which get erased later.
 
 **Test:**
-```fool
+```tulam
 algebra Functor(f:Type1) = { function fmap(g: a -> b, x:f(a)) : f(b) };
 instance Functor(Maybe) = {
     function fmap(g, x) = { {g, Nothing} -> Nothing, {g, Just(v)} -> Just(g(v)) }
@@ -513,7 +513,7 @@ instance Functor(Maybe) = {
 
 In type positions, `a -> b` should parse to a function type. This is the standard Pi type (non-dependent case):
 
-```fool
+```tulam
 function apply(f: Nat -> Bool, x:Nat) : Bool = f(x);
 ```
 
@@ -539,7 +539,7 @@ Function types are already representable as `Function (Lambda "" [Var "x" A UNDE
 
 **Files:** Parser.hs
 
-```fool
+```tulam
 action main : IO(Unit) = {
     name <- readLine(),        -- bind
     greeting = concat#("Hello, ", name),  -- let
@@ -553,7 +553,7 @@ action main : IO(Unit) = {
 
 **Files:** Pipeline.hs (Pass 0 or new pass)
 
-```fool
+```tulam
 -- name <- readLine()   =>  bind(readLine(), \name -> ...)
 -- greeting = expr      =>  let greeting = expr in ...
 -- putStrLn(greeting)   =>  bind(putStrLn(greeting), \_ -> pure(Unit))
@@ -561,9 +561,9 @@ action main : IO(Unit) = {
 
 This is a straightforward syntactic transformation. The key decision is whether to desugar in the parser (immediate) or in a pipeline pass (deferred). Deferred is better because it can use environment information to verify Monad instances exist.
 
-### Step 7.3: Define Monad in base.fool
+### Step 7.3: Define Monad in base.tl
 
-```fool
+```tulam
 algebra Functor(f:Type1) = { function fmap(g: a -> b, x:f(a)) : f(b) };
 algebra Applicative(f:Type1) extends Functor(f) = {
     function pure(x:a) : f(a),
@@ -586,7 +586,7 @@ algebra Monad(m:Type1) extends Applicative(m) = {
 
 ### Step 8.1: Core algebras
 
-```fool
+```tulam
 algebra Semigroup(a:Type) = { function combine(x:a, y:a) : a };
 algebra Monoid(a:Type) extends Semigroup(a) = { function empty() : a };
 algebra Group(a:Type) extends Monoid(a) = { function inverse(x:a) : a };
@@ -594,7 +594,7 @@ algebra Group(a:Type) extends Monoid(a) = { function inverse(x:a) : a };
 
 ### Step 8.2: Category and Arrow as library structures
 
-```fool
+```tulam
 algebra Category(arr:Type2) = {
     function id() : arr(a, a),
     function compose(f:arr(b,c), g:arr(a,b)) : arr(a,c)
@@ -614,7 +614,7 @@ When `Monad(m)` is instantiated, automatically derive `Category(Kleisli(m))` whe
 
 Add `natural` keyword for parametrically polymorphic functor morphisms:
 
-```fool
+```tulam
 natural safeHead : List ~> Maybe = {
     function transform(xs:List(a)) : Maybe(a) = { ... }
 };
