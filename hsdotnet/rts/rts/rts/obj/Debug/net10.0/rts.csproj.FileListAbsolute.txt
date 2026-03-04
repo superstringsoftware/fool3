@@ -1,0 +1,15 @@
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.GeneratedMSBuildEditorConfig.editorconfig
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.AssemblyInfoInputs.cache
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.AssemblyInfo.cs
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.csproj.CoreCompileInputs.cache
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.sourcelink.json
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/bin/Debug/net10.0/rts
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/bin/Debug/net10.0/rts.deps.json
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/bin/Debug/net10.0/rts.runtimeconfig.json
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/bin/Debug/net10.0/rts.dll
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/bin/Debug/net10.0/rts.pdb
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.dll
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/refint/rts.dll
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.pdb
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/rts.genruntimeconfig.cache
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/net10.0/ref/rts.dll

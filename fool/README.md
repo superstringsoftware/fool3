@@ -1,6 +1,11 @@
 # FOOL3: Functional Object-oriented low-level language
 
-## Internal Language Construction 
+## Design Documents
+
+- `doc/CategoricalDesign.md` — Categorical type system design: algebras, morphisms, functors, natural transformations, monads, categories, arrows.
+- `doc/ImplementationPlan.md` — 9-phase incremental implementation roadmap from current state to full categorical type system.
+
+## Internal Language Construction
 
 Based on several iterations we can have a strict construction of our language from the ground up using only 2 key "primitive" objects: everything is either a **tuple** or a **lambda**.
 

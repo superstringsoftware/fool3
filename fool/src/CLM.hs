@@ -38,6 +38,7 @@ data CLMExpr =
   | CLMTYPED CLMExpr CLMExpr -- in case we want to give a type to an expression
   | CLMPRIMCALL -- body of the function that is a primitive call
   | CLMLIT Literal
+  | CLMU Int -- Universe hierarchy: CLMU 0 = Type, CLMU 1 = Kind, etc.
     deriving (Show, Eq)
 
 -- helper function that goes inside all cons tags checks and well checks 
@@ -132,6 +133,8 @@ instance PrettyPrint CLMExpr where
     ppr (CLMFieldAccess (nm, _) ex) = ppr ex ++ "." ++ nm
     ppr (CLMPROG exs) = showListWFormat ppr "{\n" "\n}" ",\n" "{}" exs
     ppr (CLMBIND nm ex) = (as [bold] nm) ++ " = " ++ (ppr ex)
+    ppr (CLMU 0) = "Type"
+    ppr (CLMU n) = "Type" ++ show n
     ppr e = show e
 
 instance PrettyPrint CLMConsTagCheck where

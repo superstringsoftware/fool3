@@ -130,8 +130,38 @@ processBinding ( st@(Structure lam nm), si) env = do
             return env1'
     
 
-processBinding (ex, si) env = do 
-    let lpl = LogPayload 
+-- instance declaration processing
+-- instance Eq(Nat) = { function (==)(x:Nat,y:Nat):Bool = eq(x,y) }
+processBinding (Instance structName typeArgs impls, si) env = do
+    -- extract the type name from the first type arg (e.g., Id "Nat")
+    let typeName = case typeArgs of
+            (Id nm : _) -> nm
+            _           -> ""
+    if typeName == ""
+    then do
+        let lpl = LogPayload (lineNum si) (colNum si) ""
+                ("Instance declaration has no valid type argument: "
+                    ++ structName ++ "\n")
+        logError lpl
+        pure env
+    else do
+        -- for each function in the instance, store a specialized lambda
+        env' <- foldM (addInstanceFunc typeName) env impls
+        pure env'
+    where
+        addInstanceFunc typeNm env1 (Function lam) = do
+            let funcNm = lamName lam
+            -- liftIO $ putStrLn $ "Adding instance " ++ funcNm ++ " for " ++ typeNm
+            pure $ addInstanceLambda funcNm typeNm lam env1
+        addInstanceFunc _ env1 e = do
+            let lpl = LogPayload (lineNum si) (colNum si) ""
+                    ("Invalid expression inside instance declaration, expected function: "
+                        ++ ppr e ++ "\n")
+            logWarning lpl
+            pure env1
+
+processBinding (ex, si) env = do
+    let lpl = LogPayload
                 (lineNum si) (colNum si) ""
                 ("Cannot add the following expression to the Environment during initial Environment Building pass:\n" 
                     ++ (ppr ex) ++ "\n" 
@@ -173,9 +203,13 @@ buildPrimitivePass = mapM_ (\b -> buildEnvironmentM (b, SourceInfo 0 0 "")) prim
 caseOptimizationPass :: IntState()
 caseOptimizationPass = do
     s <- get
-    let lambdas = topLambdas $ currentEnvironment s
+    let env = currentEnvironment s
+    let lambdas = topLambdas env
     lambdas' <- traverseWithKey f lambdas
-    put s{currentEnvironment = (currentEnvironment s) {topLambdas = lambdas'} }
+    -- also optimize instance lambdas
+    let instLambdas = instanceLambdas env
+    instLambdas' <- traverseWithKey f instLambdas
+    put s{currentEnvironment = env {topLambdas = lambdas', instanceLambdas = instLambdas'} }
     where f k lam@(Lambda nm args (PatternMatches exs) tp) = do
                 exs' <- mapM (expandCase lam) exs
                 return lam {body = PatternMatches exs'}
@@ -409,7 +443,10 @@ lamToCLMPass = do
     let env = currentEnvironment s
     let lambdas = topLambdas env
     let clms = Map.mapWithKey (\n l -> lambdaToCLMLambda env l) lambdas
-    let env' = env { clmLambdas = clms }
+    -- also convert instance lambdas to CLM
+    let instLams = instanceLambdas env
+    let clmInsts = Map.mapWithKey (\n l -> lambdaToCLMLambda env l) instLams
+    let env' = env { clmLambdas = clms, clmInstances = clmInsts }
     let s' = s {currentEnvironment = env'}
     put s'
     
@@ -465,6 +502,7 @@ exprToCLM env e@(App (Id nm) exs) =
 exprToCLM env (App ex exs) = CLMAPP (exprToCLM env ex) (Prelude.map (exprToCLM env) exs)
 exprToCLM env (Function lam) = CLMLAM $ lambdaToCLMLambda env lam
 exprToCLM env (Lit l) = CLMLIT l
+exprToCLM _ (U n) = CLMU n
 exprToCLM _ e = CLMERR $ "ERROR: cannot convert expr to CLM: " ++ show e
 
 lambdaToCLMLambda :: Environment -> Lambda -> CLMLam

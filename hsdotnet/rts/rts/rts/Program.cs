@@ -352,11 +352,29 @@ namespace rts
             Console.WriteLine("Via Object[],    ms: " + tOpt11 + " (length = " + l1 + ")");
 
             */
-            //var lp = Test.generate.Call(new CLOSURE[] { new CONPRIM<int>(3) });
-            var lp = Test.generateIO(3);
+            // Test 1: generate a list
+            var lp = Test.generate.Call(new CLOSURE[] { new CONPRIM<int>(5) });
             Console.WriteLine("STG TESTS");
-            Console.WriteLine(lp);
-            Test.map.Call(new CLOSURE[] { Test.showIO, lp });
+            Console.WriteLine("Generated list: " + lp.ENTER);
+
+            // Test 2: PRIMOPS arithmetic
+            var a = new CONPRIM<int>(10);
+            var b = new CONPRIM<int>(32);
+            var sum = PRIMOPS.PlusHash(a, b);
+            Console.WriteLine("10 + 32 = " + sum.ENTER);
+
+            // Test 3: THUNK memoization
+            var thunk = new THUNK(Test.generate, new CLOSURE[] { new CONPRIM<int>(3) });
+            Console.WriteLine("Thunk before: " + thunk);
+            Console.WriteLine("Thunk forced: " + thunk.ENTER);
+            Console.WriteLine("Thunk after (cached): " + thunk);
+
+            // Test 4: PAP (partial application)
+            var addFun = new FUN((args) => PRIMOPS.PlusHash(args[0], args[1]), 2);
+            var pap = addFun.Call(new CLOSURE[] { new CONPRIM<int>(100) });
+            Console.WriteLine("PAP: " + pap);
+            var papResult = ((PAP)pap).Call(new CLOSURE[] { new CONPRIM<int>(42) });
+            Console.WriteLine("PAP applied: 100 + 42 = " + papResult.ENTER);
 
 
         }

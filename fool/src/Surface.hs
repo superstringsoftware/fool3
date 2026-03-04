@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, NamedFieldPuns, GADTs #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns, GADTs, PatternSynonyms #-}
 
 -- This is our PRIMARY CORE LANGUAGE, based on HoTT with some changes and extensions, notably - 
 -- we are using N-tuples explicitly, but there's more.
@@ -91,21 +91,23 @@ data Expr =
   -- body expression being a tuple of Lambdas which are constructors
   | UnaryOp Name Expr
   | BinaryOp Name Expr Expr
-  | Type -- U 0 synonim
+  | U Int -- Universe hierarchy: U 0 = Type, U 1 = Kind, etc.
   | Prim Lambda -- primitive function that is handled "magically"
   | PrimCall -- filler for the body of primitive functions
   | Implicit Expr -- current solution for implicit parameter functions
   -- that result e.g. from structure (typeclass) expansions -
   -- only used in the TYPE place!!!
+  | Instance Name [Expr] [Expr] -- Instance structureName [typeArgs] [function implementations]
   | ERROR String
 
-  -- | U Int -- universe hierarchy
-  -- | Universe -- biggest universe, when we want to refer to any type, kind, etc - see e.g. pifte function!
-  
   
   -- ^^^ in case of anonymous application, `name` fields will be empty or index; 
   -- typ is calculated for type checking. Optional + Explicit params. 
     deriving (Show, Eq)
+
+-- Convenience pattern synonym so existing code matching on Type keeps working
+pattern Type :: Expr
+pattern Type = U 0
 
 {-
 We will also handle types via Expr quite easily:
@@ -148,6 +150,8 @@ traverseExpr f (SumType lam) = SumType $ lam { body = f $ traverseExpr f (body l
 -- TODO: CHECK IF THIS IS THE CORRECT TRAVERSAL: !!!!
 traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f $ traverseExpr f (body l) } ) lams
 traverseExpr f (Binding (Var nm tp val)) = Binding (Var nm (f $ traverseExpr f tp) (f $ traverseExpr f val))
+traverseExpr _ e@(U _) = e
+traverseExpr f (Instance nm targs impls) = Instance nm (map (traverseExpr f) targs) (map (traverseExpr f) impls)
 traverseExpr f e = ERROR $ "Traverse not implemented for: " ++ ppr e
 
 -- App (Id "Succ") [App (Id "plus") [Id "n",Id "x"]]
@@ -224,5 +228,11 @@ instance PrettyPrint Expr where
     ++ showListRoBr ppr params 
     ++ pprTyp sig ++ " = "
     ++ ppr body
+  ppr (Instance nm targs impls) = (as [bold,green] "instance ") ++ nm
+    ++ showListRoBr ppr targs ++ " = "
+    ++ showListCuBr ppr impls
+  ppr (Implicit e) = "Implicit (" ++ ppr e ++ ")"
+  ppr (U 0) = "Type"
+  ppr (U n) = "Type" ++ show n
   ppr e = show e
-  -- λ  
+  -- λ

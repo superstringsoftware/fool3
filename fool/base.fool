@@ -24,15 +24,18 @@ structure Eq (a:Type) = {
 
 
 
-/*
+instance Eq(Nat) = {
+  function (==) (x:Nat,y:Nat) : Bool = eq(x,y)
+};
+
 instance Eq(Bool) = {
-  (==) = {
+  function (==) (x:Bool,y:Bool) : Bool = {
     {True,True} -> True,
     {False,False} -> True,
-    {_,_} -> False
+    {True,False} -> False,
+    {False,True} -> False
   }
 };
-*/
 /*
 type ForF = { Cons(a1:t,a2:t), Cell(a1:t,a2:t) };
 

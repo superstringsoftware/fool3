@@ -24,7 +24,6 @@ dependencies:
 - mtl
 - ghc
 - ghc-paths
-- haskeline 
 - ilist
 
 library:

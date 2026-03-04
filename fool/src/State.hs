@@ -30,12 +30,15 @@ type LTProgram = [(Expr, SourceInfo)]
 data Environment = Environment {
     -- Map that keeps all our TypeReps in the current environment
     types        :: NameMap Expr,
-    constructors :: NameMap (Lambda, Int), 
+    constructors :: NameMap (Lambda, Int),
     -- constructors are stored with their number inside the sum type
     topLambdas   :: NameMap Lambda,
     topBindings  :: NameMap Var,
     clmLambdas   :: NameMap CLMLam,
     clmBindings  :: NameMap CLMVar,
+    -- instance-specialized functions: key is "funcName\0typeName"
+    instanceLambdas :: NameMap Lambda,
+    clmInstances    :: NameMap CLMLam,
     outProgram   :: NameMap String
 } deriving Show
 
@@ -46,7 +49,9 @@ initialEnvironment = Environment {
     clmLambdas = Map.empty,
     topBindings = Map.empty,
     clmBindings = Map.empty,
-    outProgram   = Map.empty 
+    instanceLambdas = Map.empty,
+    clmInstances = Map.empty,
+    outProgram   = Map.empty
 }
 
 
@@ -102,7 +107,8 @@ data Expr =
   -- body expression being a tuple of Lambdas which are constructors
   | UnaryOp Name Expr
   | BinaryOp Name Expr Expr
-  | Type -- U 0 synonim
+  | U Int -- Universe hierarchy
+  | Instance Name [Expr] [Expr] -- instance declarations
 -}
 
 traverseExprM :: (Expr -> IntState Expr) -> Expr -> IntState Expr
@@ -151,6 +157,33 @@ addManyNamedConstructors i (c:cs) env = addManyNamedConstructors (i+1) cs (addNa
 
 -- addManyNamedConstructors :: [Lambda] -> Environment -> Environment
 -- addManyNamedConstructors ls env = env { constructors = Prelude.foldl (\acc l1 -> Map.insert (lamName l1) l1 acc) (topLambdas env) ls }
+
+-- Instance functions: keyed by "funcName\0typeName"
+mkInstanceKey :: Name -> Name -> Name
+mkInstanceKey funcName typeName = funcName ++ "\0" ++ typeName
+
+addInstanceLambda :: Name -> Name -> Lambda -> Environment -> Environment
+addInstanceLambda funcNm typeNm lam env =
+    env { instanceLambdas = Map.insert (mkInstanceKey funcNm typeNm) lam (instanceLambdas env) }
+
+lookupInstanceLambda :: Name -> Name -> Environment -> Maybe Lambda
+lookupInstanceLambda funcNm typeNm env = Map.lookup (mkInstanceKey funcNm typeNm) (instanceLambdas env)
+
+addCLMInstance :: Name -> Name -> CLMLam -> Environment -> Environment
+addCLMInstance funcNm typeNm clm env =
+    env { clmInstances = Map.insert (mkInstanceKey funcNm typeNm) clm (clmInstances env) }
+
+lookupCLMInstance :: Name -> Name -> Environment -> Maybe CLMLam
+lookupCLMInstance funcNm typeNm env = Map.lookup (mkInstanceKey funcNm typeNm) (clmInstances env)
+
+-- Reverse lookup: given a constructor name, find which type it belongs to
+lookupTypeOfConstructor :: Name -> Environment -> Maybe Name
+lookupTypeOfConstructor consName env =
+    case Map.lookup consName (constructors env) of
+        Just (lam, _) -> case lamType lam of
+            Id nm -> Just nm
+            _     -> Nothing
+        Nothing -> Nothing
 
 addManyLambdas :: [(Name, Lambda)] -> Environment -> Environment
 addManyLambdas ls env = env { topLambdas = Prelude.foldl (\acc (n1,l1) -> Map.insert n1 l1 acc) (topLambdas env) ls }

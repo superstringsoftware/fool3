@@ -9,3 +9,11 @@
 /Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.AssemblyInfo.cs
 /Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.dll
 /Users/aantich/Dropbox/Dev/Haskell/fool/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.pdb
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.csproj.AssemblyReference.cache
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.GeneratedMSBuildEditorConfig.editorconfig
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.AssemblyInfoInputs.cache
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.AssemblyInfo.cs
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.csproj.CoreCompileInputs.cache
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.sourcelink.json
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.dll
+/Users/aantich/dev/haskell/fool3/hsdotnet/rts/rts/rts/obj/Debug/netcoreapp2.1/rts.pdb

@@ -93,6 +93,16 @@ pStructure = do
     exs <- braces (sepBy (try pSumType <|> try pFunc <|> pAction ) (reservedOp ",") )
     return $ Structure (str{body = Tuple exs}) []
 
+-- INSTANCES ---------------------------------------------------------
+pInstance :: Parser Expr
+pInstance = do
+    reserved "instance"
+    name <- identifier
+    targs <- parens (sepBy1 concreteType (reservedOp ","))
+    reservedOp "="
+    exs <- braces (sepBy (try pFunc) (reservedOp ","))
+    return $ Instance name targs exs
+
 -- FUNCTIONS ---------------------------------------------------------
 pFuncHeader :: Parser Lambda
 pFuncHeader = do
@@ -205,9 +215,20 @@ strictTypeSignature =
 typeSignature = try strictTypeSignature <|> pure UNDEFINED
 
 concreteType :: Parser Expr
-concreteType = do
+concreteType = try parseUniverse <|> do
     nm <- identifier
     return $ Id nm
+
+parseUniverse :: Parser Expr
+parseUniverse = do
+    nm <- identifier
+    case nm of
+      "Type"  -> return (U 0)
+      "Type0" -> return (U 0)
+      "Type1" -> return (U 1)
+      "Type2" -> return (U 2)
+      "Type3" -> return (U 3)
+      _       -> fail "not a universe"
 
 
 int :: Parser Literal
@@ -257,8 +278,9 @@ pApp = do
 
 -- Building top level parsers
 pDef :: Parser Expr
-pDef =  try pSumType 
+pDef =  try pSumType
         <|> try pStructure
+        <|> try pInstance
         <|> try pFunc
         <|> try pAction
         <|> pBinding
