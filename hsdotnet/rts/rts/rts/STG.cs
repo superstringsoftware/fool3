@@ -229,12 +229,40 @@ namespace SuperstringSolutions.HSNet.STG
         }
     }
 
+    // State# RealWorld — phantom token for IO threading
+    public class STATE_TOKEN : CLOSURE
+    {
+        public static readonly STATE_TOKEN Instance = new STATE_TOKEN();
+        public override string ToString() => "State#";
+    }
+
+    // Unboxed tuple — (# a, b, ... #)
+    public class UNBOXED_TUPLE : CLOSURE
+    {
+        public CLOSURE[] Fields;
+        public UNBOXED_TUPLE(CLOSURE[] fs) { Fields = fs; }
+        public override string ToString()
+        {
+            return "(# " + string.Join(", ", Array.ConvertAll(Fields, f => f?.ToString() ?? "null")) + " #)";
+        }
+    }
+
     // Static STG evaluation and application helpers
     public static class STG
     {
         public static CLOSURE EVAL(CLOSURE c)
         {
+            if (c == null)
+                throw new Exception("STG.EVAL: attempted to evaluate null closure");
             return c.ENTER;
+        }
+
+        // Run a Haskell main :: IO () action
+        // IO a = State# RealWorld -> (# State# RealWorld, a #)
+        public static void RunMain(CLOSURE mainIO)
+        {
+            CLOSURE result = APPLY(EVAL(mainIO), new CLOSURE[] { STATE_TOKEN.Instance });
+            // result is UNBOXED_TUPLE — we ignore it (IO () returns unit)
         }
 
         // Apply a function closure to arguments

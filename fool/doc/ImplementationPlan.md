@@ -111,47 +111,253 @@ instance Eq(Nat) = {
 
 **Goal:** Fill in the missing basic constructs so the language is usable for non-trivial programs.
 
+See also: `doc/RecordDesign.md` for full record system design rationale.
+
 ### Step 2.1: Parse and desugar `if/then/else`
 
-**Files:** Parser.hs, Pipeline.hs (or desugar in parser)
+**Files:** Surface.hs, Parser.hs, Pipeline.hs
 
-```fool
-if cond then e1 else e2
--- desugars to:
-case cond of { True -> e1, False -> e2 }
+Add `IfThenElse Expr Expr Expr` to the `Expr` type. This keeps parsing clean and puts desugar logic in the pipeline where it belongs.
+
+**Surface.hs:**
+- Add `| IfThenElse Expr Expr Expr` to `Expr`
+- Add `traverseExpr f (IfThenElse c t e) = IfThenElse (f c) (f t) (f e)`
+- Add `ppr (IfThenElse c t e) = "if " ++ ppr c ++ " then " ++ ppr t ++ " else " ++ ppr e`
+
+**Parser.hs:**
+- Add `pIfThenElse` parser using existing reserved words `if`, `then`, `else`
+- Add `try pIfThenElse` to `pFactor` before `pApp`
+
+```haskell
+pIfThenElse :: Parser Expr
+pIfThenElse = do
+    reserved "if"
+    cond <- pExpr
+    reserved "then"
+    e1 <- pExpr
+    reserved "else"
+    e2 <- pExpr
+    return $ IfThenElse cond e1 e2
 ```
 
-Already reserved in lexer. Add parser rule in `pExpr`/`pFactor`. Desugar immediately to pattern match (no new Expr constructor needed).
+**Pipeline.hs — afterparse desugaring:**
+```haskell
+afterparse (IfThenElse cond thenE elseE) =
+    App (Function (Lambda "" []
+        (PatternMatches
+            [ CaseOf [Var "" (Id "Bool") (Id "True")]  thenE defaultSI
+            , CaseOf [Var "" (Id "Bool") (Id "False")] elseE defaultSI
+            ]) EMPTY)) [cond]
+```
 
-**Test:** `function abs(x:Int):Int = if x > 0 then x else minus(0, x);`
+The desugared form feeds into existing Pass 2 case optimization, which expands it into constructor tag checks. No CLM or interpreter changes needed.
+
+**Test:**
+```
+> if True then Succ(Z) else Z
+Succ(Z)
+> if False then Succ(Z) else Z
+Z
+```
 
 ### Step 2.2: Parse `let/in` expressions
 
-**Files:** Parser.hs
+**Files:** Surface.hs, Parser.hs, Pipeline.hs
 
-```fool
-let x:Nat = Succ(Z) in plus(x, x)
+Add `LetIn [(Var, Expr)] Expr` to `Expr` — list of `(variable, value)` bindings and a body expression.
+
+**Surface.hs:**
+- Add `| LetIn [(Var, Expr)] Expr`
+- Add traverseExpr: apply f to binding values and body
+- Add ppr
+
+**Parser.hs:**
+```haskell
+pLetIn :: Parser Expr
+pLetIn = do
+    reserved "let"
+    bindings <- sepBy1 pLetBinding (reservedOp ",")
+    reserved "in"
+    body <- pExpr
+    return $ LetIn bindings body
+
+pLetBinding :: Parser (Var, Expr)
+pLetBinding = do
+    nm <- identifier
+    tp <- optionMaybe (reservedOp ":" >> concreteType)
+    reservedOp "="
+    val <- pExpr
+    return (Var nm (maybe UNDEFINED id tp) UNDEFINED, val)
 ```
 
-Desugar to lambda application: `(\x -> plus(x,x))(Succ(Z))`. Or add a `Let Var Expr` constructor to Expr if we want to keep it explicit for readability in passes.
+Add `try pLetIn` to `pFactor` before `pApp`.
 
-**Test:** `let one = Succ(Z) in plus(one, one)` evaluates to `Succ(Succ(Z))`.
+**Pipeline.hs — afterparse desugaring:**
+```haskell
+-- let x = e1, y = e2 in body  =>  (\x -> (\y -> body)(e2))(e1)
+afterparse (LetIn [(v, val)] body) =
+    App (Function (Lambda "" [v] body EMPTY)) [val]
+afterparse (LetIn ((v,val):rest) body) =
+    App (Function (Lambda "" [v] (LetIn rest body) EMPTY)) [val]
+```
 
-### Step 2.3: Record types
+Nested lets desugar to nested lambda applications. The recursive case gets caught by the next afterparse traversal.
+
+**Test:**
+```
+> let one = Succ(Z) in plus(one, one)
+Succ(Succ(Z))
+> let a = Succ(Z), b = Succ(Succ(Z)) in plus(a, b)
+Succ(Succ(Succ(Z)))
+```
+
+### Step 2.3: Named records with functions as fields
+
+**Files:** Lexer.hs, Parser.hs
+
+Records are products with named fields. They can contain any values, including functions. They desugar to single-constructor sum types, so the existing pipeline handles them with no changes.
+
+**Lexer.hs:** Add `"record"` to reserved words.
+
+**Parser.hs:**
+```haskell
+pRecord :: Parser Expr
+pRecord = do
+    reserved "record"
+    name <- identifier
+    -- optional type parameters
+    tparams <- optionMaybe (parens (sepBy1 pTypeParam (reservedOp ",")))
+    reservedOp "="
+    fields <- braces (sepBy1 pRecordField (reservedOp ","))
+    -- Desugar: record Foo = { x:A, y:B }  =>  type Foo = { Foo(x:A, y:B) }
+    let vars = map fieldToVar fields
+    let consLam = Lambda name vars EMPTY (Id name)
+    let tpVars = maybe [] id tparams
+    return $ SumType (Lambda name tpVars (Tuple [Function consLam]) (U 0))
+
+pRecordField :: Parser (Name, Expr)
+pRecordField = do
+    nm <- identifier
+    reservedOp ":"
+    tp <- concreteType
+    return (nm, tp)
+
+fieldToVar :: (Name, Expr) -> Var
+fieldToVar (nm, tp) = Var nm tp UNDEFINED
+```
+
+Add `try pRecord` to `pDef` before `pSumType`.
+
+**Test:**
+```fool
+record Point = { x:Nat, y:Nat };
+record Pair(a:Type, b:Type) = { fst:a, snd:b };
+```
+```
+> :load test.fool
+> Point(Z, Succ(Z))
+Point(Z, Succ(Z))
+> let p = Point(Succ(Z), Z) in p.x
+Succ(Z)
+```
+
+### Step 2.4: Record spread in declarations
+
+**Files:** Parser.hs, Pipeline.hs
+
+Allow `..Name` in record field lists to include all fields from another record.
+
+**Parser.hs:** In `pRecordField`, handle the `..` prefix:
+```haskell
+pRecordField :: Parser (Either Name (Name, Expr))
+pRecordField =
+    try (reservedOp ".." >> identifier >>= return . Left)   -- spread
+    <|> (do nm <- identifier; reservedOp ":"; tp <- concreteType; return $ Right (nm, tp))
+```
+
+**Pipeline.hs — resolve spread in Pass 0 or afterparse:**
+When a spread `..Point` is encountered, look up `Point` in the parsed types, extract its constructor fields, and splice them into the field list. Duplicate field names from later in the list override spread fields.
+
+**Test:**
+```fool
+record Point = { x:Nat, y:Nat };
+record Point3D = { ..Point, z:Nat };
+// expands to: type Point3D = { Point3D(x:Nat, y:Nat, z:Nat) }
+```
+
+### Step 2.5: Named record construction syntax
 
 **Files:** Parser.hs
 
-```fool
-record Person = { name:String, age:Nat };
--- desugars to:
-type Person = { Person(name:String, age:Nat) };
+Allow `Name { field = value, ... }` as an alternative to positional `Name(value, ...)`.
+
+**Parser.hs:**
+```haskell
+pNamedConstruction :: Parser Expr
+pNamedConstruction = do
+    nm <- identifier
+    fields <- braces (sepBy1 pFieldAssign (reservedOp ","))
+    -- reorder fields to match declaration order, produce positional App
+    return $ NamedRecord nm fields
+
+pFieldAssign :: Parser (Name, Expr)
+pFieldAssign = do
+    nm <- identifier
+    reservedOp "="
+    val <- pExpr
+    return (nm, val)
 ```
 
-Add `record` to reserved words. Parser desugars to single-constructor sum type.
+This needs a new `NamedRecord Name [(Name, Expr)]` constructor in Surface.hs that desugars in Pass 0/afterparse to a positional constructor call after looking up the field order from the environment.
 
-**Test:** Parse `record Point = { x:Nat, y:Nat };`, access fields with `.x`, `.y`.
+Alternative: defer named construction to Phase 3 and only support positional `Point(Z, Z)` in Phase 2. Named construction requires environment access during desugaring which adds complexity.
 
-**Milestone: Language is usable for basic programs with structures, pattern matching, conditionals, local bindings, and records.**
+**Test:**
+```
+> Point { x = Z, y = Succ(Z) }
+Point(Z, Succ(Z))
+> Point { y = Succ(Z), x = Z }    // order doesn't matter
+Point(Z, Succ(Z))
+```
+
+### Step 2.6: Record update syntax
+
+**Files:** Parser.hs, Pipeline.hs
+
+Allow `expr { field = newValue }` to create a copy with fields changed.
+
+**Parser.hs:** Parse `pExpr { field = val, ... }` as `RecordUpdate Expr [(Name, Expr)]`.
+
+**Pipeline.hs — desugar:** Given record type info, expand to positional constructor call:
+```fool
+p { x = Succ(Z) }
+// desugars to:
+Point(Succ(Z), p.y)   // changed fields from update, unchanged from field access
+```
+
+**Note:** This requires knowing the record's type to enumerate fields. Options:
+- Require type annotation: `(p:Point) { x = Succ(Z) }`
+- Infer from context (needs type checker)
+- Defer to Phase 4+ when we have basic type inference
+
+**Recommendation:** Defer record update to a later phase. It needs type info to know which fields to copy. Steps 2.1-2.4 give us records that work; update is convenience sugar.
+
+### Phase 2 ordering and dependencies
+
+```
+Step 2.1 (if/then/else)        <- independent, simple desugar
+Step 2.2 (let/in)              <- independent, simple desugar
+Step 2.3 (named records)       <- independent, desugars to sum types
+Step 2.4 (record spread)       <- depends on 2.3
+Step 2.5 (named construction)  <- depends on 2.3, needs environment access
+Step 2.6 (record update)       <- DEFER to later phase (needs type info)
+```
+
+Recommended order: **2.1 → 2.2 → 2.3 → 2.4 → 2.5(optional)**
+
+Steps 2.1 and 2.2 are quick wins. Step 2.3 is the core record feature. Step 2.4 (spread) is valuable for record extension. Step 2.5 (named construction) can be deferred if environment access during desugaring proves complex. Step 2.6 (update) is deferred.
+
+**Milestone: Language has conditionals, local bindings, records with functions-as-fields, and record extension. Usable for non-trivial programs.**
 
 ---
 

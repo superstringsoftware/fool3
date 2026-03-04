@@ -30,7 +30,189 @@ All of these compile down to the same implicit-parameter functions that FOOL3 al
 
 ---
 
-## 2. Level 1: Algebras -- Structure on One Type
+## 2. Relationships Between Structures: `extends` vs `requires`
+
+### 2.1 The Problem
+
+In Haskell, multi-parameter typeclasses use a single mechanism (`=>` constraints) for two fundamentally different relationships:
+
+```haskell
+class Eq a => Ord a where ...          -- Ord REFINES Eq (same param)
+class (Monad m, MonadIO m) => App m    -- App NEEDS these (same param, but constraint)
+class Container f a where ...          -- f and a are different shapes entirely
+```
+
+FOOL3 distinguishes these with two keywords: **`extends`** and **`requires`**.
+
+### 2.2 `extends` — Same-shape refinement
+
+`extends` means "this structure is a refinement of that one." Both structures share the same parameter(s) in the same positions. The child adds new operations to the parent's operations.
+
+```fool
+algebra Semigroup(a:Type) = {
+    function combine(x:a, y:a) : a,
+    law associativity(x:a, y:a, z:a) = combine(x, combine(y,z)) === combine(combine(x,y), z)
+};
+
+algebra Monoid(a:Type) extends Semigroup(a) = {
+    function empty() : a,
+    law leftIdentity(x:a)  = combine(empty(), x) === x,
+    law rightIdentity(x:a) = combine(x, empty()) === x
+};
+
+algebra Group(a:Type) extends Monoid(a) = {
+    function inverse(x:a) : a,
+    law leftInverse(x:a)  = combine(inverse(x), x) === empty(),
+    law rightInverse(x:a) = combine(x, inverse(x)) === empty()
+};
+```
+
+**Semantics of `extends`:**
+- Parameters must match exactly (same names, same types, same positions)
+- All operations from the parent are inherited
+- All laws from the parent are inherited
+- An instance of the child automatically satisfies the parent
+- Compiler can verify parameter shape match at declaration time
+
+**Compilation:** `extends` generates the same implicit-parameter functions as `structure`, but the compiler registers the inheritance relationship. When you provide an `instance Group(Int)`, the compiler automatically has `Monoid(Int)` and `Semigroup(Int)` available for dispatch.
+
+### 2.3 `requires` — External constraints
+
+`requires` means "this structure needs evidence that some other structure is satisfied, but the other structure may have different parameters or a different shape."
+
+```fool
+morphism Convertible(a:Type, b:Type) = {
+    function convert(x:a) : b
+};
+
+// Requires a constraint with a DIFFERENT shape (Eq has 1 param, this has 2)
+morphism OrdConvertible(a:Type, b:Type) requires Ord(a), Ord(b) = {
+    function convert(x:a) : b,
+    law preserveOrder(x:a, y:a) = (x < y) ==> (convert(x) < convert(y))
+};
+
+// Requires a constraint on a RELATED but different parameter
+algebra Functor(f:Type1) = {
+    function fmap(g: a -> b, x:f(a)) : f(b)
+};
+
+algebra Monad(m:Type1) extends Applicative(m) = {
+    function bind(x:m(a), f:a -> m(b)) : m(b)
+};
+
+// Kleisli category: the constraint (Monad) has a different shape than Category
+algebra Category(arr: Type -> Type -> Type) = {
+    function id(a:Type) : arr(a, a),
+    function compose(f:arr(b,c), g:arr(a,b)) : arr(a,c),
+    law leftId(f:arr(a,b))  = compose(id(b), f) === f,
+    law rightId(f:arr(a,b)) = compose(f, id(a)) === f,
+    law assoc(f:arr(c,d), g:arr(b,c), h:arr(a,b)) =
+        compose(f, compose(g, h)) === compose(compose(f, g), h)
+};
+
+instance Category(Kleisli(m)) requires Monad(m) = {
+    function id(a:Type) : Kleisli(m, a, a) = { {x} -> return(x) },
+    function compose(f:Kleisli(m,b,c), g:Kleisli(m,a,b)) : Kleisli(m,a,c) = {
+        {x} -> bind(g(x), f)
+    }
+};
+```
+
+**Semantics of `requires`:**
+- Constraints can have completely different parameter shapes
+- Constraints must be satisfied for the structure/instance to be used
+- The required structures' operations are available inside the body
+- Multiple `requires` clauses are comma-separated
+
+**Compilation:** `requires` compiles to additional implicit parameters. `instance Category(Kleisli(m)) requires Monad(m)` means the dispatch for `compose` on Kleisli arrows needs a `Monad(m)` dictionary available at the call site.
+
+### 2.4 Summary
+
+| Keyword | Relationship | Parameters | Example |
+|---------|-------------|------------|---------|
+| `extends` | Refinement (adds operations) | Same shape | `Monoid extends Semigroup` |
+| `requires` | Constraint (needs evidence) | Any shape | `instance X requires Monad(m)` |
+
+---
+
+## 3. Laws
+
+### 3.1 Syntax
+
+Laws are declared inside structures using the `law` keyword. They express equalities that instances should satisfy.
+
+```fool
+law <name>(<params>) = <LHS> === <RHS>
+```
+
+- **`===`** is propositional equality — "these two expressions should always produce the same result." It is distinct from `==` which is the computable equality function from `Eq`.
+- **`==>`** is implication — "if the left side holds, the right side must also hold." Used for conditional laws.
+
+### 3.2 Examples
+
+```fool
+algebra Semigroup(a:Type) = {
+    function combine(x:a, y:a) : a,
+    law associativity(x:a, y:a, z:a) =
+        combine(x, combine(y, z)) === combine(combine(x, y), z)
+};
+
+algebra Monoid(a:Type) extends Semigroup(a) = {
+    function empty() : a,
+    law leftIdentity(x:a)  = combine(empty(), x) === x,
+    law rightIdentity(x:a) = combine(x, empty()) === x
+};
+
+algebra Eq(a:Type) = {
+    function (==)(x:a, y:a) : Bool = not(x != y),
+    function (!=)(x:a, y:a) : Bool = not(x == y),
+    law reflexivity(x:a)         = (x == x) === True,
+    law symmetry(x:a, y:a)       = (x == y) === (y == x),
+    law transitivity(x:a, y:a, z:a) =
+        ((x == y) == True) ==> ((y == z) == True) ==> ((x == z) === True)
+};
+
+algebra Ord(a:Type) extends Eq(a) = {
+    function compare(x:a, y:a) : Ordering,
+    function (<)(x:a, y:a)  : Bool = compare(x,y) == LT,
+    function (>)(x:a, y:a)  : Bool = compare(x,y) == GT,
+    function (<=)(x:a, y:a) : Bool = not(x > y),
+    function (>=)(x:a, y:a) : Bool = not(x < y),
+    law totalOrder(x:a, y:a) = (x <= y) === True ==> True
+                             |  (y <= x) === True ==> True,
+    law antisymmetry(x:a, y:a) =
+        ((x <= y) == True) ==> ((y <= x) == True) ==> ((x == y) === True)
+};
+
+morphism Iso(a:Type, b:Type) extends Convertible(a, b) = {
+    function unconvert(x:b) : a,
+    law roundtrip1(x:a) = unconvert(convert(x)) === x,
+    law roundtrip2(y:b) = convert(unconvert(y)) === y
+};
+```
+
+### 3.3 Semantics
+
+Laws are **carried but not enforced** until the type checker is ready. The plan is:
+
+1. **Phase 1 (now):** Parse and store laws in the AST. They're visible in `:list structures` output.
+2. **Phase 2 (with type checker):** Laws are available for property-based testing. The compiler generates QuickCheck-style properties.
+3. **Phase 3 (advanced):** Laws inform optimizations. If `fmap(id) === id` is a law, the compiler can eliminate identity fmaps. If associativity holds, the compiler can rebalance expression trees.
+
+### 3.4 `===` vs `==`
+
+| Operator | Meaning | Lives in | Computable? |
+|----------|---------|----------|-------------|
+| `==` | Decidable equality | `Eq` structure | Yes — returns `Bool` at runtime |
+| `===` | Propositional equality | Laws | Not directly — it's a *specification*, not a computation |
+
+`===` says "for all valid inputs satisfying the parameter types, these two sides reduce to the same value." It's the moral equivalent of Agda's `≡` or Lean's `=` in propositions.
+
+`==>` says "if the antecedent is true, the consequent must hold." Used for conditional laws where the property only needs to hold under certain conditions.
+
+---
+
+## 4. Level 1: Algebras — Structure on One Type
 
 An algebra equips a single carrier type with operations and laws.
 
@@ -39,11 +221,17 @@ An algebra equips a single carrier type with operations and laws.
 ```fool
 algebra Monoid(a:Type) = {
     function empty() : a,
-    function combine(x:a, y:a) : a
+    function combine(x:a, y:a) : a,
+    law leftIdentity(x:a)    = combine(empty(), x) === x,
+    law rightIdentity(x:a)   = combine(x, empty()) === x,
+    law associativity(x:a, y:a, z:a) =
+        combine(x, combine(y, z)) === combine(combine(x, y), z)
 };
 
 algebra Group(a:Type) extends Monoid(a) = {
-    function inverse(x:a) : a
+    function inverse(x:a) : a,
+    law leftInverse(x:a)  = combine(inverse(x), x) === empty(),
+    law rightInverse(x:a) = combine(x, inverse(x)) === empty()
 };
 ```
 
@@ -53,7 +241,7 @@ When something is declared as `algebra` rather than `structure`:
 - There is exactly **one carrier type** parameter
 - **Product derivation** is sound: if `Monoid(A)` and `Monoid(B)`, then `Monoid({a:A, b:B})` can be derived automatically (pointwise operations)
 - **Free construction** may be available: the free monoid over `a` is `List(a)`
-- Laws (when we add them) can be checked by property testing
+- Laws can be checked by property testing
 
 ### Compilation
 
@@ -63,33 +251,36 @@ Identical to current `structure` compilation. `algebra` is sugar that tells the 
 
 ```fool
 algebra Eq(a:Type) = {
-    function ==(x:a, y:a) : Bool = not(!=(x,y)),
-    function !=(x:a, y:a) : Bool = not(==(x,y))
+    function (==)(x:a, y:a) : Bool = not(x != y),
+    function (!=)(x:a, y:a) : Bool = not(x == y),
+    law reflexivity(x:a)    = (x == x) === True,
+    law symmetry(x:a, y:a)  = (x == y) === (y == x)
 };
 
 algebra Ord(a:Type) extends Eq(a) = {
     function compare(x:a, y:a) : Ordering,
-    function <(x:a, y:a) : Bool  = compare(x,y) == LT,
-    function >(x:a, y:a) : Bool  = compare(x,y) == GT,
-    function <=(x:a, y:a) : Bool = not(>(x,y)),
-    function >=(x:a, y:a) : Bool = not(<(x,y))
+    function (<)(x:a, y:a)  : Bool = compare(x,y) == LT,
+    function (>)(x:a, y:a)  : Bool = compare(x,y) == GT,
+    function (<=)(x:a, y:a) : Bool = not(x > y),
+    function (>=)(x:a, y:a) : Bool = not(x < y)
 };
 
 algebra Semigroup(a:Type) = {
-    function combine(x:a, y:a) : a
-    -- law: associativity: combine(x, combine(y,z)) == combine(combine(x,y), z)
+    function combine(x:a, y:a) : a,
+    law associativity(x:a, y:a, z:a) =
+        combine(x, combine(y, z)) === combine(combine(x, y), z)
 };
 
 algebra Monoid(a:Type) extends Semigroup(a) = {
-    function empty() : a
-    -- law: left identity:  combine(empty(), x) == x
-    -- law: right identity: combine(x, empty()) == x
+    function empty() : a,
+    law leftIdentity(x:a)  = combine(empty(), x) === x,
+    law rightIdentity(x:a) = combine(x, empty()) === x
 };
 ```
 
 ---
 
-## 3. Level 2: Morphisms -- Relations Between Types
+## 5. Level 2: Morphisms — Relations Between Types
 
 A morphism establishes a directed relationship between two (or more) types. This is structure *between* objects in our category, not *within* a single object.
 
@@ -100,11 +291,10 @@ morphism Convertible(a:Type, b:Type) = {
     function convert(x:a) : b
 };
 
-morphism Iso(a:Type, b:Type)
-    extends Convertible(a, b) = {
-    function unconvert(x:b) : a
-    -- law: unconvert(convert(x)) == x
-    -- law: convert(unconvert(y)) == y
+morphism Iso(a:Type, b:Type) extends Convertible(a, b) = {
+    function unconvert(x:b) : a,
+    law roundtrip1(x:a) = unconvert(convert(x)) === x,
+    law roundtrip2(y:b) = convert(unconvert(y)) === y
 };
 ```
 
@@ -114,7 +304,7 @@ When something is declared as `morphism`:
 - There are **two or more type** parameters with a directional relationship
 - **Composition** is automatic: if `Convertible(A,B)` and `Convertible(B,C)`, the compiler can derive `Convertible(A,C)` via `convert(x) = convert_BC(convert_AB(x))`
 - **Identity** exists: `Convertible(A,A)` is trivially `convert = id`
-- This means morphisms form a **category** automatically (see Section 6)
+- This means morphisms form a **category** automatically (see Section 8)
 
 ### Compilation
 
@@ -128,7 +318,7 @@ On .NET, `Convertible(A,B)` maps to implicit conversion operators. Composition m
 instance Convertible(Int, Float) = { function convert(x:Int):Float = intToFloat#(x) };
 instance Convertible(Float, String) = { function convert(x:Float):String = showFloat#(x) };
 
--- compiler can derive: Convertible(Int, String) via Float
+// compiler can derive: Convertible(Int, String) via Float
 ```
 
 ### Value-dependent morphisms
@@ -136,18 +326,19 @@ instance Convertible(Float, String) = { function convert(x:Float):String = showF
 Structures can also depend on values, creating *indexed* or *parameterized* morphisms:
 
 ```fool
-morphism LinearMap(k:Type, v:Type, w:Type, field:Field(k)) = {
+morphism LinearMap(k:Type, v:Type, w:Type) requires Field(k) = {
     function apply(f:v -> w, x:v) : w,
-    function scale(s:k, x:v) : v
-    -- law: apply(f, scale(s,x)) == scale(s, apply(f,x))
+    function scale(s:k, x:v) : v,
+    law linearity(f:v -> w, s:k, x:v) =
+        apply(f, scale(s, x)) === scale(s, apply(f, x))
 };
 ```
 
-Here `field:Field(k)` is a *value* (a proof that `k` is a field) living in `Type1` thanks to our universe hierarchy. The structure is parameterized by both types and evidence.
+Here `requires Field(k)` provides evidence that `k` is a field. The structure is constrained by a separate structure on one of its parameters.
 
 ---
 
-## 4. Level 3: Functors -- Structure-Preserving Maps
+## 6. Level 3: Functors — Structure-Preserving Maps
 
 A functor is a type constructor `F : Type -> Type` that also maps functions: if you have `f : a -> b`, you get `fmap(f) : F(a) -> F(b)`.
 
@@ -157,8 +348,8 @@ A functor is a type constructor `F : Type -> Type` that also maps functions: if 
 
 ```fool
 functor Maybe(a:Type) : Type = { Just(x:a), Nothing };
--- This BOTH defines the sum type AND declares fmap exists.
--- fmap must be provided or derived.
+// This BOTH defines the sum type AND declares fmap exists.
+// fmap must be provided or derived.
 
 functor List(a:Type) : Type = { Nil, Cons(head:a, tail:List(a)) };
 ```
@@ -169,7 +360,10 @@ functor List(a:Type) : Type = { Nil, Cons(head:a, tail:List(a)) };
 type Maybe(a:Type) = { Just(x:a), Nothing };
 
 algebra Functor(f:Type1) = {
-    function fmap(g: a -> b, x:f(a)) : f(b)
+    function fmap(g: a -> b, x:f(a)) : f(b),
+    law identity(x:f(a))        = fmap(id, x) === x,
+    law composition(f:b -> c, g:a -> b, x:f(a)) =
+        fmap(compose(f, g), x) === fmap(f, fmap(g, x))
 };
 
 instance Functor(Maybe) = {
@@ -192,16 +386,16 @@ instance Functor(Maybe) = {
 However, we could add `functor` as **sugar** that expands to Option B:
 
 ```fool
--- this:
+// this:
 functor Maybe(a:Type) : Type = { Just(x:a), Nothing };
--- expands to:
+// expands to:
 type Maybe(a:Type) = { Just(x:a), Nothing };
--- plus auto-derived: instance Functor(Maybe) = { ... }
+// plus auto-derived: instance Functor(Maybe) = { ... }
 ```
 
 ### What the compiler knows
 
-- `Functor(F)` means `F` preserves composition: `fmap(f . g) == fmap(f) . fmap(g)`
+- `Functor(F)` means `F` preserves composition: `fmap(f . g) === fmap(f) . fmap(g)`
 - `Functor(F)` and `Functor(G)` implies `Functor(F . G)` -- functor composition is automatic
 - This is the foundation for Applicative, Monad, Traversable, etc.
 
@@ -211,7 +405,7 @@ Functors require the type system to handle `f:Type1` -- type constructors as fir
 
 ---
 
-## 5. Level 4: Natural Transformations -- Morphisms Between Functors
+## 7. Level 4: Natural Transformations — Morphisms Between Functors
 
 A natural transformation is a family of functions `F(a) -> G(a)` that is *uniform* in `a` -- it doesn't inspect or depend on what `a` is.
 
@@ -235,7 +429,7 @@ natural flatten : List . List ~> List = {
 - The function inside `natural` must be parametrically polymorphic in the element type
 - Natural transformations compose: if `alpha : F ~> G` and `beta : G ~> H`, then `beta . alpha : F ~> H`
 - Vertical composition (above) and horizontal composition (with functors) both work
-- The naturality condition `fmap_G(f) . alpha == alpha . fmap_F(f)` holds by parametricity (free theorem)
+- The naturality condition `fmap_G(f) . alpha === alpha . fmap_F(f)` holds by parametricity (free theorem)
 
 ### Why this matters
 
@@ -251,7 +445,7 @@ By marking these as `natural`, the compiler knows they compose and can optimize 
 
 A `natural` declaration compiles to a rank-2 polymorphic function internally:
 ```fool
--- natural safeHead : List ~> Maybe compiles to:
+// natural safeHead : List ~> Maybe compiles to:
 function safeHead [a:Type] (xs:List(a)) : Maybe(a) = ...
 ```
 
@@ -259,9 +453,9 @@ The `natural` keyword is a *contract* that this function doesn't inspect `a`, wh
 
 ---
 
-## 6. Categories and Arrows
+## 8. Categories and Arrows
 
-### 6.1 The Default Category
+### 8.1 The Default Category
 
 FOOL3 programs live in a default category implicitly:
 - **Objects** = types (inhabitants of `Type`)
@@ -271,22 +465,23 @@ FOOL3 programs live in a default category implicitly:
 
 This is **Type**, the category of types and functions. We don't need to declare it -- it's the ambient universe.
 
-### 6.2 Category as a Structure
+### 8.2 Category as a Structure
 
 Other categories can be defined as structures. A category needs:
 
 ```fool
--- A category is parameterized by its morphism type
--- Objects are implicit (they're the types that arr connects)
+// A category is parameterized by its morphism type
+// Objects are implicit (they're the types that arr connects)
 algebra Category(arr: Type -> Type -> Type) = {
     function id(a:Type) : arr(a, a),
-    function compose(f:arr(b,c), g:arr(a,b)) : arr(a,c)
-    -- law: compose(id, f) == f            (left identity)
-    -- law: compose(f, id) == f            (right identity)
-    -- law: compose(f, compose(g,h)) == compose(compose(f,g), h)  (associativity)
+    function compose(f:arr(b,c), g:arr(a,b)) : arr(a,c),
+    law leftId(f:arr(a,b))  = compose(id(b), f) === f,
+    law rightId(f:arr(a,b)) = compose(f, id(a)) === f,
+    law assoc(f:arr(c,d), g:arr(b,c), h:arr(a,b)) =
+        compose(f, compose(g, h)) === compose(compose(f, g), h)
 };
 
--- The default instance: plain functions form a category
+// The default instance: plain functions form a category
 instance Category(Function) = {
     function id(a:Type) : a -> a = { {x} -> x },
     function compose(f, g) = { {x} -> f(g(x)) }
@@ -295,15 +490,15 @@ instance Category(Function) = {
 
 Note: `Category` takes `arr : Type -> Type -> Type` -- a two-parameter type constructor. This requires our type system to handle `Type -> Type -> Type` as a kind, which is `Type2` in our universe hierarchy.
 
-### 6.3 Kleisli Categories
+### 8.3 Kleisli Categories
 
 Every monad gives rise to a category -- the Kleisli category. This is where monads connect to the categorical framework:
 
 ```fool
--- Kleisli arrow: a function a -> m(b) for some monad m
+// Kleisli arrow: a function a -> m(b) for some monad m
 type Kleisli(m: Type -> Type, a:Type, b:Type) = a -> m(b);
 
--- Given a Monad(m), Kleisli(m) forms a Category
+// Given a Monad(m), Kleisli(m) forms a Category
 instance Category(Kleisli(m)) requires Monad(m) = {
     function id(a:Type) : Kleisli(m, a, a) = { {x} -> return(x) },
     function compose(f:Kleisli(m,b,c), g:Kleisli(m,a,b)) : Kleisli(m,a,c) = {
@@ -314,22 +509,24 @@ instance Category(Kleisli(m)) requires Monad(m) = {
 
 This is extremely powerful: it means **every monad automatically gives you a category** of effectful computations, with composition working correctly.
 
-### 6.4 Arrows
+### 8.4 Arrows
 
 Arrows generalize both functions and monadic computations. An Arrow is a Category with additional structure:
 
 ```fool
 algebra Arrow(arr: Type -> Type -> Type) extends Category(arr) = {
-    function arr(f: a -> b) : arr(a, b),           -- lift a function
-    function first(f:arr(a,b)) : arr({a,c}, {b,c}) -- process first component
-    -- derived:
+    function arr(f: a -> b) : arr(a, b),           // lift a function
+    function first(f:arr(a,b)) : arr({a,c}, {b,c}), // process first component
+    // derived:
     function second(f:arr(a,b)) : arr({c,a}, {c,b}) = ...,
     function split(f:arr(a,b), g:arr(c,d)) : arr({a,c}, {b,d}) = ...,
-    function fanout(f:arr(a,b), g:arr(a,c)) : arr(a, {b,c}) = ...
+    function fanout(f:arr(a,b), g:arr(a,c)) : arr(a, {b,c}) = ...,
+    law arrId() = arr(id) === id,
+    law arrCompose(f:a -> b, g:b -> c) = arr(compose(g, f)) === compose(arr(g), arr(f))
 };
 ```
 
-### 6.5 Should Category and Arrow be first-class keywords?
+### 8.5 Should Category and Arrow be first-class keywords?
 
 **No. They should be structures (algebras).**
 
@@ -338,7 +535,7 @@ Reasoning:
 - Making them keywords would add complexity without enabling anything that structures can't express
 - The Haskell approach (Category and Arrow as typeclasses) is correct here
 - The interesting thing about categories is not their definition but their *use* -- composition operators, do-notation, arrow notation
-- What we DO want is **syntactic sugar** that works with any Category instance (see Section 8)
+- What we DO want is **syntactic sugar** that works with any Category instance (see Section 10)
 
 However, `Category` and `Arrow` should be **built-in structures** in the standard library (like `base.fool`), not user-defined, because the compiler needs to know about them for:
 - Optimizing composition chains
@@ -347,9 +544,9 @@ However, `Category` and `Arrow` should be **built-in structures** in the standar
 
 ---
 
-## 7. Monads -- Structure on Functors
+## 9. Monads — Structure on Functors
 
-### 7.1 Where Monads Fit
+### 9.1 Where Monads Fit
 
 A monad is a functor with extra algebraic structure. In categorical terms:
 
@@ -357,7 +554,7 @@ A monad is a functor with extra algebraic structure. In categorical terms:
 
 In FOOL3 terms, this translates to: **a Monad is an algebra on a Functor**.
 
-### 7.2 Should Monad be a keyword or a structure?
+### 9.2 Should Monad be a keyword or a structure?
 
 **Monad should be a structure (algebra), not a first-class keyword.**
 
@@ -375,29 +572,35 @@ Reasoning:
 - Not every functor is a monad, not every monad is used with do-notation -- a keyword would be over-specific
 - `Applicative` sits between `Functor` and `Monad` -- making `Monad` special but not `Applicative` would be arbitrary
 
-### 7.3 The Monad Hierarchy
+### 9.3 The Monad Hierarchy
 
 ```fool
--- Functor: can map over contents
+// Functor: can map over contents
 algebra Functor(f:Type1) = {
-    function fmap(g: a -> b, x:f(a)) : f(b)
+    function fmap(g: a -> b, x:f(a)) : f(b),
+    law identity(x:f(a)) = fmap(id, x) === x,
+    law composition(f:b -> c, g:a -> b, x:f(a)) =
+        fmap(compose(f, g), x) === fmap(f, fmap(g, x))
 };
 
--- Applicative: can lift multi-argument functions
+// Applicative: can lift multi-argument functions
 algebra Applicative(f:Type1) extends Functor(f) = {
     function pure(x:a) : f(a),
-    function ap(ff:f(a -> b), fa:f(a)) : f(b)
+    function ap(ff:f(a -> b), fa:f(a)) : f(b),
+    law apIdentity(v:f(a)) = ap(pure(id), v) === v,
+    law apHomomorphism(f:a -> b, x:a) = ap(pure(f), pure(x)) === pure(f(x))
 };
 
--- Monad: can sequence dependent computations
+// Monad: can sequence dependent computations
 algebra Monad(m:Type1) extends Applicative(m) = {
-    function bind(x:m(a), f:a -> m(b)) : m(b)
-    -- derived from Applicative:
-    -- pure comes from Applicative
-    -- fmap(f,x) = bind(x, compose(pure, f))
+    function bind(x:m(a), f:a -> m(b)) : m(b),
+    law leftUnit(x:a, f:a -> m(b))  = bind(pure(x), f) === f(x),
+    law rightUnit(x:m(a))           = bind(x, pure) === x,
+    law associativity(x:m(a), f:a -> m(b), g:b -> m(c)) =
+        bind(bind(x, f), g) === bind(x, { {a} -> bind(f(a), g) })
 };
 
--- Example instance:
+// Example instance:
 instance Monad(Maybe) = {
     function bind(x, f) = {
         {Nothing, f} -> Nothing,
@@ -406,19 +609,19 @@ instance Monad(Maybe) = {
 };
 ```
 
-### 7.4 Do-notation as syntactic sugar
+### 9.4 Do-notation as syntactic sugar
 
 The `do`-notation desugars into `bind` calls, working with anything that has a `Monad` instance:
 
 ```fool
--- this:
+// this:
 action main : IO(Unit) = {
     name <- readLine(),
     greeting = "Hello, " + name,
     putStrLn(greeting)
 };
 
--- desugars to:
+// desugars to:
 function main() : IO(Unit) =
     bind(readLine(), { {name} ->
         bind(putStrLn("Hello, " + name), { {_} -> pure({}) })
@@ -427,20 +630,20 @@ function main() : IO(Unit) =
 
 Since FOOL3 already has `action` as a keyword for sequential computation, this is a natural fit: **`action` IS do-notation**. The action body is a sequence of statements that desugar into monadic bind chains.
 
-### 7.5 Monad gives you a Category for free
+### 9.5 Monad gives you a Category for free
 
-As shown in Section 6.3, every `Monad(m)` automatically gives `Category(Kleisli(m))`. The compiler should derive this automatically:
+As shown in Section 8.3, every `Monad(m)` automatically gives `Category(Kleisli(m))`. The compiler should derive this automatically:
 
 ```fool
--- The compiler generates this whenever it sees Monad(m):
-instance Category(Kleisli(m)) = { ... }  -- derived from Monad(m)
+// The compiler generates this whenever it sees Monad(m):
+instance Category(Kleisli(m)) = { ... }  // derived from Monad(m)
 ```
 
 This means monadic composition (`>=>` in Haskell) comes for free as `compose` in the Kleisli category.
 
 ---
 
-## 8. Syntactic Sugar Tied to Structures
+## 10. Syntactic Sugar Tied to Structures
 
 The categorical structures enable specific syntactic sugar. The key insight is that **sugar is tied to structure instances, not keywords**:
 
@@ -456,7 +659,7 @@ The categorical structures enable specific syntactic sugar. The key insight is t
 
 ---
 
-## 9. The Full Picture
+## 11. The Full Picture
 
 ```
                     Category(arr)
@@ -487,13 +690,18 @@ The hierarchy tells the compiler what *extra things* it can derive and optimize.
 
 ---
 
-## 10. Summary of Keywords
+## 12. Summary of Keywords
 
 | Keyword | Status | Meaning |
 |---------|--------|---------|
 | `structure` | **Exists now** | General-purpose, catch-all |
 | `algebra` | **New sugar** | Single-type structure (enables product derivation) |
 | `morphism` | **New sugar** | Multi-type structure (enables composition) |
+| `extends` | **New** | Same-shape refinement (inherits operations + laws) |
+| `requires` | **New** | External constraints (different shape allowed) |
+| `law` | **New** | Declares equational property using `===` |
+| `===` | **New operator** | Propositional equality in laws |
+| `==>` | **New operator** | Implication in conditional laws |
 | `functor` | **Future** | Sugar for type + Functor instance (requires HKT) |
 | `natural` | **Future** | Parametrically polymorphic functor morphism (requires HKT) |
 | `category` | **Not a keyword** | Defined as algebra in standard library |
@@ -514,38 +722,71 @@ The hierarchy tells the compiler what *extra things* it can derive and optimize.
 
 ---
 
-## 11. Implementation Roadmap
+## 13. Implementation Roadmap
 
-### Phase 1: Now (no type checker needed)
+### Phase 1: Foundation (COMPLETE)
 - [x] Universe hierarchy (`U Int`, `Type`, `Type1`, ...)
-- [ ] `algebra` keyword as alias for single-param `structure`
-- [ ] `morphism` keyword as alias for multi-param `structure`
-- [ ] `extends` for structure inheritance
-- [ ] Carry the algebra/morphism distinction through the pipeline
+- [x] Instance declarations: parse, process, case-optimize, CLM-convert, interpret
+- [x] Instance dispatch via constructor tag type inference
+- [x] `base.fool` with `Eq(Nat)`, `Eq(Bool)` instances
 
-### Phase 2: With basic type checking
-- [ ] Higher-kinded type parameters (`f:Type1` in structures)
-- [ ] `Functor` as a standard library algebra
-- [ ] `Applicative`, `Monad` as standard library algebras
+### Phase 2: Basic language completeness
+- [ ] `if/then/else` expression
+- [ ] `let/in` bindings
+- [ ] Records (named product types)
+- [ ] List literals and basic list operations
+- [ ] Primitive operations (`print#`, `concat#`, arithmetic)
+
+### Phase 3: Algebra and Morphism keywords
+- [ ] `algebra` keyword — parser, AST node, pipeline (validates single-param)
+- [ ] `morphism` keyword — parser, AST node, pipeline (validates 2+ params)
+- [ ] Both compile identically to `structure` in the pipeline
+- [ ] `law` declarations — parse and store in AST (not enforced yet)
+- [ ] `===` operator in law context (parsed as `PropEq` AST node, not a runtime op)
+- [ ] `==>` implication in law context
+
+### Phase 4: `extends` for same-shape refinement
+- [ ] `extends` in parser for structure/algebra/morphism declarations
+- [ ] Validate parameter shape match at parse time
+- [ ] Inherit operations from parent structure
+- [ ] Inherit laws from parent structure
+- [ ] Auto-derive parent instances from child instances
+
+### Phase 5: `requires` for constraints
+- [ ] `requires` clause in parser for structures and instances
+- [ ] Compile `requires` to additional implicit parameters
+- [ ] Constraint resolution during instance dispatch
+- [ ] Support on both structure declarations and instance declarations
+
+### Phase 6: Higher-kinded types
+- [ ] `f:Type1` parameters in structures (type constructor parameters)
+- [ ] Type-constructor application (`f(a)` where `f` is a type variable)
+- [ ] `Functor`, `Applicative`, `Monad` in standard library
 - [ ] `action` body desugaring to `bind` chains
 - [ ] Automatic morphism composition for `Convertible`
 
-### Phase 3: Full categorical infrastructure
+### Phase 7: Full categorical infrastructure
 - [ ] `natural` keyword for natural transformations
 - [ ] `functor` keyword as sugar for type + Functor instance
 - [ ] `Category`, `Arrow` in standard library
 - [ ] Automatic Kleisli category derivation from Monad
 - [ ] Composition operator (`.`) dispatching through Category instances
 
-### Phase 4: Advanced
-- [ ] Law specifications and property-based testing
+### Phase 8: Type checker
+- [ ] Universe level checking (`Type : Type1`, etc.)
+- [ ] Basic type inference / unification
+- [ ] Structure constraint checking
+- [ ] Law verification via property-based testing
+
+### Phase 9: Advanced
 - [ ] Automatic algebra derivation for product types
+- [ ] Law-based optimizations (rewrite rules)
 - [ ] Profunctors, Comonads, Adjunctions as standard library structures
 - [ ] Universe polymorphism (if needed)
 
 ---
 
-## 12. Relation to Existing FOOL3 Concepts
+## 14. Relation to Existing FOOL3 Concepts
 
 ### How this fits with "everything is tuples + lambdas"
 
@@ -569,12 +810,12 @@ All of these are still tuples and lambdas internally. The categorical keywords a
 
 ```
 Source (.fool)
-  -> Parser (recognizes algebra/morphism/structure keywords)
-  -> Surface AST (Expr nodes carry the categorical classification)
-  -> Pass 1: Environment building (registers algebras, morphisms with their properties)
+  -> Parser (recognizes algebra/morphism/structure/law keywords)
+  -> Surface AST (Expr nodes carry the categorical classification + laws)
+  -> Pass 1: Environment building (registers algebras, morphisms, extends/requires)
   -> Pass 2: Case optimization (unchanged)
   -> Pass 3: CLM conversion (categorical info erased -- CLM is simply-typed)
-  -> Pass 4: Type checking (validates laws, derives compositions)
+  -> Pass 4: Type checking (validates laws, derives compositions, checks extends/requires)
   -> Pass 5: Code generation (uses categorical info for target-specific optimization)
 ```
 

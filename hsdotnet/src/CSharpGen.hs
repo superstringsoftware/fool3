@@ -8,6 +8,10 @@ import GHC.Types.Var
 import GHC.Core.DataCon
 import GHC.Types.Literal
 
+import GHC.Types.RepType (PrimRep(..))
+import qualified Data.ByteString.Char8 as BS
+
+import Data.List (isInfixOf)
 import Data.List.Index (imapM, ifind)
 import Data.Foldable (foldlM)
 import Control.Monad (liftM2, foldM)
@@ -28,10 +32,21 @@ instance CSharpable a => CSharpable (Maybe a) where
 
 
 instance CSharpable DotNetObj where
+    toCSharp (STRINGLIT v bs) = do
+        ins <- checkTopLevel >>= pure . not
+        let prefix = if ins then "var " else ""
+        stab (prefix ++ funString2String v ++ " = PRIMOPS.unpackCStringHash(\"" ++ escapeCSharpString (BS.unpack bs) ++ "\");\n")
     toCSharp (CON v n1 tag ar) = do
         ins <- checkTopLevel >>= pure . not
-        s1 <- conArgs2CSharpLookup ar
-        stab ((if ins then "var " else "") ++ funString2String (fst v) ++ " = new CON(" ++ show tag ++ ", " ++ s1 ++ "); /* " ++ funString2String n1 ++ " */\n")
+        let prefix = if ins then "var " else ""
+        let vn = funString2String v
+        case primBoxType n1 of
+            Just csType -> do
+                s1 <- primBoxArg csType ar
+                stab (prefix ++ vn ++ " = " ++ s1 ++ "; /* " ++ funString2String n1 ++ " */\n")
+            Nothing -> do
+                s1 <- conArgs2CSharpLookup ar
+                stab (prefix ++ vn ++ " = new CON(" ++ show tag ++ ", " ++ s1 ++ "); /* " ++ funString2String n1 ++ " */\n")
     toCSharp e@(FUN n fv ar c) = genClosure n fv ar c "FUN"
     toCSharp e@(ONCE n fv ar c) = genClosure n fv ar c "THUNK"  -- ONCE is just THUNK for now
     toCSharp e@(THUNK n fv ar c) = genClosure n fv ar c "THUNK"
@@ -55,7 +70,7 @@ genClosureFull addVar n fv ar c con addRet = do
     ins <- checkTopLevel >>= pure . not
     s0 <- varargs2CSharpLookup fv
     let prefix = if addVar && ins then "var " else ""
-    let n' = funString2String (fst n)
+    let n' = funString2String n
     let isFun = con == "FUN"
     let arityStr = show (length ar)
     -- Get a unique freeVars variable name to avoid duplicate declarations
@@ -63,19 +78,27 @@ genClosureFull addVar n fv ar c con addRet = do
     fvDecl <- if null fv then return ""
               else stab ("var " ++ fvName ++ " = " ++ s0 ++ ";\n")
     let fvRef = if null fv then "CLOSURE.EMPTY" else fvName
-    -- FUN: new FUN(fvRef, arity, (args)=> { body })  -- fvName captured by C# closure
-    -- THUNK: new THUNK(fvRef, ()=> { body })          -- fvName captured by C# closure
+    -- FUN: new FUN(fvRef, arity, (__args)=> { var x = __args[0]; ... body })
+    -- THUNK: new THUNK(fvRef, ()=> { body })
     let ctorOpen = if isFun
-            then prefix ++ n' ++ " = new FUN(" ++ fvRef ++ ", " ++ arityStr ++ ", " ++ args2CSharp ar
+            then prefix ++ n' ++ " = new FUN(" ++ fvRef ++ ", " ++ arityStr ++ ", (__args)"
             else prefix ++ n' ++ " = new THUNK(" ++ fvRef ++ ", ()"
-    s1 <- stab ( ctorOpen ++ if addRet then "=> {\n" else "=> {" )
+    s1 <- stab (ctorOpen ++ "=> {\n")
     incTab
+    -- For FUN: unpack __args into named local variables
+    argUnpack <- if isFun
+        then fmap concat $ imapM (\i v -> stab ("var " ++ funString2String (showGhc v) ++ " = __args[" ++ show i ++ "];\n")) ar
+        else return ""
     s2 <- withFreeVars fvName fv (toCSharp c)
-    r1 <- stab "return "
-    decTab
-    s3 <- stab "});\n"
-    let body = if addRet then (s1 ++ r1 ++ s2 ++ ";\n" ++ s3) else (s1 ++ s2 ++ "\n" ++ s3)
-    return (fvDecl ++ body)
+    if addRet then do
+        r1 <- stab "return "
+        decTab
+        s3 <- stab "});\n"
+        return (fvDecl ++ s1 ++ argUnpack ++ r1 ++ s2 ++ ";\n" ++ s3)
+    else do
+        decTab
+        s3 <- stab "});\n"
+        return (fvDecl ++ s1 ++ argUnpack ++ s2 ++ "\n" ++ s3)
 
 -- converting free vars to arguments in a new closure object call
 freeVars2CSharp [] = "CLOSURE.EMPTY"
@@ -102,15 +125,37 @@ lookupArgs _emptyCase open close convert (x:xs) = do
 -- Convert a StgArg (literal or variable) with free var lookup
 convertStgArg :: StgArg -> SM String
 convertStgArg (StgLitArg lit) = pure $ lit2CSharp lit
-convertStgArg (StgVarArg x)  = lookupFreeVar (showGhc x)
+convertStgArg (StgVarArg x)  = case knownNullaryCon (showGhc x) of
+    Just cs -> pure cs
+    Nothing -> lookupFreeVar (showGhc x)
 
--- Lookup a variable name, resolving to __fvN[i] if it's a captured free var
+-- | Known nullary constructors that need special C# representation
+knownNullaryCon :: String -> Maybe String
+knownNullaryCon "[]"    = Just "new CON(1, CLOSURE.EMPTY) /* [] */"
+knownNullaryCon "True"  = Just "new CON(2, CLOSURE.EMPTY) /* True */"
+knownNullaryCon "False" = Just "new CON(1, CLOSURE.EMPTY) /* False */"
+knownNullaryCon "()"    = Just "new CON(1, CLOSURE.EMPTY) /* () */"
+knownNullaryCon _       = Nothing
+
+-- Lookup a variable name, resolving to __fvN[i] if it's a captured free var.
+-- If not a free var, sanitize the name for C# via funString2String.
 lookupFreeVar :: String -> SM String
 lookupFreeVar name = do
     freeVars <- readFreeVars
     fvName <- getFreeVarsName
     let fv = ifind (\i el -> name == (showGhc el) ) freeVars
-    return $ maybe name ( \(i,_) -> fvName ++ "[" ++ show i ++ "]" ) fv
+    return $ maybe (funString2String name) ( \(i,_) -> fvName ++ "[" ++ show i ++ "]" ) fv
+
+-- Convert a StgArg to raw (unboxed) C# value — no CONPRIM wrapping for literals
+convertStgArgRaw :: StgArg -> SM String
+convertStgArgRaw (StgLitArg lit) = pure $ lit2CSharpRaw lit
+convertStgArgRaw (StgVarArg x)  = case knownNullaryCon (showGhc x) of
+    Just cs -> pure cs
+    Nothing -> lookupFreeVar (showGhc x)
+
+-- Primitive boxing constructor args: raw values, comma-separated
+primArgs2CSharpLookup :: [StgArg] -> SM String
+primArgs2CSharpLookup = lookupArgs "" "" "" convertStgArgRaw
 
 -- Free vars for closure construction: new CLOSURE[] {...} or CLOSURE.EMPTY
 varargs2CSharpLookup :: Args -> SM String
@@ -127,17 +172,35 @@ args2CSharpLookup = lookupArgs "()" "(" ")" convertStgArg
 
 instance CSharpable DotNetExpr where
     toCSharp (RAWSTG e) = return $ "[NOT IMPLEMENTED] " ++ "(" ++ showGhc e ++ ")\n"
-    toCSharp (VAR v) = lookupFreeVar $ fst v
+    toCSharp (VAR v) = lookupFreeVar v
     toCSharp (LITERAL l) = return $ lit2CSharp l
-    toCSharp (FUNCALL (n1,_) args) = do
+    toCSharp (FUNCALL n1 args) = do
+        fn <- lookupFreeVar n1
         s <- conArgs2CSharpLookup args
-        pure ("STG.APPLY(" ++ n ++ ", " ++ s ++ ")") where n = funString2String n1
-    toCSharp (CONCALL (n1,_) tag args) = do
+        pure ("STG.APPLY(" ++ fn ++ ", " ++ s ++ ")")
+    toCSharp (CONCALL n1 tag args) = do
+        let n = funString2String n1
+        case primBoxType n1 of
+            Just csType -> do
+                -- Primitive boxing constructor (I#, C#, D#, F#, W#) → CONPRIM<T>
+                -- If the arg is a variable, it's already a CONPRIM — just pass through.
+                -- If it's a literal, wrap in new CONPRIM<T>(rawValue).
+                s <- primBoxArg csType args
+                pure (s ++ " /* " ++ n ++ " */")
+            Nothing -> do
+                s <- conArgs2CSharpLookup args
+                pure ("new CON(" ++ show tag ++ ", " ++ s ++ ") /* " ++ n ++ " */")
+    toCSharp (PRIMOP n1 args)   = args2CSharpLookup args >>= \s -> pure ("PRIMOPS." ++ n ++ s) where n = funString2String n1
+    toCSharp (PRIMCALL n1 args) = args2CSharpLookup args >>= \s -> pure ("[PRIMCALL]" ++ n ++ ".CALL" ++ s) where n = funString2String n1
+    toCSharp (FOREIGNCALL n1 args) = do
+        s <- args2CSharpLookup args
+        let n = funString2String n1
+        case knownForeignCall n of
+            Just gen -> pure (gen s)
+            Nothing  -> pure ("/* [FOREIGN] " ++ n ++ " */ null")
+    toCSharp (UNBOXED_TUPLE args) = do
         s <- conArgs2CSharpLookup args
-        pure ("new CON(" ++ show tag ++ ", " ++ s ++ ") /* " ++ funString2String n1 ++ " */")
-    toCSharp (PRIMOP (n1,_) args)   = args2CSharpLookup args >>= \s -> pure ("PRIMOPS." ++ n ++ s) where n = funString2String n1
-    toCSharp (PRIMCALL (n1,_) args) = args2CSharpLookup args >>= \s -> pure ("[PRIMCALL]" ++ n ++ ".CALL" ++ s) where n = funString2String n1
-    toCSharp (FOREIGNCALL (n1,_) args) = args2CSharpLookup args >>= \s -> pure ("[FOREIGN]" ++ n ++ ".CALL" ++ s) where n = funString2String n1
+        pure ("new UNBOXED_TUPLE(" ++ s ++ ")")
     -- let .. in let - is a separate case, don't need "return" there!!!
     toCSharp (LET o e@(LET _ _)) = (liftM2 (++) (toCSharp o) (toCSharp e)) >>= (\s -> pure $ "\n" ++ s)
     -- normal let transforms to a number of var assignments and then a return for "in" expression
@@ -157,13 +220,15 @@ instance CSharpable DotNetExpr where
               else toCSharp e >>= \x -> stab ("return " ++ x ++ ";")
         return ("\n" ++ concat decls ++ concat assigns ++ s1)
         where
-            forwardDecl obj = stab ("CLOSURE " ++ funString2String (fst $ name obj) ++ " = null;\n")
+            forwardDecl obj = stab ("CLOSURE " ++ funString2String (name obj) ++ " = null;\n")
             -- like toCSharp for DotNetObj but without "var" prefix
-            letrecAssign (CON v n1 tag ar) = conArgs2CSharpLookup ar >>= \s1 -> stab (funString2String (fst v) ++ " = new CON(" ++ show tag ++ ", " ++ s1 ++ ");\n")
+            letrecAssign (CON v n1 tag ar) = case primBoxType n1 of
+                Just csType -> primBoxArg csType ar >>= \s1 -> stab (funString2String v ++ " = " ++ s1 ++ ";\n")
+                Nothing -> conArgs2CSharpLookup ar >>= \s1 -> stab (funString2String v ++ " = new CON(" ++ show tag ++ ", " ++ s1 ++ ");\n")
             letrecAssign obj = genClosureFull False (name obj) (freeVars obj) (args obj) (code obj) (conName' obj) (not $ isACaseOrLet (code obj))
             conName' (FUN {}) = "FUN"
             conName' (THUNK {}) = "THUNK"
-            conName' (ONCE {}) = "THUNK_ONCE"
+            conName' (ONCE {}) = "THUNK"
             conName' _ = "CLOSURE"
     -- only one case and it is default - flat code with evaluation and return
     -- Needs TONS AND TONS OF REFACTORING!!!!!
@@ -178,62 +243,166 @@ instance CSharpable DotNetExpr where
         s2 <- if (isACaseOrLet re) then
                 do toCSharp re >>= stab
               else do toCSharp re >>= \x -> stab ("return " ++ x ++ ";")
-        s3 <- altToPatternMatch bndrs n >>= pure . (foldl (++) "")
+        s3 <- altToPatternMatchCon bndrs (funString2String n) altType con >>= pure . (foldl (++) "")
         return ("/* [CASESIMPLE][" ++ showGhc altType ++ "] */" ++ (altConToComment con bndrs) ++ "\n" ++ s1 ++ s3 ++ s2)
     toCSharp (CASE n e def cases altType) = do
         s2 <- processCaseEval n e
-        s6 <- stab ("switch (" ++ n ++ ") {\n")
+        let switchExpr = caseSwitchExpr n altType
+        s6 <- stab ("switch (" ++ switchExpr ++ ") {\n")
         incTab
-        s3 <- altsToCSharp n cases
-        incTab
-        defSt <- toCSharp def
-        decTab
-        s4 <- stab ("default: " ++ defSt)
+        s3 <- altsToCSharp n cases altType
+        -- Default case
+        s5 <- case def of
+            Nothing -> do
+                -- No default — add throw to satisfy C# exhaustiveness check
+                s4 <- stab "default:\n"
+                incTab
+                throwSt <- stab "throw new Exception(\"Non-exhaustive case\");\n"
+                decTab
+                return (s4 ++ throwSt)
+            Just defExpr -> do
+                s4 <- stab "default:\n"
+                incTab
+                defBody <- if (isACaseOrLet defExpr) then
+                        toCSharp defExpr >>= stab
+                    else toCSharp defExpr >>= \x -> stab ("return " ++ x ++ ";")
+                decTab
+                return (s4 ++ defBody ++ "\n")
         decTab
         s7 <- stab "}"
-        let s5 = if (defSt == "") then "" else s4
-        return ("/* [CASE][" ++ showGhc altType ++ "] */\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ "\n" ++ s7)
+        return ("/* [CASE][" ++ showGhc altType ++ "] */\n" ++ s2 ++ s6 ++ s3 ++ s5 ++ s7)
 
 ----------------------------------------------------------------------
 -- HELPER FUNCTIONS
 ----------------------------------------------------------------------
 
+-- | Generate the C# switch expression based on the AltType
+-- The name `n` is raw from showGhc — sanitize it.
+caseSwitchExpr :: String -> AltType -> String
+caseSwitchExpr n (AlgAlt _)        = "((CON)" ++ n' ++ ").__CONSTAG__"  where n' = funString2String n
+caseSwitchExpr n (PrimAlt IntRep)  = "((CONPRIM<int>)" ++ n' ++ ").Val"  where n' = funString2String n
+caseSwitchExpr n (PrimAlt WordRep) = "((CONPRIM<uint>)" ++ n' ++ ").Val"  where n' = funString2String n
+caseSwitchExpr n (PrimAlt Int64Rep) = "((CONPRIM<long>)" ++ n' ++ ").Val"  where n' = funString2String n
+caseSwitchExpr n (PrimAlt Word64Rep) = "((CONPRIM<ulong>)" ++ n' ++ ").Val"  where n' = funString2String n
+caseSwitchExpr n (PrimAlt DoubleRep) = "((CONPRIM<double>)" ++ n' ++ ").Val"  where n' = funString2String n
+caseSwitchExpr n (PrimAlt FloatRep)  = "((CONPRIM<float>)" ++ n' ++ ").Val"  where n' = funString2String n
+caseSwitchExpr n (PrimAlt _)       = "((CONPRIM<int>)" ++ n' ++ ").Val"  where n' = funString2String n
+caseSwitchExpr n (MultiValAlt _)   = funString2String n
+caseSwitchExpr n PolyAlt           = funString2String n
+
 -- | Generate case scrutinee evaluation; primops don't need extra EVAL call
+-- The name `n` comes from showGhc and needs sanitization.
 processCaseEval :: String -> DotNetExpr -> SM String
-processCaseEval n e@(PRIMOP _ _) = toCSharp e >>= \x -> stab ("var " ++ n ++ " = " ++ x ++ ";\n")
-processCaseEval n e = toCSharp e >>= \x -> stab ("var " ++ n ++ " = STG.EVAL(" ++ x ++ ");\n")
+processCaseEval n e@(PRIMOP _ _) = toCSharp e >>= \x -> stab ("var " ++ funString2String n ++ " = " ++ x ++ ";\n")
+processCaseEval n e = toCSharp e >>= \x -> stab ("var " ++ funString2String n ++ " = STG.EVAL(" ++ x ++ ");\n")
 
 -- | Convert pattern match constructor to destructuring assignment of C# datatypes
-altToPatternMatch :: [String] -> String -> SM [String]
-altToPatternMatch bndrs vname = imapM (fn vname) bndrs
-        where fn vn i b = stab ("var " ++ b ++ " = ((CON)" ++ vn ++ ").Vals[" ++ show i ++ "];\n")
+-- AltType-aware: AlgAlt uses CON.Vals[i], PrimAlt has no destructuring,
+-- MultiValAlt uses UNBOXED_TUPLE.Fields[i]
+-- For prim boxing constructors (I#, C#, etc.), use CONPRIM<T>.Val
+altToPatternMatch :: [String] -> String -> AltType -> SM [String]
+altToPatternMatch bndrs vname (AlgAlt _) = imapM (fn vname) bndrs
+        where fn vn i b = stab ("var " ++ funString2String b ++ " = ((CON)" ++ vn ++ ").Vals[" ++ show i ++ "];\n")
+altToPatternMatch bndrs vname (PrimAlt _) = return [] -- PrimAlt: scrutinee IS the unboxed value, no destructuring
+altToPatternMatch bndrs vname (MultiValAlt _) = imapM (fn vname) bndrs
+        where fn vn i b = stab ("var " ++ funString2String b ++ " = ((UNBOXED_TUPLE)" ++ vn ++ ").Fields[" ++ show i ++ "];\n")
+altToPatternMatch bndrs vname _ = imapM (fn vname) bndrs
+        where fn vn i b = stab ("var " ++ funString2String b ++ " = ((CON)" ++ vn ++ ").Vals[" ++ show i ++ "];\n")
+
+-- | Specialized pattern match for prim boxing constructors (I#, C#, etc.)
+-- The scrutinee is already a CONPRIM<T> (a CLOSURE), so we just alias it.
+-- PRIMOPs will unbox via .Val themselves. This avoids type mismatches.
+altToPatternMatchPrimBox :: [String] -> String -> String -> SM [String]
+altToPatternMatchPrimBox [b] vname _csType =
+    sequence [stab ("var " ++ funString2String b ++ " = " ++ vname ++ ";\n")]
+altToPatternMatchPrimBox bndrs vname _ = altToPatternMatch bndrs vname (AlgAlt undefined) -- fallback
+
+-- | Pattern match that checks for prim boxing constructors first
+altToPatternMatchCon :: [String] -> String -> AltType -> AltCon -> SM [String]
+altToPatternMatchCon bndrs vname altType (DataAlt dc) =
+    case primBoxType (showGhc dc) of
+        Just csType -> altToPatternMatchPrimBox bndrs vname csType
+        Nothing     -> altToPatternMatch bndrs vname altType
+altToPatternMatchCon bndrs vname altType _ = altToPatternMatch bndrs vname altType
 
 -- | Generate C# switch cases from a list of case alternatives
-altsToCSharp :: String -> [(AltCon, [String], DotNetExpr)] -> SM String
-altsToCSharp n alts = foldM (altToCSharp n) "" alts
+-- `n` is the raw scrutinee name (from showGhc), sanitized here.
+altsToCSharp :: String -> [(AltCon, [String], DotNetExpr)] -> AltType -> SM String
+altsToCSharp n alts altType = foldM (altToCSharp (funString2String n) altType) "" alts
 
 -- | Generate a single C# switch case from a case alternative
-altToCSharp :: String -> String -> (AltCon, [String], DotNetExpr) -> SM String
-altToCSharp n acc (altCon, bndrs, ex) = do
-    s1 <- stab (altConToCSharp altCon bndrs ++ ":\n")
+-- `n` is already sanitized by altsToCSharp.
+altToCSharp :: String -> AltType -> String -> (AltCon, [String], DotNetExpr) -> SM String
+altToCSharp n altType acc (altCon, bndrs, ex) = do
+    s1 <- stab (altConToCSharp altCon bndrs altType ++ ":\n")
     incTab
     exprRes <- if (isACaseOrLet ex) then
         do toCSharp ex >>= stab
       else do toCSharp ex >>= \x -> stab ("return " ++ x ++ ";")
     let s2 = (exprRes ++ "\n")
-    s3 <- altToPatternMatch bndrs n >>= pure . (foldl (++) "")
+    s3 <- altToPatternMatchCon bndrs n altType altCon >>= pure . (foldl (++) "")
     decTab
     return (acc ++ s1 ++ s3 ++ s2)
 
 -- | Convert an AltCon to a C# case label
-altConToCSharp :: AltCon -> [String] -> String
-altConToCSharp (LitAlt lit) _ = "case " ++ showGhc lit
-altConToCSharp (DataAlt dc) bndrs = "case /* " ++ showGhc dc ++ show bndrs ++ " */ " ++ show (dataConTag dc)
+altConToCSharp :: AltCon -> [String] -> AltType -> String
+altConToCSharp (LitAlt lit) _ (PrimAlt _) = "case " ++ lit2CSharpRaw lit
+altConToCSharp (LitAlt lit) _ _ = "case " ++ showGhc lit
+altConToCSharp (DataAlt dc) bndrs _ = "case /* " ++ showGhc dc ++ show bndrs ++ " */ " ++ show (dataConTag dc)
+
+-- | Convert a literal to a raw C# value (no CONPRIM wrapping) for use in case labels
+lit2CSharpRaw :: Literal -> String
+lit2CSharpRaw (LitNumber LitNumInt n) = show n
+lit2CSharpRaw (LitNumber LitNumInt64 n) = show n ++ "L"
+lit2CSharpRaw (LitNumber LitNumWord n) = show n ++ "u"
+lit2CSharpRaw (LitNumber LitNumWord64 n) = show n ++ "UL"
+lit2CSharpRaw (LitChar c) = "'" ++ [c] ++ "'"
+lit2CSharpRaw l = showGhc l
 
 -- | Convert an AltCon to a C# comment for documentation
 altConToComment :: AltCon -> [String] -> String
 altConToComment (DataAlt dc) bndrs = "/* " ++ showGhc dc ++ show bndrs ++ " */ "
 altConToComment (LitAlt lit) _ = "/* " ++ showGhc lit ++ " */"
+
+-- | Map known foreign calls to C# code generators
+knownForeignCall :: String -> Maybe (String -> String)
+knownForeignCall "hs_free_stable_ptr" = Just $ \_ -> "/* hs_free_stable_ptr: no-op */ null"
+knownForeignCall "hs_free_fun_ptr"    = Just $ \_ -> "/* hs_free_fun_ptr: no-op */ null"
+knownForeignCall n
+    | "unpackCString" `isInfixOf` n = Just $ \s -> "PRIMOPS.unpackCStringHash" ++ s
+    | otherwise = Nothing
+
+-- | Escape a string for C# string literal
+escapeCSharpString :: String -> String
+escapeCSharpString [] = []
+escapeCSharpString ('\\':cs) = '\\' : '\\' : escapeCSharpString cs
+escapeCSharpString ('"':cs) = '\\' : '"' : escapeCSharpString cs
+escapeCSharpString ('\n':cs) = '\\' : 'n' : escapeCSharpString cs
+escapeCSharpString ('\r':cs) = '\\' : 'r' : escapeCSharpString cs
+escapeCSharpString ('\t':cs) = '\\' : 't' : escapeCSharpString cs
+escapeCSharpString ('\0':cs) = '\\' : '0' : escapeCSharpString cs
+escapeCSharpString (c:cs) = c : escapeCSharpString cs
+
+-- | Generate code for a primitive boxing constructor (I#, C#, etc.)
+-- If the single arg is a literal, wrap in new CONPRIM<T>(rawValue).
+-- If the single arg is a variable, it's already a CONPRIM<T> CLOSURE — just pass through.
+primBoxArg :: String -> [StgArg] -> SM String
+primBoxArg csType [StgLitArg lit] = pure ("new CONPRIM<" ++ csType ++ ">(" ++ lit2CSharpRaw lit ++ ")")
+primBoxArg _csType [StgVarArg x] = lookupFreeVar (showGhc x) -- already a CONPRIM, just use it
+primBoxArg csType args = do
+    -- Fallback for unexpected multi-arg case
+    s <- primArgs2CSharpLookup args
+    pure ("new CONPRIM<" ++ csType ++ ">(" ++ s ++ ")")
+
+-- | Check if a constructor name is a known primitive boxing constructor.
+-- Returns the C# type if so.
+primBoxType :: String -> Maybe String
+primBoxType "I#" = Just "int"
+primBoxType "C#" = Just "char"
+primBoxType "D#" = Just "double"
+primBoxType "F#" = Just "float"
+primBoxType "W#" = Just "uint"
+primBoxType _    = Nothing
 
 -- MAIN FUNCTION: compiles STG program to C# program
 stgToText :: [CgStgTopBinding] -> TextProgram
@@ -256,10 +425,28 @@ funChar2String ']' = "_"
 funChar2String '\'' = "P"
 funChar2String c = [c]
 
--- | Convert a string with illegal C# characters to a valid C# identifier
+-- | Convert a string with illegal C# characters to a valid C# identifier.
+-- Also escapes C# reserved keywords with @-prefix.
 funString2String :: String -> String
-funString2String s = foldl fn "" s
+funString2String s = escapeCSharpKeyword $ foldl fn "" s
         where fn acc c = acc ++ funChar2String c
+
+-- | C# reserved keywords that need @-prefix when used as identifiers
+csharpKeywords :: [String]
+csharpKeywords = ["abstract","as","base","bool","break","byte","case","catch","char",
+    "checked","class","const","continue","decimal","default","delegate","do","double",
+    "else","enum","event","explicit","extern","false","finally","fixed","float","for",
+    "foreach","goto","if","implicit","in","int","interface","internal","is","lock",
+    "long","namespace","new","null","object","operator","out","override","params",
+    "private","protected","public","readonly","ref","return","sbyte","sealed","short",
+    "sizeof","stackalloc","static","string","struct","switch","this","throw","true",
+    "try","typeof","uint","ulong","unchecked","unsafe","ushort","using","virtual",
+    "void","volatile","while"]
+
+escapeCSharpKeyword :: String -> String
+escapeCSharpKeyword s
+    | s `elem` csharpKeywords = "@" ++ s
+    | otherwise = s
 
 -- Type-aware literal conversion: wraps GHC literals in appropriate CONPRIM<T>
 lit2CSharp :: Literal -> String
@@ -270,6 +457,6 @@ lit2CSharp (LitNumber LitNumWord n) = "new CONPRIM<uint>(" ++ show n ++ "u)"
 lit2CSharp (LitNumber LitNumWord64 n) = "new CONPRIM<ulong>(" ++ show n ++ "UL)"
 lit2CSharp (LitFloat r) = "new CONPRIM<float>(" ++ show (fromRational r :: Double) ++ "f)"
 lit2CSharp (LitDouble r) = "new CONPRIM<double>(" ++ show (fromRational r :: Double) ++ "d)"
-lit2CSharp (LitString bs) = "PRIMOPS.unpackCStringHash(\"" ++ show bs ++ "\")"
+lit2CSharp (LitString bs) = "PRIMOPS.unpackCStringHash(\"" ++ escapeCSharpString (BS.unpack bs) ++ "\")"
 lit2CSharp (LitNullAddr) = "null"
 lit2CSharp l = "/* unknown literal: " ++ showGhc l ++ " */ null"

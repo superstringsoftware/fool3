@@ -20,12 +20,9 @@ import GHC.Types.Literal
 
 import GHC.Core
 import GHC.Stg.Syntax
-import GHC.Core.TyCon
-
 import GHC.Types.Var
-import GHC.Types.Id.Info (idDetails)
+import GHC.Types.Id.Info
 
-import GHC.Core.TyCo.Rep -- Type data type
 import GHC.Core.DataCon
 
 import GHC.Builtin.PrimOps
@@ -33,9 +30,11 @@ import GHC.Types.ForeignCall
 
 import GHC.Types.Var.Set (dVarSetElems)
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS
+import Data.List (isPrefixOf)
+
 import Control.Monad.State
-import Data.List.Index (imapM, ifind)
-import Data.Foldable (foldlM)
 
 -- FIRST, SOME GHC HELPERS
 showGhc :: (Outputable a) => a -> String
@@ -131,18 +130,18 @@ stab s = do
 -- Now for the interesting part, conversion from STG into internal codegen rep
 ------------------------------------------------------------------------------------------------
 -- Filtering out some bindings / rhs we don't want:
--- Top level literals - don't look like we need them in the compilation now
-isTopLevelLiteral :: CgStgTopBinding -> Bool
-isTopLevelLiteral (StgTopStringLit _ _) = True
-isTopLevelLiteral _ = False
--- top level constructor applications to what looks like some helpful type / kind manipulation stuff which
--- we also probably don't need, at least initially
+-- GHC internal bindings (type representations, module info) — all have $-prefixed names
+isInternalBinding :: CgStgTopBinding -> Bool
+isInternalBinding (StgTopLifted (StgNonRec bndr _)) = isPrefixOf "$" (showGhc bndr)
+isInternalBinding (StgTopLifted (StgRec ((bndr,_):_))) = isPrefixOf "$" (showGhc bndr)
+isInternalBinding _ = False
+-- top level constructor applications to type/kind metadata
 isHelperConApp :: CgStgTopBinding -> Bool
 isHelperConApp (StgTopLifted (StgNonRec bndr _)) = elem (showVarType bndr) helperCons
-    where helperCons = ["KindRep", "TrName", "TyCon"]
+    where helperCons = ["KindRep", "TrName", "TyCon", "Module", "[KindRep]"]
 isHelperConApp _ = False
 -- all filters combined
-allStgTopBindingFilters b = (isTopLevelLiteral b) || (isHelperConApp b)
+allStgTopBindingFilters b = isInternalBinding b || isHelperConApp b
 
 -- We are stripping going down the GenStgTopBinding --> GenStgBinding hierarchy,
 -- then killing the difference between REC and NONREC (may need it in the future, but not now???)
@@ -156,6 +155,7 @@ simplifyStgToBare (x:xs) = if (allStgTopBindingFilters x)
 
 convertTopBinding :: CgStgTopBinding -> BareStgProgram
 convertTopBinding (StgTopLifted x) = convertStgBinding x
+convertTopBinding (StgTopStringLit _ _) = [] -- handled separately in simplifyStgToBare
 
 -- need this separately as this is used in let expressions!
 convertStgBinding :: CgStgBinding -> BareStgProgram
@@ -164,13 +164,11 @@ convertStgBinding (StgRec ls) = ls
 
 -- we want to store all op applications together,
 -- thus adding some tags to process StgOpApp below
-type IdName = (String, Maybe Type)
+type IdName = String
 type Args = [Var]
 
-var2IdName v = (showGhc v ++ extractVarDetails v, Just $ varType v)
-
-extractVarDetails :: Var -> String
-extractVarDetails v = showGhc (idDetails v)
+var2IdName :: Var -> IdName
+var2IdName v = showGhc v
 
 -- Types for handling code generation later on
 -- Heap objects, loosely following standard STG operational semantics
@@ -184,6 +182,8 @@ data DotNetObj =
     | ONCE  { name :: IdName, freeVars :: Args, args :: Args, code :: DotNetExpr}
      -- constructor application, always saturated
     | CON   { name :: IdName, conName :: String, conTag :: Int, conArgs :: [StgArg]}
+    -- top-level string literal binding
+    | STRINGLIT { name :: IdName, strBytes :: ByteString }
 
 -- following BareStgProgram
 type DotNetProgram = [DotNetObj]
@@ -206,6 +206,7 @@ stgProgram2DotNetProgram p = map stgBinding2DotNet p
 
 -- Expression representation
 data DotNetExpr = RAWSTG CgStgExpr -- non implemented conversion yet
+    | UNBOXED_TUPLE [StgArg] -- unboxed tuple (# a, b, ... #)
     | VAR IdName -- lone Var not being applied to anything, corresponds to App Var [] in Stg
     | LITERAL Literal
     -- various calls
@@ -244,13 +245,16 @@ isACaseOrLet e = (isACase e) || (isALet e)
 stgExpr2DotNetExpr :: CgStgExpr -> DotNetExpr
 stgExpr2DotNetExpr (StgLit lit) = LITERAL lit
 stgExpr2DotNetExpr (StgApp occ []) = VAR (var2IdName occ)
-stgExpr2DotNetExpr (StgApp occ args) = FUNCALL (var2IdName occ) args -- no PAP analysis now!
+stgExpr2DotNetExpr (StgApp occ args) = FUNCALL (var2IdName occ) args
+-- unboxed tuple constructor application
+stgExpr2DotNetExpr (StgConApp dcon _cn args _tps)
+    | isUnboxedTupleDataCon dcon = UNBOXED_TUPLE args
 -- constructor application (gained ConstructorNumber in 9.6)
-stgExpr2DotNetExpr (StgConApp dcon _cn args _tps) = CONCALL (showGhc dcon, Nothing) (dataConTag dcon) args
+stgExpr2DotNetExpr (StgConApp dcon _cn args _tps) = CONCALL (showGhc dcon) (dataConTag dcon) args
 -- primops and foreign calls
-stgExpr2DotNetExpr (StgOpApp (StgPrimOp pop) args _tp) = PRIMOP (showGhc pop, Nothing) args
-stgExpr2DotNetExpr (StgOpApp (StgPrimCallOp pop) args _tp) = PRIMCALL (showGhc pop, Nothing) args
-stgExpr2DotNetExpr (StgOpApp (StgFCallOp pop _) args _tp) = FOREIGNCALL (showGhc pop, Nothing) args
+stgExpr2DotNetExpr (StgOpApp (StgPrimOp pop) args _tp) = PRIMOP (showGhc pop) args
+stgExpr2DotNetExpr (StgOpApp (StgPrimCallOp pop) args _tp) = PRIMCALL (showGhc pop) args
+stgExpr2DotNetExpr (StgOpApp (StgFCallOp pop _) args _tp) = FOREIGNCALL (showGhc pop) args
 -- let bindings (gained extension field in 9.6)
 stgExpr2DotNetExpr (StgLet _ext (StgNonRec bndr rhs) expr) = LET (stgBinding2DotNet (bndr,rhs)) (stgExpr2DotNetExpr expr)
 stgExpr2DotNetExpr (StgLet _ext (StgRec ls) expr) = LETREC (stgProgram2DotNetProgram ls) (stgExpr2DotNetExpr expr)
@@ -271,12 +275,22 @@ stgExpr2DotNetExpr (StgCase ex bndr altType alts) =
           convertAlts [] = []
           convertAlts (GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=ex}:xs) =
               (con, map showGhc bndrs, stgExpr2DotNetExpr ex):(convertAlts xs)
+-- Strip profiling/source location ticks — just recurse into the inner expression
+stgExpr2DotNetExpr (StgTick _ expr) = stgExpr2DotNetExpr expr
 stgExpr2DotNetExpr e = RAWSTG e
 
 
 
+-- | Extract top-level string literals as STRINGLIT objects (skip $-prefixed internal ones)
+extractStringLits :: [CgStgTopBinding] -> [DotNetObj]
+extractStringLits [] = []
+extractStringLits (StgTopStringLit v bs : xs)
+    | isPrefixOf "$" (showGhc v) = extractStringLits xs
+    | otherwise = STRINGLIT (var2IdName v) bs : extractStringLits xs
+extractStringLits (_ : xs) = extractStringLits xs
+
 stg2DotNet :: [CgStgTopBinding] -> DotNetProgram
-stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
+stg2DotNet stg = extractStringLits stg ++ (stgProgram2DotNetProgram . simplifyStgToBare) stg
 
 
 
@@ -285,12 +299,13 @@ stg2DotNet = stgProgram2DotNetProgram . simplifyStgToBare
 -- simple show instances converting to text - LEGACY
 --------------------------------------------------------
 instance Show DotNetObj where
-    show (CON v n tag ar) = fst v ++ " = new CON(" ++ show tag ++ ", " ++ showGhc ar ++ ")\n"
+    show (STRINGLIT v bs) = v ++ " = \"" ++ BS.unpack bs ++ "\"\n"
+    show (CON v n tag ar) = v ++ " = new CON(" ++ show tag ++ ", " ++ showGhc ar ++ ")\n"
     show e@(FUN _ _ _ _) = _s e "FUN"
     show e@(ONCE _ _ _ _) = _s e "THUNK_ONCE"
     show e@(THUNK _ _ _ _) = _s e "THUNK"
 -- helper function
-_s o con = (fst $ name o) ++ " = new "
+_s o con = name o ++ " = new "
             ++ con ++ "("
             ++ showGhc (freeVars o) ++ ", "
             ++ "(" ++ showGhc (args o) ++ ")=> {\n"
@@ -298,14 +313,15 @@ _s o con = (fst $ name o) ++ " = new "
 
 instance Show DotNetExpr where
     show (RAWSTG e) = "[NOT IMPLEMENTED] " ++ "(" ++ showGhc e ++ ")\n"
-    show (VAR v) = fst v
+    show (VAR v) = v
     show (LITERAL l) = showGhc l
-    show (FUNCALL (n,_) args) = n ++ ".CALL" ++ showGhc args ++ "\n"
-    show (PAPCALL (n,_) args) = "[PAP]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
-    show (CONCALL (n,_) tag args) = "new CON(" ++ show tag ++ ", " ++ showGhc args ++ ")\n"
-    show (PRIMOP (n,_) args) = "[PRIMOP]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
-    show (PRIMCALL (n,_) args) = "[PRIMCALL]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
-    show (FOREIGNCALL (n,_) args) = "[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (FUNCALL n args) = n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (PAPCALL n args) = "[PAP]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (CONCALL n tag args) = "new CON(" ++ show tag ++ ", " ++ showGhc args ++ ")\n"
+    show (PRIMOP n args) = "[PRIMOP]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (PRIMCALL n args) = "[PRIMCALL]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (FOREIGNCALL n args) = "[FOREIGN]" ++ n ++ ".CALL" ++ showGhc args ++ "\n"
+    show (UNBOXED_TUPLE args) = "(# " ++ showGhc args ++ " #)"
     show (LET o e@(LET _ _)) = show o ++ show e
     show (LET o e) = show o ++ "return " ++ show e ++ "\n"
     show (LETREC p e) = "[REC]" ++ show p ++ "return " ++ show e ++ "\n"

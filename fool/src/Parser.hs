@@ -93,6 +93,47 @@ pStructure = do
     exs <- braces (sepBy (try pSumType <|> try pFunc <|> pAction ) (reservedOp ",") )
     return $ Structure (str{body = Tuple exs}) []
 
+-- RECORDS ----------------------------------------------------------
+-- record Point = { x:Nat, y:Nat };
+-- record Pair(a:Type, b:Type) = { fst:a, snd:b };
+-- Desugars to single-constructor sum type
+pRecord :: Parser Expr
+pRecord = do
+    reserved "record"
+    recName <- uIdentifier
+    tparams <- try pVars <|> pure []
+    reservedOp "="
+    fields <- braces (sepBy1 pRecordField (reservedOp ","))
+    -- Desugar: record Foo = { x:A, y:B }  =>  type Foo = { Foo(x:A, y:B) }
+    -- Spread fields (..Name) are stored as Var "..Name" UNDEFINED UNDEFINED
+    -- and resolved in Pass 1 when the environment is available
+    let vars = map (\(nm, tp) -> Var nm tp UNDEFINED) fields
+    let consLam = Lambda recName vars UNDEFINED (Id recName)
+    let lam = Lambda {
+       lamName = recName
+     , params = tparams
+     , body = Constructors [consLam]
+     , lamType = Type
+    }
+    return $ SumType lam
+
+pRecordField :: Parser (Name, Expr)
+pRecordField =
+    try pSpreadField <|> pNormalField
+
+pSpreadField :: Parser (Name, Expr)
+pSpreadField = do
+    reservedOp ".."
+    nm <- uIdentifier
+    return (".." ++ nm, UNDEFINED)  -- marker: name starts with ".."
+
+pNormalField :: Parser (Name, Expr)
+pNormalField = do
+    nm <- identifier
+    reservedOp ":"
+    tp <- concreteType
+    return (nm, tp)
+
 -- INSTANCES ---------------------------------------------------------
 pInstance :: Parser Expr
 pInstance = do
@@ -254,15 +295,43 @@ pContainers =
 pExpr :: Parser Expr
 pExpr = Ex.buildExpressionParser (binops ++ [[unop],[binop]] ++ [[binary "==" Ex.AssocLeft]] ) pFactor
 
+pIfThenElse :: Parser Expr
+pIfThenElse = do
+    reserved "if"
+    cond <- pExpr
+    reserved "then"
+    e1 <- pExpr
+    reserved "else"
+    e2 <- pExpr
+    return $ IfThenElse cond e1 e2
+
+pLetIn :: Parser Expr
+pLetIn = do
+    reserved "let"
+    bindings <- sepBy1 pLetBinding (reservedOp ",")
+    reserved "in"
+    bdy <- pExpr
+    return $ LetIn bindings bdy
+
+pLetBinding :: Parser (Var, Expr)
+pLetBinding = do
+    nm <- identifier
+    tp <- typeSignature
+    reservedOp "="
+    val <- pExpr
+    return (Var nm tp UNDEFINED, val)
+
 pFactor :: Parser Expr
-pFactor = try pApp
+pFactor = try pIfThenElse
+    <|> try pLetIn
+    <|> try pApp
     <|> try (parens pExpr)
     <|> try symbolId
     <|> try (Lit <$> floating)
     <|> try (Lit <$> int)
     <|> try (Lit <$> stringVal)
     <|> pContainers
-    <?> "container, literal, symbol id or parenthesized expression"
+    <?> "if/then/else, let/in, container, literal, symbol id or parenthesized expression"
 
 symbolId :: Parser Expr
 symbolId = do 
@@ -279,6 +348,7 @@ pApp = do
 -- Building top level parsers
 pDef :: Parser Expr
 pDef =  try pSumType
+        <|> try pRecord
         <|> try pStructure
         <|> try pInstance
         <|> try pFunc

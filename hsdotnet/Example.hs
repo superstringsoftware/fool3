@@ -31,3 +31,11 @@ letTest :: Int -> Int
 letTest n = let x = add n (I# 2#)
                 y = add n n
             in add x y
+
+-- Test: case on primitive (PrimAlt) — double an Int by unboxing
+double :: Int -> Int
+double (I# x) = I# (x +# x)
+
+-- Test: Bool via tagToEnum#
+isZero :: Int -> Bool
+isZero (I# x) = tagToEnum# (x ==# 0#)

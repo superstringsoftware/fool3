@@ -98,6 +98,8 @@ data Expr =
   -- that result e.g. from structure (typeclass) expansions -
   -- only used in the TYPE place!!!
   | Instance Name [Expr] [Expr] -- Instance structureName [typeArgs] [function implementations]
+  | IfThenElse Expr Expr Expr -- if cond then e1 else e2 (desugared in afterparse)
+  | LetIn [(Var, Expr)] Expr -- let x = e1, y = e2 in body (desugared in afterparse)
   | ERROR String
 
   
@@ -152,6 +154,8 @@ traverseExpr f (Constructors lams) = Constructors $ map (\l-> l {body = f $ trav
 traverseExpr f (Binding (Var nm tp val)) = Binding (Var nm (f $ traverseExpr f tp) (f $ traverseExpr f val))
 traverseExpr _ e@(U _) = e
 traverseExpr f (Instance nm targs impls) = Instance nm (map (traverseExpr f) targs) (map (traverseExpr f) impls)
+traverseExpr f (IfThenElse c t e) = IfThenElse (f $ traverseExpr f c) (f $ traverseExpr f t) (f $ traverseExpr f e)
+traverseExpr f (LetIn binds body) = LetIn (map (\(v,ex) -> (v, f $ traverseExpr f ex)) binds) (f $ traverseExpr f body)
 traverseExpr f e = ERROR $ "Traverse not implemented for: " ++ ppr e
 
 -- App (Id "Succ") [App (Id "plus") [Id "n",Id "x"]]
@@ -231,6 +235,8 @@ instance PrettyPrint Expr where
   ppr (Instance nm targs impls) = (as [bold,green] "instance ") ++ nm
     ++ showListRoBr ppr targs ++ " = "
     ++ showListCuBr ppr impls
+  ppr (IfThenElse c t e) = "if " ++ ppr c ++ " then " ++ ppr t ++ " else " ++ ppr e
+  ppr (LetIn binds body) = "let " ++ showListPlainSep (\(v,ex) -> ppr v ++ " = " ++ ppr ex) ", " binds ++ " in " ++ ppr body
   ppr (Implicit e) = "Implicit (" ++ ppr e ++ ")"
   ppr (U 0) = "Type"
   ppr (U n) = "Type" ++ show n

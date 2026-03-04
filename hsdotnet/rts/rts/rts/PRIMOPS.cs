@@ -30,12 +30,18 @@ namespace SuperstringSolutions.HSNet.STG
 
         public static CLOSURE quotIntHash(CLOSURE a, CLOSURE b)
         {
-            return new CONPRIM<int>(((CONPRIM<int>)a.ENTER).Val / ((CONPRIM<int>)b.ENTER).Val);
+            int divisor = ((CONPRIM<int>)b.ENTER).Val;
+            if (divisor == 0)
+                throw new Exception("quotInt#: division by zero");
+            return new CONPRIM<int>(((CONPRIM<int>)a.ENTER).Val / divisor);
         }
 
         public static CLOSURE remIntHash(CLOSURE a, CLOSURE b)
         {
-            return new CONPRIM<int>(((CONPRIM<int>)a.ENTER).Val % ((CONPRIM<int>)b.ENTER).Val);
+            int divisor = ((CONPRIM<int>)b.ENTER).Val;
+            if (divisor == 0)
+                throw new Exception("remInt#: division by zero");
+            return new CONPRIM<int>(((CONPRIM<int>)a.ENTER).Val % divisor);
         }
 
         public static CLOSURE negateIntHash(CLOSURE a)
@@ -115,8 +121,8 @@ namespace SuperstringSolutions.HSNet.STG
         public static CLOSURE tagToEnumHash(CLOSURE a)
         {
             int tag = ((CONPRIM<int>)a.ENTER).Val;
-            // GHC tags: False=0, True=1 → CON tags are 1-indexed
-            return new CON(tag + 1, new CLOSURE[0]);
+            // GHC tags are 0-based, our CON tags are 1-based
+            return new CON(tag + 1, CLOSURE.EMPTY);
         }
 
         // ============================================================
@@ -155,14 +161,32 @@ namespace SuperstringSolutions.HSNet.STG
                 Console.Write(ch.Val);
                 current = con.Vals[1].ENTER;
             }
-            return new CON(1, new CLOSURE[0]); // () unit
+            return new CON(1, CLOSURE.EMPTY); // () unit
         }
 
         public static CLOSURE putStrLnHash(CLOSURE s)
         {
             putStrHash(s);
             Console.WriteLine();
-            return new CON(1, new CLOSURE[0]); // () unit
+            return new CON(1, CLOSURE.EMPTY); // () unit
+        }
+
+        // ============================================================
+        // IO-aware primops (receive State# token, return unboxed tuple)
+        // ============================================================
+
+        // putStr# with IO threading: State# -> (# State#, () #)
+        public static CLOSURE putStrHash_IO(CLOSURE s, CLOSURE state)
+        {
+            putStrHash(s);
+            return new UNBOXED_TUPLE(new CLOSURE[] { STATE_TOKEN.Instance, new CON(1, CLOSURE.EMPTY) });
+        }
+
+        // putStrLn# with IO threading
+        public static CLOSURE putStrLnHash_IO(CLOSURE s, CLOSURE state)
+        {
+            putStrLnHash(s);
+            return new UNBOXED_TUPLE(new CLOSURE[] { STATE_TOKEN.Instance, new CON(1, CLOSURE.EMPTY) });
         }
 
         // ============================================================

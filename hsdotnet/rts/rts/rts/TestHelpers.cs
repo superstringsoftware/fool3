@@ -42,7 +42,7 @@ namespace SuperstringSolutions.HSNet.STG
         public static CLOSURE showIO_code(CLOSURE[] args)
         {
             Console.WriteLine(args[0].ENTER.ToString());
-            return null;
+            return new CON(1, CLOSURE.EMPTY); // () unit
         }
 
         public static FUN generate = new FUN(generate_code, 1);

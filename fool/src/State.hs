@@ -128,6 +128,9 @@ lookupLambda n env = Map.lookup n (topLambdas env)
 lookupConstructor :: Name -> Environment -> Maybe (Lambda, Int)
 lookupConstructor n env = Map.lookup n (constructors env)
 
+lookupType :: Name -> Environment -> Maybe Expr
+lookupType n env = Map.lookup n (types env)
+
 addLambda :: Name -> Lambda -> Environment -> Environment
 addLambda n l env = env { topLambdas = Map.insert n l (topLambdas env) }
 

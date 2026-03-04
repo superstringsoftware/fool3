@@ -25,6 +25,7 @@ dependencies:
 - ghc
 - ghc-paths
 - ilist
+- bytestring
 
 library:
   source-dirs: src

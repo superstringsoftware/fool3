@@ -49,8 +49,41 @@ runExprPassAndReverse f l = rev f l []
 afterparse :: Expr -> Expr
 afterparse (BinaryOp n e1 e2) = App (Id n) ( e1:e2:[])
 afterparse (UnaryOp n e) = App (Id n) ( e:[])
+-- if/then/else desugars to a 1-arg lambda with expanded pattern match on Bool
+-- We use a fresh variable name "__cond" and produce ExpandedCase directly
+-- so it doesn't need to go through caseOptimizationPass
+afterparse (IfThenElse cond thenE elseE) =
+    App (Function (Lambda "" [Var "__cond" (Id "Bool") UNDEFINED]
+        (PatternMatches
+            [ ExpandedCase [ExprConsTagCheck (ConsTag "True" 0) (Id "__cond")]  thenE SourceInteractive
+            , ExpandedCase [ExprConsTagCheck (ConsTag "False" 1) (Id "__cond")] elseE SourceInteractive
+            ]) UNDEFINED)) [cond]
+-- let/in desugars to nested lambda application
+afterparse (LetIn [(v, val)] bdy) =
+    App (Function (Lambda "" [v] bdy UNDEFINED)) [val]
+afterparse (LetIn ((v,val):rest) bdy) =
+    App (Function (Lambda "" [v] (afterparse (LetIn rest bdy)) UNDEFINED)) [val]
 afterparse e = e
 
+
+-- Resolve spread fields (..Name) in a constructor lambda's params
+-- by looking up the source record/type's constructor fields from the environment
+resolveSpreadFields :: Environment -> Lambda -> Lambda
+resolveSpreadFields env lam@(Lambda nm args ex tp) =
+    let args' = Prelude.concatMap resolveField args
+    in  lam { params = args' }
+    where
+        resolveField v@(Var fieldNm _ _)
+            | Prelude.take 2 fieldNm == ".." =
+                let srcTypeName = Prelude.drop 2 fieldNm
+                in  case lookupType srcTypeName env of
+                        Just (SumType (Lambda _ _ (Constructors cons) _)) ->
+                            -- take fields from the first (or matching) constructor
+                            case cons of
+                                (Lambda _ fields _ _ : _) -> fields
+                                _ -> [v]  -- couldn't resolve, keep marker
+                        _ -> [v]  -- type not found, keep marker
+            | otherwise = [v]
 
 -- Only VarDefinition, Binding and PatternMatch should be seen at the top level
 buildEnvironmentM :: (Expr, SourceInfo) -> IntState ()
@@ -72,11 +105,13 @@ processBinding (Prim lam, si) env = pure $ addLambda (lamName lam) lam env
 -- now extracting constructors from SumTypes, body is guaranteed to be
 -- a list of Lambdas under Constructors constructor
 processBinding ( tp@(SumType lam@(Lambda typName typArgs (Constructors cons) typTyp)), si) env = do
-    let newCons = imap fixCons cons
+    -- resolve any spread fields (..Name) in constructor params
+    let cons' = Prelude.map (resolveSpreadFields env) cons
+    let newCons = imap fixCons cons'
     let newTp = SumType lam { body = Constructors newCons }
     pure $ addManyNamedConstructors 0 newCons (addNamedSumType newTp env)
-    where fixCons i lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED) 
-            then lam 
+    where fixCons i lam@(Lambda nm args ex typ) = if (ex /= UNDEFINED)
+            then lam
             else lam { body = ConTuple (ConsTag nm i) $ Prelude.map (\v -> Id $ name v) args}
 
 -- so, structures (typeclasses) are very interesting.
