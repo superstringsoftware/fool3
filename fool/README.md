@@ -1,7 +1,8 @@
 # FOOL3: Functional Object-oriented low-level language
 
-## Design Documents
+## Documentation
 
+- **[Language Reference](doc/LanguageReference.md)** — Comprehensive end-user guide to FOOL3 syntax and semantics. Covers all implemented features: types, records, functions, pattern matching, structures, instances, if/then/else, let/in, and more.
 - `doc/CategoricalDesign.md` — Categorical type system design: algebras, morphisms, functors, natural transformations, monads, categories, arrows.
 - `doc/ImplementationPlan.md` — 9-phase incremental implementation roadmap from current state to full categorical type system.
 
